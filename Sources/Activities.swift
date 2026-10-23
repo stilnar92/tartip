@@ -81,7 +81,7 @@ struct PendingStart {
     var block: String
     var phases: [Phase]
     var extra: [String]
-    var auto = false   // opened by the 15-min prompt: no Cancel
+    var auto = false   // opened automatically because nothing is running: no Cancel
 }
 
 // Normal closable window (stats, settings).

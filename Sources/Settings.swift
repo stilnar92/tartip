@@ -13,16 +13,9 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
 }
 
 struct AppSettings: Codable, Equatable {
-    // Guard: when idle time is counted and the 15-min prompt can appear.
-    var guardDays = [2, 3, 4, 5, 6]          // Calendar weekdays, 1 = Sunday
-    var guardFromHour = 10
-    var guardToHour = 22
-
     // Free time
     var dailyFreeMinutes = 60
     var maxRestMinutes = 60          // longest single stretch of free time
-    var idleNudgeMinutes = 15
-    var promptCountdownSeconds = 60
 
     // Session length
     var durationOptions = [15, 20, 30, 45, 60]

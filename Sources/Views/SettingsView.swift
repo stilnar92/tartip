@@ -8,8 +8,6 @@ struct SettingsView: View {
     @State private var newActivity = ""
     @State private var optionsText = Settings.shared.v.durationOptions.map(String.init).joined(separator: ", ")
 
-    private let weekdays = [(2, "Mo"), (3, "Tu"), (4, "We"), (5, "Th"), (6, "Fr"), (7, "Sa"), (1, "Su")]
-
     var body: some View {
         ScrollView { content }
             .frame(width: 460, height: 640)
@@ -19,7 +17,6 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 18) {
                 Text("Settings").font(.system(size: 20, weight: .bold, design: .rounded))
                 activitiesSection
-                guardSection
                 nightSection
                 freeTimeSection
                 durationSection
@@ -61,35 +58,6 @@ struct SettingsView: View {
                     .onSubmit(addActivity)
                 Button("Add", action: addActivity)
                     .disabled(newActivity.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-        }
-    }
-
-    private var guardSection: some View {
-        group("Work hours", "On these days and hours, \(settings.v.idleNudgeMinutes) minutes at the computer without a session brings up a window asking what you'll do.") {
-            HStack(spacing: 4) {
-                ForEach(weekdays, id: \.0) { wd, label in
-                    let on = settings.v.guardDays.contains(wd)
-                    Button {
-                        if on { settings.v.guardDays.removeAll { $0 == wd } } else { settings.v.guardDays.append(wd) }
-                    } label: {
-                        Text(label).font(.system(size: 12, weight: on ? .semibold : .regular))
-                            .frame(maxWidth: .infinity).padding(.vertical, 6)
-                            .foregroundStyle(on ? Color.white : Color.primary)
-                            .background(Capsule().fill(on ? AnyShapeStyle(Color.indigo.gradient) : AnyShapeStyle(.quaternary.opacity(0.6))))
-                            .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            row("From") { hourStepper($settings.v.guardFromHour) }
-            row("To") { hourStepper($settings.v.guardToHour) }
-            row("Ask after idle") { minuteStepper($settings.v.idleNudgeMinutes, 5...60, step: 5) }
-            row("Window countdown") {
-                HStack(spacing: 6) {
-                    Text("\(settings.v.promptCountdownSeconds) s").monospacedDigit()
-                    Stepper("", value: $settings.v.promptCountdownSeconds, in: 10...300, step: 10).labelsHidden()
-                }
             }
         }
     }

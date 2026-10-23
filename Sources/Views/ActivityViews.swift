@@ -47,8 +47,8 @@ struct ActivityPickerView: View {
         let auto = m.pendingStart?.auto ?? true
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(auto ? "Time to focus" : "What will you work on?").font(.system(size: 18, weight: .bold, design: .rounded))
-                Text(auto ? "Pick how long and what. Its Cold Turkey block starts right away."
+                Text("What's next?").font(.system(size: 18, weight: .bold, design: .rounded))
+                Text(auto ? "Pick an activity (its block starts right away) or take free time."
                           : (showsDuration ? "Pick how long and what, then it starts" : "Pick one to start · \(m.pendingLabel)"))
                     .font(.system(size: 12)).foregroundStyle(.secondary)
             }
@@ -82,6 +82,9 @@ struct ActivityPickerView: View {
                     }
                 }
             }
+            Divider()
+            FreeTimeRow(m: m)
+
             if !auto {
                 Button("Cancel") { m.cancelPick() }
                     .buttonStyle(.borderless).font(.caption).foregroundStyle(.secondary)

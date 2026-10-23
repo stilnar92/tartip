@@ -109,13 +109,14 @@ struct ContentView: View {
     }
 
     private var guardColor: Color {
-        isNight(m.now) ? .purple : (enforcementActive(m.now) ? .green : .secondary)
+        isNight(m.now) ? .purple : (m.session != nil ? .green : (m.restEnd != nil ? .orange : .secondary))
     }
 
     private var guardText: String {
         if isNight(m.now) { return "Night until \(clockLabel(S.nightTo))" }
-        if enforcementActive(m.now) { return "Work hours until \(String(format: "%02d:00", S.guardToHour))" }
-        return "Off hours"
+        if m.session != nil { return "In a session" }
+        if m.restEnd != nil { return "Free time" }
+        return "Pick what's next"
     }
 
     // Footer: four equal tools, icon above a caption, so nothing wraps.

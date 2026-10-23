@@ -14,12 +14,9 @@ final class Model: ObservableObject {
     @Published var configs: [String: ModeConfig] = [:]
     @Published var oneTimeLink = ""
     @Published var restEnd: Date? = UserDefaults.standard.object(forKey: "restEnd") as? Date
-    @Published var prompt: Prompt?
     @Published var restTaken = UserDefaults.standard.bool(forKey: "restTaken")
     @Published var stats: DayStats = UserDefaults.standard.data(forKey: "stats")
         .flatMap { try? JSONDecoder().decode(DayStats.self, from: $0) } ?? DayStats(day: dayKey(Date()))
-    private var idleSeconds = 0
-    private let promptWindow = PromptWindow()
     @Published var activities: [String] = loadActivities()
     @Published var pendingStart: PendingStart?
     @Published var review: SessionRecord? = UserDefaults.standard.data(forKey: "review")
@@ -150,13 +147,6 @@ final class Model: ObservableObject {
         showPicker()
     }
 
-    // Prompt: start a mode with the duration last chosen in the panel.
-    func startFromPrompt(_ block: String) {
-        dismissPrompt()
-        pendingStart = PendingStart(block: block, phases: chosenPhases(), extra: [])
-        showPicker()
-    }
-
     // MARK: activity: pick before, review after
 
     var pendingLabel: String {
@@ -267,12 +257,10 @@ final class Model: ObservableObject {
 
     func start(block: String, phases: [Phase], extra: [String] = [], autoThinking: Bool = false,
                planned: String? = nil, note: String? = nil) {
-        dismissPrompt()
         restTaken = false
         UserDefaults.standard.set(false, forKey: "restTaken")
         restEnd = nil
         UserDefaults.standard.removeObject(forKey: "restEnd")
-        idleSeconds = 0
 
         let s = Session(block: block, phases: phases, start: Date(), autoThinking: autoThinking, planned: planned, note: note)
         runCT(["-start", s.block, "-lock", String(s.totalMinutes)], keep: Double(s.totalMinutes * 60 + 60))
@@ -310,20 +298,19 @@ final class Model: ObservableObject {
     private func endSession() {
         session = nil
         lastPhase = nil
-        idleSeconds = 0
         UserDefaults.standard.removeObject(forKey: "session")
     }
 
-    // MARK: rest (free time, counted against the daily budget)
+    // MARK: free time (nothing blocked, from the daily budget, only taken on purpose)
 
-    // Rest can't be chosen twice in a row: a mode has to run in between.
+    // Free time can't be taken twice in a row: a session has to run in between.
     var canRest: Bool { freeLeft >= 60 && !restTaken }
 
     func startRest(minutes: Int) {
         guard session == nil, canRest else { return }
         restTaken = true
         UserDefaults.standard.set(true, forKey: "restTaken")
-        dismissPrompt()
+        if pendingStart != nil { cancelPick() }
         let secs = min(min(minutes, S.maxRestMinutes) * 60, freeLeft)   // one stretch is capped (Settings)
         restEnd = Date().addingTimeInterval(Double(secs))
         UserDefaults.standard.set(restEnd, forKey: "restEnd")
@@ -332,39 +319,7 @@ final class Model: ObservableObject {
 
     func endRest() {
         restEnd = nil
-        idleSeconds = 0
         UserDefaults.standard.removeObject(forKey: "restEnd")
-    }
-
-    // MARK: prompt
-
-    private func showPrompt(_ kind: PromptKind) {
-        guard prompt == nil else { return }
-        prompt = Prompt(kind: kind, deadline: Date().addingTimeInterval(promptCountdown))
-        NSSound(named: "Funk")?.play()
-        promptWindow.show(PromptView(m: self))
-        log("prompt \(kind)")
-    }
-
-    func dismissPrompt() {
-        prompt = nil
-        promptWindow.hide()
-    }
-
-    // What the prompt does when the countdown ends (or "Start now").
-    func promptDefault() {
-        guard let p = prompt else { return }
-        _ = p
-        // Nothing is blocked until an activity is picked; then its own block starts.
-        dismissPrompt()
-        pendingStart = PendingStart(block: focusBlock, phases: [Phase(isBreak: false, minutes: defaultMinutes)], extra: [], auto: true)
-        showPicker()
-    }
-
-    var promptDefaultLabel: String {
-        guard let p = prompt else { return "" }
-        _ = p
-        return "pick what to work on"
     }
 
     // MARK: tick
@@ -376,7 +331,6 @@ final class Model: ObservableObject {
     // Night: the night block is locked until morning, once per night; nothing is asked.
     // A session that's already running just finishes.
     private func enterNightIfNeeded() {
-        if prompt != nil { dismissPrompt() }
         if pendingStart?.auto == true { cancelPick() }
         let end = nightEnd(after: now)
         if let applied = UserDefaults.standard.object(forKey: "nightUntil") as? Date, applied >= end { return }
@@ -390,18 +344,16 @@ final class Model: ObservableObject {
     private func tick() {
         now = Date()
         if stats.day != dayKey(now) { stats = DayStats(day: dayKey(now)) }
-        let enforce = enforcementActive(now)
         defer { if Int(now.timeIntervalSince1970) % 10 == 0 { saveStats() } }
 
-        if isNight(now) { enterNightIfNeeded() }
-        if let p = prompt, now >= p.deadline { promptDefault() }
+        let night = isNight(now)
+        if night { enterNightIfNeeded() }
 
         if let s = session {
             guard let cur = s.current(at: now) else {
                 log("done  \(s.block) (app)")
                 runCT(["-stop", s.block])
                 endSession()
-                // After auto Thinking nothing else is forced; the 15-min idle clock starts again.
                 notify("Focus: \(s.block)", "Session done 🎉")
                 beginReview(s)
                 return
@@ -422,16 +374,17 @@ final class Model: ObservableObject {
                 return
             }
             endRest()
-            if enforce { showPrompt(.restOver) } else { notify("Rest is over", "Pick a mode when you're ready.") }
+            notify("Free time is over", "Pick what's next.")
             return
         }
 
-        // Idle: no mode, no rest.
-        // Answering a question isn't idle time.
-        guard enforce, prompt == nil, review == nil, pendingStart == nil, userPresent() else { return }
-        // Idle time doesn't use up free time; free time is only taken on purpose.
-        idleSeconds += 1
-        if idleSeconds >= idleNudgeSeconds { showPrompt(.idle) }
+        // Nothing running and it's not night: you always decide what's next, right away.
+        // The picker can't be closed; nothing is blocked until you pick.
+        guard !night, review == nil, pendingStart == nil, userPresent() else { return }
+        pendingStart = PendingStart(block: focusBlock, phases: [Phase(isBreak: false, minutes: defaultMinutes)], extra: [], auto: true)
+        NSSound(named: "Funk")?.play()
+        log("ask   what's next")
+        showPicker()
     }
 
     // MARK: display

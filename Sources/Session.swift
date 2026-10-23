@@ -11,7 +11,7 @@ struct Session: Codable {
     var block: String
     var phases: [Phase]
     var start: Date
-    var autoThinking: Bool? = nil   // started by the prompt
+    var autoThinking: Bool? = nil   // legacy flag from older saved sessions
     var planned: String? = nil      // activity picked before (or right after) the start
     var note: String? = nil         // free text when the activity is "Other"
     var pickedAt: Date? = nil       // auto-started: stats count from the pick, not the start
