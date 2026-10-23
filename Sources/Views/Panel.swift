@@ -119,10 +119,6 @@ struct ContentView: View {
             tool("chart.bar", "Stats") { NSApp.keyWindow?.close(); m.openMain(.stats) }
             tool("list.bullet", "Activities") { NSApp.keyWindow?.close(); m.openMain(.activities) }
             tool("gearshape", "Rules") { NSApp.keyWindow?.close(); m.openMain(.rules) }
-            tool("arrow.up.forward.app", "CT") {
-                NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Cold Turkey Blocker.app"))
-            }
-            .help("Open Cold Turkey")
         }
         .padding(4)
         .background(Capsule().fill(Theme.card).shadow(color: .black.opacity(0.08), radius: 8, y: 2))
