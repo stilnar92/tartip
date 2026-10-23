@@ -40,7 +40,7 @@ struct ContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            header
+            if m.session == nil { header }
             if let r = m.restEnd {
                 freeTimeCard(r)
             } else if let s = m.session, let cur = s.current(at: m.now) {
@@ -138,7 +138,8 @@ struct ContentView: View {
 
     // MARK: session
 
-    // The running session as one card: what, how long, which round, until when it's blocked.
+    // During a session only what matters: what you're doing, the time left (huge),
+    // when it ends, and today's progress on this activity. Stop is a quiet link.
     private func sessionCard(_ s: Session, _ cur: (index: Int, end: Date)) -> some View {
         let p = s.phases[cur.index]
         let name = s.planned ?? s.block.replacingOccurrences(of: "_", with: " ")
@@ -149,78 +150,78 @@ struct ContentView: View {
         let f = DateFormatter(); f.dateFormat = "HH:mm"
         let color = p.isBreak ? Color.green : st.color
 
-        return VStack(alignment: .leading, spacing: 14) {
+        return VStack(spacing: 18) {
+            // What
             HStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous).fill(st.color.opacity(0.14))
-                    Image(systemName: st.icon).font(.system(size: 14, weight: .semibold)).foregroundStyle(st.color)
-                }
-                .frame(width: 32, height: 32)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
-                    // Something useful under the name: the session length and when it started,
-                    // or the Pomodoro round; during a break, what to do.
-                    Text(p.isBreak ? "Break · stand up, drink water"
-                                   : (s.workRounds > 1 ? "Pomodoro · round \(s.round(of: cur.index)) of \(s.workRounds)"
-                                                       : "\(s.totalMinutes) min · started \(f.string(from: s.start))"))
-                        .font(.system(size: 12)).foregroundStyle(Theme.text2)
-                }
-                Spacer()
-                // Only a break gets a tag; while working the name says enough.
-                if p.isBreak { Tag(text: "Break", color: color, fill: color.opacity(0.14)) }
-            }
-
-            Text(m.remaining(cur.end))
-                .font(.system(size: 52, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(Theme.text)
-                .contentTransition(.numericText(countsDown: true))
-                .frame(maxWidth: .infinity)
-
-            GeometryReader { g in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Theme.pill)
-                    Capsule().fill(color).frame(width: g.size.width * progress)
+                Image(systemName: p.isBreak ? "cup.and.saucer.fill" : st.icon)
+                    .font(.system(size: 18, weight: .semibold)).foregroundStyle(color)
+                Text(p.isBreak ? "Break" : name)
+                    .font(.system(size: 22, weight: .bold)).foregroundStyle(Theme.text)
+                if s.workRounds > 1 {
+                    Tag(text: "\(s.round(of: cur.index))/\(s.workRounds)", color: color, fill: color.opacity(0.12))
                 }
             }
-            .frame(height: 6)
-            .animation(.linear(duration: 1), value: progress)
 
-            dailyLine(name)
-
-            HStack {
-                Label("Blocked until \(f.string(from: s.end))", systemImage: "lock.fill")
-                    .font(.system(size: 12)).foregroundStyle(Theme.text2)
-                Spacer()
-                Button { m.stop() } label: {
-                    Text("Stop").font(.system(size: 12, weight: .medium))
-                        .padding(.horizontal, 14).padding(.vertical, 6)
-                        .pill()
+            // How long: ring + huge time, end time right under it
+            ZStack {
+                Circle().stroke(Theme.pill, lineWidth: 8)
+                Circle().trim(from: 0, to: progress)
+                    .stroke(color, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.linear(duration: 1), value: progress)
+                VStack(spacing: 2) {
+                    Text(m.remaining(cur.end))
+                        .font(.system(size: 56, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.text)
+                        .contentTransition(.numericText(countsDown: true))
+                    Text(p.isBreak ? "stand up · back at \(f.string(from: cur.end))" : "until \(f.string(from: s.end))")
+                        .font(.system(size: 13)).foregroundStyle(Theme.text2)
                 }
-                .buttonStyle(.plain)
             }
+            .frame(width: 220, height: 220)
+
+            if !p.isBreak { dailyProgress(name, color) }
+
+            Button { m.stop() } label: {
+                Text("Stop session").font(.system(size: 12)).foregroundStyle(Theme.text2).underline()
+            }
+            .buttonStyle(.plain)
+            .help("The Cold Turkey block stays on until \(f.string(from: s.end))")
         }
-        .padding(16)
-        .card(radius: 16)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20).padding(.horizontal, 16)
+        .card(radius: 18)
     }
 
-    // How much of today's limit for this activity is used (counting this session live).
-    private func dailyLine(_ name: String) -> some View {
+    // Today's progress on this activity, counting this session live: one bar and "27m left today".
+    private func dailyProgress(_ name: String, _ color: Color) -> some View {
         let used = m.secondsByActivity(since: Calendar.current.startOfDay(for: m.now))[name] ?? 0
         let limit = m.limitMinutes(name)
-        let left = m.secondsLeftToday(name)
-        return HStack(spacing: 6) {
-            Text("\(name) today").font(.system(size: 12)).foregroundStyle(Theme.text2)
-            Spacer()
+        let left = m.secondsLeftToday(name) ?? 0
+        return VStack(spacing: 6) {
+            HStack {
+                Text(limit > 0 ? (left > 0 ? "\(formatDuration(left)) left today" : "Daily limit reached")
+                               : "\(formatDuration(used)) today")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(limit > 0 && left == 0 ? Theme.red : Theme.text)
+                Spacer()
+                if limit > 0 {
+                    Text("\(formatDuration(used)) of \(limitLabel(limit))").font(.system(size: 12)).foregroundStyle(Theme.text2)
+                }
+            }
             if limit > 0 {
-                Tag(text: "\(formatDuration(used)) of \(limitLabel(limit))")
-                Tag(text: (left ?? 0) > 0 ? "\(formatDuration(left ?? 0)) left" : "limit reached",
-                    color: (left ?? 0) > 0 ? Theme.accent : Theme.red,
-                    fill: (left ?? 0) > 0 ? Theme.accentTint : Theme.redTint)
-            } else {
-                Tag(text: "\(formatDuration(used)) · no limit")
+                GeometryReader { g in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Theme.pill)
+                        Capsule().fill(color.opacity(0.85))
+                            .frame(width: g.size.width * min(1, CGFloat(used) / CGFloat(limit * 60)))
+                    }
+                }
+                .frame(height: 6)
             }
         }
+        .padding(.horizontal, 4)
     }
 
     // MARK: free time
