@@ -2,156 +2,100 @@ import SwiftUI
 import AppKit
 import ApplicationServices
 
-// MARK: - Activity picker (before) and review (after)
+// MARK: - "What's next?" (forced when nothing runs) and the review after a session
 
-struct ActivityChip: View {
-    let name: String
-    let selected: Bool
-    var detail: String? = nil      // e.g. "35m left"
-    let action: () -> Void
-
-    var body: some View {
-        let st = ActivityStyle.of(name)
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: st.icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(selected ? .white : st.color)
-                    .frame(width: 26, height: 26)
-                    .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(selected ? AnyShapeStyle(st.color.gradient) : AnyShapeStyle(st.color.opacity(0.15))))
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(name).font(.system(size: 13, weight: selected ? .semibold : .medium)).lineLimit(1)
-                    if let detail { Text(detail).font(.system(size: 10)).foregroundStyle(.secondary) }
-                }
-                Spacer(minLength: 0)
-                if selected { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(st.color) }
-            }
-            .padding(8)
-            .card(selected ? st.color : nil, radius: 11)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
+// The same Today list as the panel, in its own window that stays on top.
 struct ActivityPickerView: View {
     @ObservedObject var m: Model
-    @State private var minutes: Int? = nil
-
-    // Pomodoro (several rounds) keeps its own timing; no duration row then.
-    private var showsDuration: Bool { (m.pendingStart?.phases.count ?? 1) == 1 }
-    private var chosen: Int { minutes ?? defaultMinutes }
 
     var body: some View {
         let auto = m.pendingStart?.auto ?? true
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("What's next?").font(.system(size: 18, weight: .bold))
-                Text(auto ? "Pick an activity (its block starts right away) or take free time."
-                          : (showsDuration ? "Pick how long and what, then it starts" : "Pick one to start · \(m.pendingLabel)"))
-                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                Text("What's next?").font(.system(size: 26, weight: .bold)).foregroundStyle(Theme.text)
+                Text("Click an activity to start it, or take free time. Nothing is blocked until you choose.")
+                    .font(.system(size: 13)).foregroundStyle(Theme.text2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            if showsDuration {
-                HStack(spacing: 6) {
-                    ForEach(durationOptions, id: \.self) { n in
-                        let sel = chosen == n
-                        Button { minutes = n } label: {
-                            Text(n == 60 ? "1 h" : "\(n) min")
-                                .font(.system(size: 12, weight: sel ? .semibold : .medium))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 7)
-                                .pill(selected: sel)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            let available = m.availableActivities
-            if available.isEmpty {
-                Label("All daily goals done 🎉 Take free time or call it a day.", systemImage: "checkmark.seal.fill")
-                    .font(.system(size: 13, weight: .medium)).foregroundStyle(.green)
-            }
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                ForEach(available, id: \.self) { a in
-                    // Outside its hours: greyed out with "from 12:00".
-                    let open = m.isOpen(a)
-                    ActivityChip(name: a, selected: false,
-                                 detail: m.opensLabel(a) ?? m.secondsLeftToday(a).map { "\(formatDuration($0)) left today" }) {
-                        m.choosePlan(a, note: nil, minutes: chosen)
-                    }
-                    .disabled(!open)
-                    .opacity(open ? 1 : 0.4)
-                }
-            }
-            Divider()
-            FreeTimeRow(m: m)
-
+            TodayList(m: m)
             if !auto {
                 Button("Cancel") { m.cancelPick() }
-                    .buttonStyle(.borderless).font(.caption).foregroundStyle(.secondary)
+                    .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.text2)
                     .keyboardShortcut(.cancelAction)
             }
         }
-        .padding(22)
-        .frame(width: 400)
+        .padding(24)
+        .frame(width: 420)
     }
-
 }
 
+// After a session: the activity list as a checklist with the plan already checked.
+// One click on "Save" confirms; tick or untick to change what you actually did.
 struct ReviewView: View {
     @ObservedObject var m: Model
-    @State private var picked: [String] = []
+    @State private var picked: [String]? = nil
 
     var body: some View {
         let r = m.review
         let mins = (r?.seconds ?? 0) / 60
-        VStack(alignment: .leading, spacing: 16) {
+        let checked = picked ?? (r?.planned.map { [$0] } ?? [])
+        VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Session done · \(mins) min").font(.system(size: 18, weight: .bold))
-                Text("What did you actually do?").font(.system(size: 12)).foregroundStyle(.secondary)
+                Text("Session done").font(.system(size: 26, weight: .bold)).foregroundStyle(Theme.text)
+                HStack(spacing: 6) {
+                    Tag(text: "\(mins) min", color: Theme.accent, fill: Theme.accentTint)
+                    if let planned = r?.planned { Tag(text: "planned: \(planned)") }
+                }
+                Text("What did you actually do? The plan is checked; change it if needed.")
+                    .font(.system(size: 13)).foregroundStyle(Theme.text2)
             }
 
-            if let planned = r?.planned {
-                let st = ActivityStyle.of(planned)
-                Button { m.saveReview(actual: [planned], note: r?.note) } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                        Text("Yes, \(planned)\(r?.note.map { " · \($0)" } ?? "")").lineLimit(1)
+            VStack(spacing: 0) {
+                let names = m.activities
+                ForEach(Array(names.enumerated()), id: \.element) { i, a in
+                    let on = checked.contains(a)
+                    let st = ActivityStyle.of(a)
+                    Button {
+                        var c = checked
+                        if let idx = c.firstIndex(of: a) { c.remove(at: idx) } else { c.append(a) }
+                        picked = c
+                    } label: {
+                        HStack(spacing: 10) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 4, style: .continuous).fill(on ? Theme.accent : Color.clear)
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .strokeBorder(on ? Theme.accent : Theme.text2.opacity(0.5), lineWidth: 1.2)
+                                if on { Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(.white) }
+                            }
+                            .frame(width: 16, height: 16)
+                            Image(systemName: st.icon).font(.system(size: 12)).foregroundStyle(st.color).frame(width: 18)
+                            Text(a).font(.system(size: 14)).foregroundStyle(Theme.text)
+                            Spacer()
+                            if a == r?.planned { Tag(text: "plan") }
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .contentShape(Rectangle())
                     }
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
+                    .buttonStyle(.plain)
+                    if i < names.count - 1 { Divider().opacity(0.4).padding(.leading, 40) }
+                }
+            }
+            .padding(.vertical, 4)
+            .card(radius: 14)
+
+            Button { m.saveReview(actual: checked, note: nil) } label: {
+                Text(checked == (r?.planned.map { [$0] } ?? []) && !checked.isEmpty ? "Yes, as planned" : "Save")
+                    .font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
+                    .frame(maxWidth: .infinity).padding(.vertical, 11)
                     .background(Capsule().fill(Theme.accent))
-                    .contentShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.defaultAction)
-
-                SectionLabel(text: "Or something else / more")
-            } else {
-                SectionLabel(text: "Pick all that apply")
-            }
-
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                ForEach(m.activities, id: \.self) { a in
-                    ActivityChip(name: a, selected: picked.contains(a)) {
-                        if let i = picked.firstIndex(of: a) { picked.remove(at: i) } else { picked.append(a) }
-                    }
-                }
-            }
-            Button(action: save) {
-                Text("Save").font(.system(size: 13, weight: .semibold)).frame(maxWidth: .infinity).padding(.vertical, 8)
-                    .card(radius: 10).contentShape(Rectangle())
+                    .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .disabled(picked.isEmpty)
-            .opacity(picked.isEmpty ? 0.4 : 1)
+            .disabled(checked.isEmpty)
+            .opacity(checked.isEmpty ? 0.4 : 1)
+            .keyboardShortcut(.defaultAction)
         }
-        .padding(22)
-        .frame(width: 400)
+        .padding(24)
+        .frame(width: 420)
     }
-
-    private func save() { m.saveReview(actual: picked, note: nil) }
 }

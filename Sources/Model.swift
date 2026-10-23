@@ -23,8 +23,7 @@ final class Model: ObservableObject {
         .flatMap { try? recordCoder().1.decode(SessionRecord.self, from: $0) }
     @Published var records: [SessionRecord] = loadRecords()
     private let activityWindow = PromptWindow()
-    private let statsWindow = StatsWindow()
-    private let settingsWindow = StatsWindow(title: "Focus settings")
+    private let mainWindow = StatsWindow(title: "Focus")
 
     private var lastPhase: Int?
     private var timer: Timer?
@@ -123,6 +122,21 @@ final class Model: ObservableObject {
     func blockFor(_ activity: String) -> String { activity == otherActivity ? focusBlock : activity }
     var freeLeft: Int { max(0, dailyFreeSeconds - stats.free) }
 
+    // One click on a row in the Today list: start it now with the chosen length (or Pomodoro).
+    func startActivity(_ activity: String, minutes chosen: Int? = nil, pomodoro usePomodoro: Bool? = nil) {
+        guard session == nil, isOpen(activity), (secondsLeftToday(activity) ?? 1) > 0 else { return }
+        if let chosen { minutes = chosen }
+        if let usePomodoro { pomodoro = usePomodoro }
+        if minutes < minMinutes { minutes = minMinutes }
+        let d = UserDefaults.standard
+        d.set(minutes, forKey: "minutes"); d.set(pomodoro, forKey: "pomodoro")
+        let extra = oneTimeLink.trimmingCharacters(in: .whitespaces)
+        oneTimeLink = ""
+        pendingStart = nil
+        activityWindow.hide()
+        start(block: blockFor(activity), phases: chosenPhases(), extra: extra.isEmpty ? [] : [extra], planned: activity)
+    }
+
     private func chosenPhases() -> [Phase] {
         guard pomodoro else { return [Phase(isBreak: false, minutes: minutes)] }
         var phases: [Phase] = []
@@ -132,19 +146,6 @@ final class Model: ObservableObject {
             if i < rounds - 1 { phases.append(Phase(isBreak: true, minutes: S.pomodoroBreak)) }
         }
         return phases
-    }
-
-    // Start button in the panel.
-    func start() {
-        if minutes < minMinutes { minutes = minMinutes }
-        let d = UserDefaults.standard
-        d.set(selected, forKey: "selected"); d.set(minutes, forKey: "minutes")
-        d.set(pomodoro, forKey: "pomodoro")
-        let extra = oneTimeLink.trimmingCharacters(in: .whitespaces)
-        oneTimeLink = ""
-        // Nothing starts until the activity is picked.
-        pendingStart = PendingStart(block: selected, phases: chosenPhases(), extra: extra.isEmpty ? [] : [extra])
-        showPicker()
     }
 
     // MARK: activity: pick before, review after
@@ -268,9 +269,11 @@ final class Model: ObservableObject {
     // Activities that can actually be picked now.
     var pickableActivities: [String] { availableActivities.filter(isOpen) }
 
-    func openStats() { statsWindow.show(StatsView(m: self)) }
-
-    func openSettings() { settingsWindow.show(SettingsView(m: self)) }
+    // Stats, Activities and Rules live in one window with a sidebar.
+    func openMain(_ tab: MainTab) {
+        reloadRecords()
+        mainWindow.show(MainView(m: self, tab: tab))
+    }
 
     func start(block: String, phases: [Phase], extra: [String] = [], autoThinking: Bool = false,
                planned: String? = nil, note: String? = nil) {

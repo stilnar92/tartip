@@ -84,7 +84,7 @@ struct PendingStart {
     var auto = false   // opened automatically because nothing is running: no Cancel
 }
 
-// Normal closable window (stats, settings).
+// Normal closable window (the main Stats / Activities / Rules window).
 final class StatsWindow {
     private var window: NSWindow?
     private let title: String
@@ -103,7 +103,9 @@ final class StatsWindow {
             window = w
         }
         guard let window else { return }
-        window.contentView = NSHostingView(rootView: view.background(Theme.bg).environment(\.colorScheme, .light))
+        let host = NSHostingView(rootView: view.background(Theme.bg).environment(\.colorScheme, .light))
+        window.contentView = host
+        window.setContentSize(host.fittingSize)
         window.center()
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)

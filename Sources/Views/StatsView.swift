@@ -26,7 +26,7 @@ struct StatsView: View {
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Where the time went").font(.system(size: 18, weight: .bold))
+                Text("Stats").font(.system(size: 26, weight: .bold)).foregroundStyle(Theme.text)
                 Spacer()
                 Picker("", selection: $range) {
                     Text("Today").tag(0)
@@ -81,7 +81,6 @@ struct StatsView: View {
             }
         }
         .padding(22)
-        .frame(width: 440)
         .onAppear { m.reloadRecords() }
     }
 

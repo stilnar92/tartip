@@ -17,22 +17,43 @@ struct SettingsView: View {
 
     var content: some View {
             VStack(alignment: .leading, spacing: 18) {
-                Text("Settings").font(.system(size: 20, weight: .bold))
-                activitiesSection
-                nightSection
-                freeTimeSection
-                durationSection
-                Text("Saved automatically to ~/modes/settings.json")
-                    .font(.system(size: 11)).foregroundStyle(.tertiary)
+                activitiesPage
+                rulesPage
             }
             .padding(22)
             .frame(width: 460)
     }
 
+    // Pages of the main window's sidebar.
+    var activitiesPage: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            pageTitle("Activities", "Each one starts the Cold Turkey block with the same name.")
+            activitiesSection
+        }
+    }
+
+    var rulesPage: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            pageTitle("Rules", "Night, free time and session length.")
+            nightSection
+            freeTimeSection
+            durationSection
+            Text("Saved automatically to ~/modes/settings.json")
+                .font(.system(size: 11)).foregroundStyle(.tertiary)
+        }
+    }
+
+    private func pageTitle(_ title: String, _ subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.system(size: 26, weight: .bold)).foregroundStyle(Theme.text)
+            Text(subtitle).font(.system(size: 13)).foregroundStyle(Theme.text2)
+        }
+    }
+
     // MARK: sections
 
     private var activitiesSection: some View {
-        group("Activities", "Each activity starts the Cold Turkey block with the same name. Tap ⌄ for its hours and what it opens.") {
+        group("Your list", "Set a daily limit with the stepper; tap ⌄ for hours and what it opens.") {
             ForEach($settings.v.activities) { $a in
                 activityRow($a)
             }
