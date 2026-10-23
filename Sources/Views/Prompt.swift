@@ -86,7 +86,7 @@ struct RestPicker: View {
         let leftMin = m.freeLeft / 60
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                SectionLabel(text: "Rest · nothing blocked")
+                SectionLabel(text: "Free time · nothing blocked")
                 Spacer()
                 Text(m.restTaken ? "already used · start a mode first" : (leftMin > 0 ? "\(leftMin) min left today" : "used up today"))
                     .font(.system(size: 11)).foregroundStyle(m.canRest ? Color.secondary : Color.red)

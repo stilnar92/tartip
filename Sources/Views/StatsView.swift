@@ -13,7 +13,7 @@ struct StatsView: View {
         let from = range == 0 ? cal.startOfDay(for: Date()) : cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: Date()))!
         let recs = m.recordsSince(from)
         var byActivity = m.secondsByActivity(since: from)
-        for a in m.activities + [otherActivity] where byActivity[a] == nil { byActivity[a] = 0 }
+        for a in m.activities where byActivity[a] == nil { byActivity[a] = 0 }
         // Every activity from the list is shown, busiest first; empty ones stay at the bottom.
         let order = m.activities + [otherActivity]
         let rows = byActivity.sorted {

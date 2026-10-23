@@ -114,8 +114,8 @@ struct ContentView: View {
 
     private var guardText: String {
         if isNight(m.now) { return "Night until \(clockLabel(S.nightTo))" }
-        if enforcementActive(m.now) { return "Guard on until \(String(format: "%02d:00", S.guardToHour))" }
-        return "Guard off"
+        if enforcementActive(m.now) { return "Work hours until \(String(format: "%02d:00", S.guardToHour))" }
+        return "Off hours"
     }
 
     // Footer: four equal tools, icon above a caption, so nothing wraps.
@@ -262,14 +262,14 @@ struct ContentView: View {
 
     private var restMenu: some View {
         Menu {
-            Section(m.restTaken ? "Rest used · start a session first" : "Rest · nothing blocked · \(m.freeLeft / 60) min left today") {
+            Section(m.restTaken ? "Free time used · do a session first" : "Free time · nothing blocked · \(m.freeLeft / 60) min left today") {
                 ForEach(restOptions, id: \.self) { n in
                     Button("☕ \(n) min") { m.startRest(minutes: n) }
                         .disabled(!m.canRest)
                 }
             }
         } label: {
-            Label(m.canRest ? "Rest · \(m.freeLeft / 60)m" : "Rest used", systemImage: "cup.and.saucer.fill")
+            Label(m.canRest ? "Free time · \(m.freeLeft / 60)m" : "Free time used", systemImage: "popcorn.fill")
                 .font(.system(size: 12, weight: .medium))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 9)
@@ -279,7 +279,7 @@ struct ContentView: View {
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
-        .help("Rest: nothing blocked (\(m.freeLeft / 60) min left today)")
+        .help("Free time: nothing blocked (\(m.freeLeft / 60) min left today)")
     }
 
     // MARK: editor (add/remove modes, what each opens)
@@ -289,11 +289,11 @@ struct ContentView: View {
             Text("What each activity opens when it starts. Add or rename activities in Settings; each needs a Cold Turkey block with the same name.")
                 .font(.system(size: 11)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            ForEach(m.activities + [m.focusBlock], id: \.self) { b in
-                let st = ActivityStyle.of(b == m.focusBlock ? otherActivity : b)
+            ForEach(m.activities, id: \.self) { b in
+                let st = ActivityStyle.of(b)
                 HStack(spacing: 8) {
                     Image(systemName: st.icon).foregroundStyle(st.color).frame(width: 18)
-                    Text(b == m.focusBlock ? "Other → \(b)" : b)
+                    Text(b)
                         .font(.system(size: 12, weight: m.selected == b ? .semibold : .regular))
                     Spacer()
                 }
@@ -445,12 +445,12 @@ struct ContentView: View {
 
     private func resting(_ until: Date) -> some View {
         VStack(spacing: 14) {
-            Text("☕").font(.system(size: 44))
+            Text("🍿").font(.system(size: 44))
             Text(m.remaining(until))
                 .font(.system(size: 42, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .contentTransition(.numericText(countsDown: true))
-            Text("Rest · nothing blocked · \(m.freeLeft / 60) min left today")
+            Text("Free time · nothing blocked · \(m.freeLeft / 60) min left today")
                 .font(.caption).foregroundStyle(.secondary)
             Button { m.endRest() } label: {
                 Text("Back to work")

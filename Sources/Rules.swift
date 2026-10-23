@@ -12,7 +12,7 @@ var minMinutes: Int { S.minMinutes }                         // no session short
 var durationOptions: [Int] { S.durationOptions.filter { $0 >= S.minMinutes }.sorted() }
 var defaultMinutes: Int { max(S.defaultMinutes, S.minMinutes) }
 // Rest lengths offered, never longer than the per-stretch cap.
-var restOptions: [Int] { [5, 10, 15, 20, 30].filter { $0 <= S.maxRestMinutes } }
+var restOptions: [Int] { [15, 30, 45, 60, 90, 120].filter { $0 <= S.maxRestMinutes } }
 
 func durationLabel(_ m: Int) -> String { m == 60 ? "1h" : "\(m)" }
 

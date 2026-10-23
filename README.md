@@ -5,12 +5,12 @@ A small macOS menu bar app that helps you **start** working and keeps you from d
 ## How a day works
 
 1. **Start.** Click ◎ in the menu bar → **Start** → pick a length (default 30 min, never under 15) and an activity (Work, Arabic, English, …).
-2. **Blocking.** The Cold Turkey block **with the same name as the activity** is locked for the session. Anything typed under "Other" uses `Focus_Mode`.
+2. **Blocking.** The Cold Turkey block **with the same name as the activity** is locked for the session. **Rest** is an activity too: a short break between tasks with its own block, so a break doesn't turn into a movie.
 3. **Workspace.** The app opens the activity's apps and links (set them up in **Edit**). For a one-off site, use **Open a site** before pressing Start.
 4. **Review.** When time's up (or you stop), it asks what you did: confirm the plan, or pick what you did instead. That goes into the stats.
-5. **Idle guard.** On weekdays 10:00–22:00, after 15 minutes at the computer without a session, a window counts down 60 s and then opens the picker. Nothing is blocked until you pick.
-6. **Free time.** ☕ Rest unblocks nothing for 5–15 min. Rest and idle time share one budget of 60 min a day. Rest can't be taken twice in a row; a session has to run in between.
-7. **Daily limits.** Each activity can have a daily limit (e.g. Work 1h). Once it's used up, the activity disappears from the picker for the rest of the day. When nothing is left, only "Other" remains.
+5. **Work hours.** On weekdays 10:00–22:00, after 15 minutes at the computer without a session, a window counts down 60 s and then opens the picker. Nothing is blocked until you pick: you decide what to do.
+6. **Free time.** 🍿 Free time blocks nothing (movies, YouTube) and comes from a budget of 60 min a day. It's only ever taken on purpose with the Free time button; sitting idle doesn't use it up. It can't be taken twice in a row; a session has to run in between.
+7. **Daily limits.** Each activity can have a daily limit (e.g. Work 1h). Once it's used up, the activity disappears from the picker for the rest of the day. When nothing is left, the picker says so.
 8. **Night.** From 00:00 to 08:00 the night block (`Focus_Mode`) is locked until morning. No prompts, no timers, and nothing can be started.
 
 All the numbers above are defaults and can be changed in **Settings** (the gear in the panel).
@@ -25,7 +25,7 @@ Install [Cold Turkey Blocker](https://getcoldturkey.com/) (Pro is needed for loc
 Work, Arabic, AI education, Project, English, Interview, Rest, Focus_Mode
 ```
 
-`Focus_Mode` is used for "Other" and at night. To allow only certain sites in a block, block `*` and add the allowed sites as exceptions.
+`Focus_Mode` is the night block. To allow only certain sites in a block, block `*` and add the allowed sites as exceptions.
 
 ### 2. Build and install
 
@@ -63,7 +63,7 @@ Everything personal lives in `~/modes`, outside the repo:
 | `Sources/App.swift` | entry point, menu bar item, single-instance logic |
 | `Sources/Model.swift` | state, timer loop, sessions, rest, prompts, limits, night |
 | `Sources/Settings.swift` | `AppSettings` and its JSON storage |
-| `Sources/Rules.swift` | guard hours, presence detection, values derived from settings |
+| `Sources/Rules.swift` | work hours, presence detection, values derived from settings |
 | `Sources/Activities.swift` | session history, activity styles, helper windows |
 | `Sources/Workspace.swift` | opening apps and a Chrome window, cleanup |
 | `Sources/Core.swift` | paths, process helpers, logging, Cold Turkey CLI |

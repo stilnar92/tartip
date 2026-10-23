@@ -23,7 +23,6 @@ struct SettingsView: View {
                 nightSection
                 freeTimeSection
                 durationSection
-                workspaceSection
                 Text("Saved automatically to ~/modes/settings.json")
                     .font(.system(size: 11)).foregroundStyle(.tertiary)
             }
@@ -67,7 +66,7 @@ struct SettingsView: View {
     }
 
     private var guardSection: some View {
-        group("Guard", "When idle time counts and the \(settings.v.idleNudgeMinutes)-minute prompt can appear.") {
+        group("Work hours", "On these days and hours, \(settings.v.idleNudgeMinutes) minutes at the computer without a session brings up a window asking what you'll do.") {
             HStack(spacing: 4) {
                 ForEach(weekdays, id: \.0) { wd, label in
                     let on = settings.v.guardDays.contains(wd)
@@ -85,6 +84,13 @@ struct SettingsView: View {
             }
             row("From") { hourStepper($settings.v.guardFromHour) }
             row("To") { hourStepper($settings.v.guardToHour) }
+            row("Ask after idle") { minuteStepper($settings.v.idleNudgeMinutes, 5...60, step: 5) }
+            row("Window countdown") {
+                HStack(spacing: 6) {
+                    Text("\(settings.v.promptCountdownSeconds) s").monospacedDigit()
+                    Stepper("", value: $settings.v.promptCountdownSeconds, in: 10...300, step: 10).labelsHidden()
+                }
+            }
         }
     }
 
@@ -100,16 +106,9 @@ struct SettingsView: View {
     }
 
     private var freeTimeSection: some View {
-        group("Free time", "Rest (☕) and idle time at the computer share one daily budget.") {
+        group("Free time", "Nothing blocked: movies, YouTube, anything. Only when you take it on purpose; idle time doesn't count.") {
             row("Per day") { minuteStepper($settings.v.dailyFreeMinutes, 0...240, step: 5) }
-            row("One rest at most") { minuteStepper($settings.v.maxRestMinutes, 5...60, step: 5) }
-            row("Prompt after idle") { minuteStepper($settings.v.idleNudgeMinutes, 5...60, step: 5) }
-            row("Prompt countdown") {
-                HStack(spacing: 6) {
-                    Text("\(settings.v.promptCountdownSeconds) s").monospacedDigit()
-                    Stepper("", value: $settings.v.promptCountdownSeconds, in: 10...300, step: 10).labelsHidden()
-                }
-            }
+            row("One stretch at most") { minuteStepper($settings.v.maxRestMinutes, 5...120, step: 5) }
         }
     }
 
@@ -131,12 +130,6 @@ struct SettingsView: View {
                     Stepper("", value: $settings.v.pomodoroRounds, in: 1...8).labelsHidden()
                 }
             }
-        }
-    }
-
-    private var workspaceSection: some View {
-        group("Workspace", nil) {
-            row("Block for \"Other\"") { textField($settings.v.otherBlock) }
         }
     }
 

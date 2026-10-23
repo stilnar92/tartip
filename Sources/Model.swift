@@ -429,10 +429,9 @@ final class Model: ObservableObject {
         // Idle: no mode, no rest.
         // Answering a question isn't idle time.
         guard enforce, prompt == nil, review == nil, pendingStart == nil, userPresent() else { return }
-        stats.free += 1
+        // Idle time doesn't use up free time; free time is only taken on purpose.
         idleSeconds += 1
-        if freeLeft <= 0 { showPrompt(.budget) }
-        else if idleSeconds >= idleNudgeSeconds { showPrompt(.idle) }
+        if idleSeconds >= idleNudgeSeconds { showPrompt(.idle) }
     }
 
     // MARK: display

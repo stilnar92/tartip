@@ -37,7 +37,6 @@ struct ActivityChip: View {
 
 struct ActivityPickerView: View {
     @ObservedObject var m: Model
-    @State private var other = ""
     @State private var minutes: Int? = nil
 
     // Pomodoro (several rounds) keeps its own timing; no duration row then.
@@ -72,7 +71,7 @@ struct ActivityPickerView: View {
             }
             let available = m.availableActivities
             if available.isEmpty {
-                Label("All daily goals done 🎉 Anything else goes under Other.", systemImage: "checkmark.seal.fill")
+                Label("All daily goals done 🎉 Take free time or call it a day.", systemImage: "checkmark.seal.fill")
                     .font(.system(size: 13, weight: .medium)).foregroundStyle(.green)
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
@@ -83,18 +82,6 @@ struct ActivityPickerView: View {
                     }
                 }
             }
-            HStack(spacing: 6) {
-                Image(systemName: ActivityStyle.of(otherActivity).icon).foregroundStyle(.secondary)
-                TextField("Other: type what…", text: $other)
-                    .textFieldStyle(.plain)
-                    .onSubmit(chooseOther)
-                Button("Start", action: chooseOther)
-                    .disabled(other.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-            .font(.system(size: 13))
-            .padding(.horizontal, 10).padding(.vertical, 8)
-            .card(radius: 10)
-
             if !auto {
                 Button("Cancel") { m.cancelPick() }
                     .buttonStyle(.borderless).font(.caption).foregroundStyle(.secondary)
@@ -105,18 +92,11 @@ struct ActivityPickerView: View {
         .frame(width: 400)
     }
 
-    private func chooseOther() {
-        let t = other.trimmingCharacters(in: .whitespaces)
-        guard !t.isEmpty else { return }
-        // Anything not on the list counts as "Other"; the text is kept as a note.
-        m.choosePlan(m.activities.first { $0.lowercased() == t.lowercased() } ?? otherActivity, note: t, minutes: chosen)
-    }
 }
 
 struct ReviewView: View {
     @ObservedObject var m: Model
     @State private var picked: [String] = []
-    @State private var other = ""
 
     var body: some View {
         let r = m.review
@@ -156,30 +136,17 @@ struct ReviewView: View {
                     }
                 }
             }
-            HStack(spacing: 6) {
-                Image(systemName: ActivityStyle.of(otherActivity).icon).foregroundStyle(.secondary)
-                TextField("Other: type what…", text: $other).textFieldStyle(.plain)
-            }
-            .font(.system(size: 13))
-            .padding(.horizontal, 10).padding(.vertical, 8)
-            .card(radius: 10)
-
             Button(action: save) {
                 Text("Save").font(.system(size: 13, weight: .semibold)).frame(maxWidth: .infinity).padding(.vertical, 8)
                     .card(radius: 10).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(picked.isEmpty && other.trimmingCharacters(in: .whitespaces).isEmpty)
-            .opacity(picked.isEmpty && other.trimmingCharacters(in: .whitespaces).isEmpty ? 0.4 : 1)
+            .disabled(picked.isEmpty)
+            .opacity(picked.isEmpty ? 0.4 : 1)
         }
         .padding(22)
         .frame(width: 400)
     }
 
-    private func save() {
-        let t = other.trimmingCharacters(in: .whitespaces)
-        var actual = picked
-        if !t.isEmpty { actual.append(m.activities.first { $0.lowercased() == t.lowercased() } ?? otherActivity) }
-        m.saveReview(actual: Array(NSOrderedSet(array: actual)) as! [String], note: t.isEmpty ? nil : t)
-    }
+    private func save() { m.saveReview(actual: picked, note: nil) }
 }

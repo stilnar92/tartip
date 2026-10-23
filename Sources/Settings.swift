@@ -20,7 +20,7 @@ struct AppSettings: Codable, Equatable {
 
     // Free time
     var dailyFreeMinutes = 60
-    var maxRestMinutes = 15
+    var maxRestMinutes = 60          // longest single stretch of free time
     var idleNudgeMinutes = 15
     var promptCountdownSeconds = 60
 
