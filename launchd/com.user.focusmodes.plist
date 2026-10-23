@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.user.focusmodes</string>
+  <key>ProgramArguments</key>
+  <array><string>/Applications/Focus Modes.app/Contents/MacOS/FocusModes</string></array>
+  <key>RunAtLoad</key><true/>
+  <!-- Relaunch after any exit, including a normal quit. -->
+  <key>KeepAlive</key><true/>
+  <key>EnvironmentVariables</key><dict><key>FOCUSMODES_LAUNCHD</key><string>1</string></dict>
+  <key>ThrottleInterval</key><integer>5</integer>
+  <key>LimitLoadToSessionType</key><string>Aqua</string>
+</dict>
+</plist>
