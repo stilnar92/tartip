@@ -14,7 +14,6 @@ final class Model: ObservableObject {
     }
     @Published var message = ""
     @Published var oneTimeLink = ""
-    @Published private(set) var configs: [String: ModeConfig]
     @Published private(set) var records: [SessionRecord]
 
     let clock: Clock
@@ -29,7 +28,6 @@ final class Model: ObservableObject {
         self.clock = clock ?? Clock()
         self.blocker = blocker
         self.state = state
-        configs = loadModeConfigs()
         records = loadRecords()
 
         if self.state.minutes < S.minMinutes { self.state.minutes = S.defaultSessionMinutes }
@@ -96,19 +94,15 @@ final class Model: ObservableObject {
 
     func reloadRecords() { records = loadRecords() }
 
-    // MARK: what each mode opens (~/modes/modes.json)
+    // MARK: what each activity opens
 
-    func config(_ block: String) -> ModeConfig { configs[block] ?? ModeConfig() }
-
-    func updateConfig(_ block: String, _ change: (inout ModeConfig) -> Void) {
-        var c = config(block)
-        change(&c)
-        configs[block] = c
-        saveModeConfigs(configs)
-        if !(c.apps.isEmpty && c.urls.isEmpty) { _ = axTrusted(prompt: true) }
+    func updateOpens(_ activity: UUID, _ change: (inout ModeConfig) -> Void) {
+        Settings.shared.updateActivity(activity) { change(&$0.opens) }
+        // Stretching windows needs Accessibility; ask as soon as there's something to stretch.
+        if S.activities.contains(where: { $0.id == activity && !$0.opens.isEmpty }) { _ = axTrusted(prompt: true) }
     }
 
-    func chooseApps(for block: String) {
+    func chooseApps(for activity: UUID) {
         let panel = NSOpenPanel()
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
         panel.allowedContentTypes = [.application]
@@ -119,7 +113,7 @@ final class Model: ObservableObject {
         panel.begin { [weak self] response in
             guard response == .OK else { return }
             let paths = panel.urls.map(\.path)
-            self?.updateConfig(block) { c in
+            self?.updateOpens(activity) { c in
                 for p in paths where !c.apps.contains(p) { c.apps.append(p) }
             }
         }
@@ -143,8 +137,8 @@ final class Model: ObservableObject {
     private func start(_ s: Session, extraURLs: [String]) {
         blocker.lock(s.block, until: s.end)
         message = ""
-        let c = config(s.block)
-        let opensSomething = !(c.apps.isEmpty && c.urls.isEmpty && extraURLs.isEmpty)
+        let c = s.planned.flatMap { S.activity(named: $0)?.opens } ?? ModeConfig()
+        let opensSomething = !c.isEmpty || !extraURLs.isEmpty
         if opensSomething && c.maximize && !axTrusted(prompt: true) {
             message = "Allow Focus Modes in Privacy & Security → Accessibility to resize windows."
         }

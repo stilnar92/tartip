@@ -8,8 +8,15 @@ final class Settings: ObservableObject {
     @Published var v: AppSettings { didSet { if v != oldValue { save() } } }
 
     private init() {
-        v = Settings.load()
-        if !FileManager.default.fileExists(atPath: settingsFile.path) { save() }
+        var s = Settings.load()
+        let moved = Settings.moveModeConfigs(into: &s)
+        v = s
+        if moved || !FileManager.default.fileExists(atPath: settingsFile.path) { save() }
+    }
+
+    func updateActivity(_ id: UUID, _ change: (inout ActivitySetting) -> Void) {
+        guard let i = v.activities.firstIndex(where: { $0.id == id }) else { return }
+        change(&v.activities[i])
     }
 
     private static func load() -> AppSettings {
@@ -30,6 +37,23 @@ final class Settings: ObservableObject {
             s.nightBlock = first
         }
         return s
+    }
+
+    // modes.json used to hold what each activity opens, keyed by its block name, so renaming
+    // an activity lost it. Move it into the activities once; the file stays as modes.json.migrated.
+    private static func moveModeConfigs(into s: inout AppSettings) -> Bool {
+        guard let data = try? Data(contentsOf: configFile),
+              let configs = try? JSONDecoder().decode([String: ModeConfig].self, from: data) else { return false }
+        for i in s.activities.indices where s.activities[i].opens.isEmpty {
+            if let c = configs[s.activities[i].block] ?? configs[s.activities[i].name] { s.activities[i].opens = c }
+        }
+        do {
+            try FileManager.default.moveItem(at: configFile, to: configFile.appendingPathExtension("migrated"))
+        } catch {
+            log("error: couldn't rename \(configFile.path) after moving it into settings: \(error)")
+        }
+        log("moved modes.json into settings.json")
+        return true
     }
 
     func save() {

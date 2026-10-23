@@ -19,7 +19,7 @@ struct SettingsView: View {
     // Pages of the main window's sidebar.
     var activitiesPage: some View {
         VStack(alignment: .leading, spacing: 18) {
-            pageTitle("Activities", "Each one starts the Cold Turkey block with the same name.")
+            pageTitle("Activities", "Each one locks a Cold Turkey block: the one with its name, unless you pick another.")
             activitiesSection
         }
     }
@@ -50,7 +50,7 @@ struct SettingsView: View {
                 activityRow($a)
             }
             HStack(spacing: 6) {
-                TextField("New activity (same name as its Cold Turkey block)", text: $newActivity)
+                TextField("New activity (locks the Cold Turkey block with its name)", text: $newActivity)
                     .textFieldStyle(.plain).font(.system(size: 12))
                     .padding(.horizontal, 10).padding(.vertical, 7)
                     .card(radius: 9)
@@ -64,7 +64,7 @@ struct SettingsView: View {
 
     private func activityRow(_ a: Binding<ActivitySetting>) -> some View {
         let v = a.wrappedValue
-        let st = ActivityStyle.of(v.name)
+        let st = ActivityStyle.of(v)
         let open = expanded.contains(v.id)
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
@@ -86,7 +86,7 @@ struct SettingsView: View {
                     Image(systemName: open ? "chevron.up" : "chevron.down").font(.system(size: 11, weight: .semibold))
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
-                .help("Hours and what it opens")
+                .help("Hours, block, look and what it opens")
                 Button { settings.v.activities.removeAll { $0.id == v.id } } label: {
                     Image(systemName: "trash").font(.system(size: 11))
                 }
@@ -106,9 +106,15 @@ struct SettingsView: View {
                         row("Can be picked from") { clockStepper(Binding(get: { a.wrappedValue.fromMinute ?? 720 }, set: { a.wrappedValue.fromMinute = $0 })) }
                         row("Until") { clockStepper(Binding(get: { a.wrappedValue.toMinute ?? 1200 }, set: { a.wrappedValue.toMinute = $0 })) }
                     }
+                    Divider()
+                    SectionLabel(text: "Cold Turkey")
+                    row("Block it locks") { textField(a.block) }
+                    Divider()
+                    SectionLabel(text: "Look")
+                    lookPicker(a, st)
                     if let m {
                         Divider()
-                        OpensEditor(m: m, block: v.name)
+                        OpensEditor(m: m, activity: v)
                     }
                 }
                 .padding(.leading, 26)
@@ -245,6 +251,31 @@ struct SettingsView: View {
             Text(clockLabel(value.wrappedValue)).monospacedDigit()
             Stepper("", onIncrement: { value.wrappedValue = (value.wrappedValue + 30) % 1440 },
                         onDecrement: { value.wrappedValue = (value.wrappedValue + 1410) % 1440 }).labelsHidden()
+        }
+    }
+
+    // Color swatches and an icon menu; the first swatch goes back to the guess from the name.
+    private func lookPicker(_ a: Binding<ActivitySetting>, _ st: ActivityStyle) -> some View {
+        HStack(spacing: 6) {
+            ForEach(ActivityStyle.colors, id: \.name) { name, color in
+                Button { a.wrappedValue.color = name } label: {
+                    Circle().fill(color).frame(width: 14, height: 14)
+                        .overlay(Circle().strokeBorder(.white, lineWidth: a.wrappedValue.color == name ? 2 : 0))
+                        .shadow(color: a.wrappedValue.color == name ? color : .clear, radius: 2)
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+            Menu {
+                Button("From the name") { a.wrappedValue.icon = nil; a.wrappedValue.color = nil }
+                Divider()
+                ForEach(ActivityStyle.icons, id: \.self) { icon in
+                    Button { a.wrappedValue.icon = icon } label: { Label(icon, systemImage: icon) }
+                }
+            } label: {
+                Image(systemName: st.icon).foregroundStyle(st.color)
+            }
+            .menuStyle(.borderlessButton).fixedSize()
         }
     }
 

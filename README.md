@@ -5,7 +5,7 @@ A small macOS menu bar app that helps you **start** working and keeps you from d
 ## How a day works
 
 1. **Start.** Click ◎ in the menu bar: the **Today** list shows every activity with the time left today. Pick a length at the top (default 30 min, or 🍅 Pomodoro) and click an activity to start it. Right-click a row to start it with a specific length.
-2. **Blocking.** The Cold Turkey block **with the same name as the activity** is locked for the session. **Rest** is an activity too: a short break between tasks with its own block, so a break doesn't turn into a movie.
+2. **Blocking.** The activity's Cold Turkey block is locked for the session: by default the one **with the same name**, and it stays linked if you rename the activity (Activities → ⌄ → Block it locks). **Rest** is an activity too: a short break between tasks with its own block, so a break doesn't turn into a movie.
 3. **Workspace.** The app opens the activity's apps and links (set them up in Activities → ⌄). For a one-off site, use **Open a site** before pressing Start.
 4. **Review.** When time's up (or you stop), a checklist appears with the plan already checked: one click confirms, or tick what you actually did. That goes into the stats.
 5. **Always decide.** Whenever nothing is running (no session, no free time) and it isn't night, the "What's next?" window opens right away and can't be closed. Nothing is blocked until you pick an activity or free time.
@@ -52,8 +52,7 @@ Everything personal lives in `~/modes`, outside the repo:
 
 | File | What |
 |---|---|
-| `settings.json` | all settings, including activities and daily limits |
-| `modes.json` | what each activity opens (apps, links, stretch windows) |
+| `settings.json` | all settings, including activities, daily limits, their Cold Turkey block and what each opens (apps, links, stretch windows) |
 | `logs/sessions.jsonl` | one line per session: start, end, planned, actual, note |
 | `logs/modes.log` | event log: launches, Cold Turkey commands, prompts, reviews |
 

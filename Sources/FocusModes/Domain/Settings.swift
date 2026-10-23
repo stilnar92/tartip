@@ -6,9 +6,55 @@ import Foundation
 struct ActivitySetting: Codable, Hashable, Identifiable {
     var id = UUID()
     var name: String
-    var dailyMinutes = 0          // 0 = no daily limit
-    var fromMinute: Int? = nil    // hours it can be picked, minutes since midnight;
-    var toMinute: Int? = nil      // nil = any time. May cross midnight.
+    var block: String              // Cold Turkey block it locks: the name at first, kept when the name changes
+    var dailyMinutes = 0           // 0 = no daily limit
+    var fromMinute: Int? = nil     // hours it can be picked, minutes since midnight;
+    var toMinute: Int? = nil       // nil = any time. May cross midnight.
+    var opens = ModeConfig()       // apps and links opened when it starts
+    var icon: String? = nil        // SF Symbol; nil = picked from the name
+    var color: String? = nil       // one of ActivityStyle.colors; nil = picked from the name
+
+    init(name: String, dailyMinutes: Int = 0, fromMinute: Int? = nil, toMinute: Int? = nil) {
+        self.name = name
+        self.block = name
+        self.dailyMinutes = dailyMinutes
+        self.fromMinute = fromMinute
+        self.toMinute = toMinute
+    }
+
+    // Settings saved before a field existed still load.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try c.decode(String.self, forKey: .name)
+        block = try c.decodeIfPresent(String.self, forKey: .block) ?? name
+        dailyMinutes = try c.decodeIfPresent(Int.self, forKey: .dailyMinutes) ?? 0
+        fromMinute = try c.decodeIfPresent(Int.self, forKey: .fromMinute)
+        toMinute = try c.decodeIfPresent(Int.self, forKey: .toMinute)
+        opens = try c.decodeIfPresent(ModeConfig.self, forKey: .opens) ?? ModeConfig()
+        icon = try c.decodeIfPresent(String.self, forKey: .icon)
+        color = try c.decodeIfPresent(String.self, forKey: .color)
+    }
+}
+
+// What an activity opens when it starts.
+struct ModeConfig: Codable, Hashable, Sendable {
+    var apps: [String] = []        // .app paths
+    var urls: [String] = []
+    var maximize: Bool = true      // stretch windows to fill the screen
+
+    init(apps: [String] = [], urls: [String] = [], maximize: Bool = true) {
+        self.apps = apps; self.urls = urls; self.maximize = maximize
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        apps = try c.decodeIfPresent([String].self, forKey: .apps) ?? []
+        urls = try c.decodeIfPresent([String].self, forKey: .urls) ?? []
+        maximize = try c.decodeIfPresent(Bool.self, forKey: .maximize) ?? true
+    }
+
+    var isEmpty: Bool { apps.isEmpty && urls.isEmpty }
 }
 
 struct AppSettings: Codable, Equatable {
@@ -52,8 +98,14 @@ extension AppSettings {
         }
     }
 
-    // Each activity has a Cold Turkey block with the same name; "Other" uses its own.
-    func block(for activity: String) -> String { activity == otherActivity ? otherBlock : activity }
+    func activity(named name: String) -> ActivitySetting? { activities.first { $0.name == name } }
+
+    // The Cold Turkey block an activity locks; "Other" has its own setting.
+    func block(for activity: String) -> String {
+        if activity == otherActivity { return otherBlock }
+        guard let b = self.activity(named: activity)?.block, !b.isEmpty else { return activity }
+        return b
+    }
 
     // Saved values are laid over the defaults, so new settings get their default.
     static func merged(over data: Data) -> AppSettings? {

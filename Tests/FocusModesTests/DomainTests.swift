@@ -153,3 +153,21 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(StateStore.migrate(from: d, now: at(11)).phase == .idle)
     }
 }
+
+@Suite struct ActivityIdentityTests {
+    @Test func oldActivityLoadsWithItsNameAsBlock() throws {
+        let json = #"{"activities": [{"id": "6F9619FF-8B86-D011-B42D-00CF4FC964FF", "name": "Work", "dailyMinutes": 60}]}"#
+        let s = try #require(AppSettings.merged(over: Data(json.utf8)))
+        #expect(s.activities.first?.block == "Work")
+        #expect(s.activities.first?.opens == ModeConfig())
+        #expect(s.activities.first?.dailyMinutes == 60)
+    }
+
+    @Test func renamingKeepsTheBlock() {
+        var s = AppSettings()
+        s.activities = [ActivitySetting(name: "Arabic")]
+        s.activities[0].name = "Arabic lessons"
+        #expect(s.block(for: "Arabic lessons") == "Arabic")
+        #expect(s.block(for: otherActivity) == s.otherBlock)
+    }
+}

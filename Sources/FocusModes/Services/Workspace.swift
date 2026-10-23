@@ -3,41 +3,11 @@
 import AppKit
 import ApplicationServices
 
-// What a mode opens when it starts.
-struct ModeConfig: Codable, Equatable, Sendable {
-    var apps: [String] = []        // .app paths
-    var urls: [String] = []
-    var maximize: Bool = true      // stretch windows to fill the screen
-
-    init(apps: [String] = [], urls: [String] = [], maximize: Bool = true) {
-        self.apps = apps; self.urls = urls; self.maximize = maximize
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        apps = try c.decodeIfPresent([String].self, forKey: .apps) ?? []
-        urls = try c.decodeIfPresent([String].self, forKey: .urls) ?? []
-        maximize = try c.decodeIfPresent(Bool.self, forKey: .maximize) ?? true
-    }
-}
-
 // What the last start opened, so the next start can clean it up.
 struct OpenedWorkspace: Codable, Equatable, Sendable {
     var mode: String
     var apps: [String]
     var chromeWindow: Int?
-}
-
-// ~/modes/modes.json: what each mode opens, by block name.
-func loadModeConfigs() -> [String: ModeConfig] {
-    guard let d = try? Data(contentsOf: configFile) else { return [:] }
-    return (try? JSONDecoder().decode([String: ModeConfig].self, from: d)) ?? [:]
-}
-
-func saveModeConfigs(_ configs: [String: ModeConfig]) {
-    let enc = JSONEncoder()
-    enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-    do { try enc.encode(configs).write(to: configFile) } catch { log("error: couldn't save \(configFile.path): \(error)") }
 }
 
 // MARK: workspace (open apps / sites, close the previous mode's)
