@@ -194,22 +194,17 @@ struct ContentView: View {
         .card(radius: 18)
     }
 
-    // Today's progress on this activity, counting this session live: one bar and "27m left today".
+    // Today's progress on this activity, counting this session live. Centered like the rest:
+    // "25m left today", a bar, then "34m of 1h".
     private func dailyProgress(_ name: String, _ color: Color) -> some View {
         let used = m.secondsByActivity(since: Calendar.current.startOfDay(for: m.now))[name] ?? 0
         let limit = m.limitMinutes(name)
         let left = m.secondsLeftToday(name) ?? 0
         return VStack(spacing: 6) {
-            HStack {
-                Text(limit > 0 ? (left > 0 ? "\(formatDuration(left)) left today" : "Daily limit reached")
-                               : "\(formatDuration(used)) today")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(limit > 0 && left == 0 ? Theme.red : Theme.text)
-                Spacer()
-                if limit > 0 {
-                    Text("\(formatDuration(used)) of \(limitLabel(limit))").font(.system(size: 12)).foregroundStyle(Theme.text2)
-                }
-            }
+            Text(limit > 0 ? (left > 0 ? "\(formatDuration(left)) left today" : "Daily limit reached")
+                           : "\(formatDuration(used)) today")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(limit > 0 && left == 0 ? Theme.red : Theme.text)
             if limit > 0 {
                 GeometryReader { g in
                     ZStack(alignment: .leading) {
@@ -218,10 +213,11 @@ struct ContentView: View {
                             .frame(width: g.size.width * min(1, CGFloat(used) / CGFloat(limit * 60)))
                     }
                 }
-                .frame(height: 6)
+                .frame(width: 200, height: 6)
+                Text("\(formatDuration(used)) of \(limitLabel(limit))").font(.system(size: 12)).foregroundStyle(Theme.text2)
             }
         }
-        .padding(.horizontal, 4)
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: free time
