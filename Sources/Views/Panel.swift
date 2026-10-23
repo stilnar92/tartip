@@ -61,7 +61,7 @@ struct ContentView: View {
     @State private var showLink = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             header
             if let r = m.restEnd {
                 resting(r)
@@ -81,8 +81,8 @@ struct ContentView: View {
             }
             footer
         }
-        .padding(14)
-        .frame(width: 300)
+        .padding(16)
+        .frame(width: 340)
         .animation(.snappy(duration: 0.2), value: m.session == nil)
         .animation(.snappy(duration: 0.2), value: editing)
         .animation(.snappy(duration: 0.2), value: showLink)
@@ -92,147 +92,194 @@ struct ContentView: View {
     // MARK: header / footer
 
     private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "scope")
-                .font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
-                .frame(width: 24, height: 24)
-                .background(Circle().fill(LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)))
-            Text("Focus").font(.system(size: 14, weight: .bold, design: .rounded))
-            Spacer()
-            // Today at a glance
-            HStack(spacing: 8) {
-                stat("scope", formatDuration(m.stats.focus), .indigo)
-                stat("cup.and.saucer.fill", "\(m.freeLeft / 60)m", m.freeLeft > 0 ? .green : .red)
-            }
-            .help("Today: focus · thinking · free time left")
-        }
-    }
-
-    private func stat(_ icon: String, _ value: String, _ color: Color) -> some View {
-        HStack(spacing: 3) {
-            Image(systemName: icon).font(.system(size: 9, weight: .semibold))
-            Text(value).font(.system(size: 11, weight: .semibold, design: .rounded)).monospacedDigit()
-        }
-        .foregroundStyle(color)
-    }
-
-    private var footer: some View {
         HStack(spacing: 10) {
-            if m.session == nil && m.restEnd == nil {
-                Button { editing.toggle() } label: {
-                    Label(editing ? "Done" : "Edit modes", systemImage: editing ? "checkmark" : "slider.horizontal.3")
+            Image(systemName: isNight(m.now) ? "moon.stars.fill" : "scope")
+                .font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)))
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Focus").font(.system(size: 16, weight: .bold, design: .rounded))
+                HStack(spacing: 5) {
+                    Circle().fill(guardColor).frame(width: 6, height: 6)
+                    Text(guardText).font(.system(size: 11)).foregroundStyle(.secondary)
                 }
             }
-            Button {
-                // Close the menu bar panel first so it doesn't cover the stats window.
-                NSApp.keyWindow?.close()
-                m.openStats()
-            } label: { Label("Stats", systemImage: "chart.bar.fill") }
-            Button {
-                NSApp.keyWindow?.close()
-                m.openSettings()
-            } label: { Image(systemName: "gearshape.fill") }
-            .help("Settings")
-            Button {
-                NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Cold Turkey Blocker.app"))
-            } label: {
-                Label("Cold Turkey", systemImage: "arrow.up.forward.app")
-            }
             Spacer()
-            Circle().fill(enforcementActive(m.now) ? Color.green : Color.secondary).frame(width: 6, height: 6)
-                .help(enforcementActive(m.now) ? "Guard on · weekdays 10–22" : "Guard off")
         }
-        .buttonStyle(.borderless)
-        .font(.system(size: 11))
-        .foregroundStyle(.secondary)
     }
 
-    // MARK: setup (compact)
+    private var guardColor: Color {
+        isNight(m.now) ? .purple : (enforcementActive(m.now) ? .green : .secondary)
+    }
+
+    private var guardText: String {
+        if isNight(m.now) { return "Night until \(clockLabel(S.nightTo))" }
+        if enforcementActive(m.now) { return "Guard on until \(String(format: "%02d:00", S.guardToHour))" }
+        return "Guard off"
+    }
+
+    // Footer: four equal tools, icon above a caption, so nothing wraps.
+    private var footer: some View {
+        HStack(spacing: 4) {
+            if m.session == nil && m.restEnd == nil {
+                tool(editing ? "checkmark" : "slider.horizontal.3", editing ? "Done" : "Edit") { editing.toggle() }
+            }
+            tool("chart.bar.fill", "Stats") {
+                // Close the menu bar panel first so it doesn't cover the window.
+                NSApp.keyWindow?.close()
+                m.openStats()
+            }
+            tool("gearshape.fill", "Settings") {
+                NSApp.keyWindow?.close()
+                m.openSettings()
+            }
+            tool("arrow.up.forward.app", "Cold Turkey") {
+                NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Cold Turkey Blocker.app"))
+            }
+        }
+    }
+
+    private func tool(_ icon: String, _ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                Image(systemName: icon).font(.system(size: 13, weight: .semibold))
+                Text(title).font(.system(size: 10, weight: .medium)).lineLimit(1)
+            }
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 7)
+            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(.quaternary.opacity(0.35)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: setup
 
     private var setup: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // How long is chosen in the "What will you work on?" window (default 30 min).
-            HStack(spacing: 6) {
-                Text(m.pomodoro ? "Pomodoro 25/5 × 4" : "Duration: choose when starting")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            todayCard
+
+            // Pomodoro switch; otherwise the length is picked in the "What will you work on?" window.
+            HStack(spacing: 10) {
+                Text("🍅").font(.system(size: 18))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Pomodoro").font(.system(size: 13, weight: .medium))
+                    Text(m.pomodoro ? "\(S.pomodoroWork)/\(S.pomodoroBreak) min × \(S.pomodoroRounds)" : "Off · length picked at start")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                }
                 Spacer()
-                Toggle(isOn: $m.pomodoro) { Text("🍅").font(.system(size: 12)) }
-                    .toggleStyle(.switch).controlSize(.mini)
-                    .help("Pomodoro 25/5 × 4")
+                Toggle("", isOn: $m.pomodoro).labelsHidden().toggleStyle(.switch).controlSize(.small)
             }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .card(radius: 12)
 
             if showLink {
                 HStack(spacing: 6) {
                     Image(systemName: "link").foregroundStyle(.secondary)
-                    TextField("Also open this time…", text: $m.oneTimeLink).textFieldStyle(.plain)
+                    TextField("Also open this link this time…", text: $m.oneTimeLink).textFieldStyle(.plain)
                 }
                 .font(.system(size: 12))
-                .padding(.horizontal, 10).padding(.vertical, 6)
-                .card(radius: 9)
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .card(radius: 10)
             }
 
-            HStack(spacing: 6) {
-                startButton
-                iconButton("link", active: showLink || !m.oneTimeLink.isEmpty, help: "Open an extra link this time") {
-                    showLink.toggle()
-                }
+            startButton
+
+            HStack(spacing: 8) {
+                secondary("link", m.oneTimeLink.isEmpty ? "Extra link" : "Link added",
+                          active: showLink || !m.oneTimeLink.isEmpty) { showLink.toggle() }
                 restMenu
             }
         }
     }
 
-    private func modeTile(_ b: String) -> some View {
-        let st = BlockStyle.of(b)
-        let sel = m.selected == b
-        return HStack(spacing: 6) {
-            Image(systemName: st.icon)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(sel ? .white : st.color)
-                .frame(width: 22, height: 22)
-                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(sel ? AnyShapeStyle(st.color.gradient) : AnyShapeStyle(st.color.opacity(0.15))))
-            Text(b.replacingOccurrences(of: "_Mode", with: "").replacingOccurrences(of: "_", with: " "))
-                .font(.system(size: 12, weight: sel ? .semibold : .regular))
-                .lineLimit(1)
-            Spacer(minLength: 0)
+    // Today: totals plus progress for every activity that has a daily limit.
+    private var todayCard: some View {
+        let today = Calendar.current.startOfDay(for: m.now)
+        let used = m.secondsByActivity(since: today)
+        let goals = S.activities.filter { $0.dailyMinutes > 0 }
+        let sessions = m.recordsSince(today).count
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 0) {
+                todayStat(formatDuration(m.stats.focus), "Focused", .indigo)
+                todayStat("\(sessions)", "Sessions", .primary)
+                todayStat("\(m.freeLeft / 60)m", "Free left", m.freeLeft > 0 ? .green : .red)
+            }
+            if goals.isEmpty {
+                Text("Set daily goals for activities in Settings.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+            } else {
+                VStack(spacing: 6) {
+                    ForEach(goals) { g in
+                        let secs = used[g.name] ?? 0
+                        let st = ActivityStyle.of(g.name)
+                        let done = secs >= g.dailyMinutes * 60
+                        HStack(spacing: 8) {
+                            Image(systemName: done ? "checkmark.circle.fill" : st.icon)
+                                .font(.system(size: 11)).foregroundStyle(done ? .green : st.color).frame(width: 16)
+                            Text(g.name).font(.system(size: 12)).lineLimit(1).frame(width: 86, alignment: .leading)
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(st.color.opacity(0.15))
+                                    Capsule().fill(done ? AnyShapeStyle(Color.green.gradient) : AnyShapeStyle(st.color.gradient))
+                                        .frame(width: geo.size.width * min(1, CGFloat(secs) / CGFloat(g.dailyMinutes * 60)))
+                                }
+                            }
+                            .frame(height: 6)
+                            Text("\(formatDuration(secs)) / \(limitLabel(g.dailyMinutes))")
+                                .font(.system(size: 10, weight: .medium, design: .rounded)).monospacedDigit()
+                                .foregroundStyle(.secondary).frame(width: 62, alignment: .trailing)
+                        }
+                    }
+                }
+            }
         }
-        .padding(6)
-        .card(sel ? st.color : nil, radius: 10)
-        .contentShape(Rectangle())
-        .onTapGesture { m.selected = b }
-        .help(b)
+        .padding(12)
+        .card(radius: 14)
     }
 
-    private func iconButton(_ icon: String, active: Bool, help: String, action: @escaping () -> Void) -> some View {
+    private func todayStat(_ value: String, _ label: String, _ color: Color) -> some View {
+        VStack(spacing: 2) {
+            Text(value).font(.system(size: 17, weight: .bold, design: .rounded)).monospacedDigit().foregroundStyle(color)
+            Text(label).font(.system(size: 10)).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func secondary(_ icon: String, _ title: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
-                .frame(width: 36, height: 36)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(active ? AnyShapeStyle(Color.accentColor.opacity(0.25)) : AnyShapeStyle(.quaternary.opacity(0.6))))
+            Label(title, systemImage: icon)
+                .font(.system(size: 12, weight: .medium))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(active ? AnyShapeStyle(Color.accentColor.opacity(0.22)) : AnyShapeStyle(.quaternary.opacity(0.6))))
                 .contentShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
-        .help(help)
     }
 
     private var restMenu: some View {
         Menu {
-            Section(m.restTaken ? "Rest used · start a mode first" : "Rest · nothing blocked · \(m.freeLeft / 60) min left today") {
+            Section(m.restTaken ? "Rest used · start a session first" : "Rest · nothing blocked · \(m.freeLeft / 60) min left today") {
                 ForEach(restOptions, id: \.self) { n in
                     Button("☕ \(n) min") { m.startRest(minutes: n) }
                         .disabled(!m.canRest)
                 }
             }
         } label: {
-            Image(systemName: "cup.and.saucer.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .frame(width: 36, height: 36)
+            Label(m.canRest ? "Rest · \(m.freeLeft / 60)m" : "Rest used", systemImage: "cup.and.saucer.fill")
+                .font(.system(size: 12, weight: .medium))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
                 .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.quaternary.opacity(0.6)))
+                .contentShape(RoundedRectangle(cornerRadius: 10))
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Rest (\(m.freeLeft / 60) min left today)")
+        .help("Rest: nothing blocked (\(m.freeLeft / 60) min left today)")
     }
 
     // MARK: editor (add/remove modes, what each opens)
@@ -369,10 +416,10 @@ struct ContentView: View {
                 Image(systemName: "play.fill")
                 Text(startLabel)
             }
-            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .font(.system(size: 15, weight: .semibold, design: .rounded))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
-            .frame(height: 36)
+            .frame(height: 44)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(LinearGradient(colors: [color, color.opacity(0.75)], startPoint: .topLeading, endPoint: .bottomTrailing))

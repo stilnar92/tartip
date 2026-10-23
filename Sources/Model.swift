@@ -455,5 +455,6 @@ final class Model: ObservableObject {
 
 func formatDuration(_ secs: Int) -> String {
     let m = secs / 60
-    return m >= 60 ? "\(m / 60)h \(m % 60)m" : "\(m)m"
+    if m < 60 { return "\(m)m" }
+    return m % 60 == 0 ? "\(m / 60)h" : "\(m / 60)h \(m % 60)m"
 }
