@@ -5,9 +5,9 @@ import SwiftUI
 // The same Today list as the panel, in its own window that stays on top.
 struct ActivityPickerView: View {
     @ObservedObject var m: Model
+    @ObservedObject var clock: Clock
 
     var body: some View {
-        let auto = m.pendingStart?.auto ?? true
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("What's next?").font(.system(size: 26, weight: .bold)).foregroundStyle(Theme.text)
@@ -15,12 +15,7 @@ struct ActivityPickerView: View {
                     .font(.system(size: 13)).foregroundStyle(Theme.text2)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            TodayList(m: m)
-            if !auto {
-                Button("Cancel") { m.cancelPick() }
-                    .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.text2)
-                    .keyboardShortcut(.cancelAction)
-            }
+            TodayList(m: m, clock: clock)
         }
         .padding(24)
         .frame(width: 420)
@@ -81,7 +76,7 @@ struct ReviewView: View {
             .padding(.vertical, 4)
             .card(radius: 14)
 
-            Button { m.saveReview(actual: checked, note: nil) } label: {
+            Button { m.saveReview(actual: checked) } label: {
                 Text(checked == (r?.planned.map { [$0] } ?? []) && !checked.isEmpty ? "Yes, as planned" : "Save")
                     .font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
                     .frame(maxWidth: .infinity).padding(.vertical, 11)

@@ -4,7 +4,7 @@ import AppKit
 import ApplicationServices
 
 // What a mode opens when it starts.
-struct ModeConfig: Codable, Equatable {
+struct ModeConfig: Codable, Equatable, Sendable {
     var apps: [String] = []        // .app paths
     var urls: [String] = []
     var maximize: Bool = true      // stretch windows to fill the screen
@@ -22,35 +22,30 @@ struct ModeConfig: Codable, Equatable {
 }
 
 // What the last start opened, so the next start can clean it up.
-struct OpenedWorkspace: Codable {
+struct OpenedWorkspace: Codable, Equatable, Sendable {
     var mode: String
     var apps: [String]
     var chromeWindow: Int?
 }
 
+// ~/modes/modes.json: what each mode opens, by block name.
+func loadModeConfigs() -> [String: ModeConfig] {
+    guard let d = try? Data(contentsOf: configFile) else { return [:] }
+    return (try? JSONDecoder().decode([String: ModeConfig].self, from: d)) ?? [:]
+}
+
+func saveModeConfigs(_ configs: [String: ModeConfig]) {
+    let enc = JSONEncoder()
+    enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+    do { try enc.encode(configs).write(to: configFile) } catch { log("error: couldn't save \(configFile.path): \(error)") }
+}
+
 // MARK: workspace (open apps / sites, close the previous mode's)
 
 func axTrusted(prompt: Bool) -> Bool {
-    let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+    // The value of kAXTrustedCheckOptionPrompt, which Swift 6 sees as a mutable global.
+    let key = "AXTrustedCheckOptionPrompt"
     return AXIsProcessTrustedWithOptions([key: prompt] as CFDictionary)
-}
-
-@discardableResult
-func osascript(_ script: String) -> String {
-    let p = Process()
-    p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-    p.arguments = ["-e", script]
-    let out = Pipe()
-    p.standardOutput = out
-    p.standardError = FileHandle.nullDevice
-    do { try p.run() } catch { return "" }
-    let data = out.fileHandleForReading.readDataToEndOfFile()
-    p.waitUntilExit()
-    return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-}
-
-func appleString(_ s: String) -> String {
-    "\"" + s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
 }
 
 func waitForApp(bundleID: String, timeout: Double = 10) -> NSRunningApplication? {
@@ -128,7 +123,7 @@ let workspaceQueue = DispatchQueue(label: "workspace")   // one start at a time
 
 // prev: what the previous start opened. Returns what this start opened.
 func openWorkspace(mode: String, _ c: ModeConfig, extraURLs: [String],
-                   prev: OpenedWorkspace?, done: @escaping (OpenedWorkspace) -> Void) {
+                   prev: OpenedWorkspace?, done: @escaping @MainActor @Sendable (OpenedWorkspace) -> Void) {
     workspaceQueue.async {
         let trusted = axTrusted(prompt: false)
 
@@ -160,6 +155,6 @@ func openWorkspace(mode: String, _ c: ModeConfig, extraURLs: [String],
         }
 
         let opened = OpenedWorkspace(mode: mode, apps: c.apps, chromeWindow: chromeWindow)
-        DispatchQueue.main.async { done(opened) }
+        Task { @MainActor in done(opened) }
     }
 }

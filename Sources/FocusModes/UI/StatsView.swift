@@ -20,6 +20,7 @@ struct StatsView: View {
                 : (order.firstIndex(of: $0.key) ?? 99) < (order.firstIndex(of: $1.key) ?? 99)
         }
         let total = rows.reduce(0) { $0 + $1.value }
+        let limits = m.limits
         let reviewed = recs.filter { !$0.actual.isEmpty && $0.planned != nil }
         let kept = reviewed.filter(\.asPlanned).count
 
@@ -59,7 +60,7 @@ struct StatsView: View {
                         }
                         .frame(height: 10)
                         // Today: show progress against the daily limit, e.g. "45m / 1h".
-                        let limit = m.limitMinutes(name)
+                        let limit = limits.limitMinutes(name)
                         Text((secs > 0 ? formatDuration(secs) : "–") + (range == 0 && limit > 0 ? " / \(limitLabel(limit))" : "")).font(.system(size: 12, weight: .semibold))
                             .monospacedDigit().frame(width: 92, alignment: .trailing)
                     }

@@ -16,19 +16,21 @@ struct SectionLabel: View {
 // in a session = the session card; free time and night have their own cards.
 struct ContentView: View {
     @ObservedObject var m: Model
+    @ObservedObject var clock: Clock
+    let openMain: (MainTab) -> Void
     @State private var showLink = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if m.session == nil { header }
-            if let r = m.restEnd {
-                freeTimeCard(r)
+            if let end = m.freeTimeEnd {
+                freeTimeCard(end)
             } else if let s = m.session, let cur = s.current(at: m.now) {
                 sessionCard(s, cur)
             } else if S.isNight(at: m.now) {
                 nightCard
             } else {
-                TodayList(m: m)
+                TodayList(m: m, clock: clock)
                 siteRow
             }
             if !m.message.isEmpty {
@@ -43,7 +45,7 @@ struct ContentView: View {
         .background(Theme.bg)
         .environment(\.colorScheme, .light)
         .animation(.snappy(duration: 0.2), value: m.session == nil)
-        .animation(.snappy(duration: 0.2), value: m.restEnd == nil)
+        .animation(.snappy(duration: 0.2), value: m.freeTimeEnd == nil)
         .animation(.snappy(duration: 0.2), value: showLink)
     }
 
@@ -95,9 +97,9 @@ struct ContentView: View {
     // Floating white pill with icon buttons, like Craft's toolbar.
     private var toolbar: some View {
         HStack(spacing: 2) {
-            tool("chart.bar", "Stats") { hideMenuPanel(); m.openMain(.stats) }
-            tool("list.bullet", "Activities") { hideMenuPanel(); m.openMain(.activities) }
-            tool("gearshape", "Rules") { hideMenuPanel(); m.openMain(.rules) }
+            tool("chart.bar", "Stats") { openMain(.stats) }
+            tool("list.bullet", "Activities") { openMain(.activities) }
+            tool("gearshape", "Rules") { openMain(.rules) }
         }
         .padding(4)
         .background(Capsule().fill(Theme.card).shadow(color: .black.opacity(0.08), radius: 8, y: 2))
@@ -149,7 +151,7 @@ struct ContentView: View {
                     .rotationEffect(.degrees(-90))
                     .animation(.linear(duration: 1), value: progress)
                 VStack(spacing: 2) {
-                    Text(m.remaining(cur.end))
+                    Text(countdown(to: cur.end, from: m.now))
                         .font(.system(size: 56, weight: .semibold))
                         .monospacedDigit()
                         .foregroundStyle(Theme.text)
@@ -176,9 +178,10 @@ struct ContentView: View {
     // Today's progress on this activity, counting this session live. Centered like the rest:
     // "25m left today", a bar, then "34m of 1h".
     private func dailyProgress(_ name: String, _ color: Color) -> some View {
-        let used = m.secondsByActivity(since: Calendar.current.startOfDay(for: m.now))[name] ?? 0
-        let limit = m.limitMinutes(name)
-        let left = m.secondsLeftToday(name) ?? 0
+        let limits = m.limits
+        let used = limits.usedToday(name)
+        let limit = limits.limitMinutes(name)
+        let left = limits.secondsLeftToday(name) ?? 0
         return VStack(spacing: 6) {
             Text(limit > 0 ? (left > 0 ? "\(formatDuration(left)) left today" : "Daily limit reached")
                            : "\(formatDuration(used)) today")
@@ -211,7 +214,7 @@ struct ContentView: View {
                 }
                 Spacer()
             }
-            Text(m.remaining(until))
+            Text(countdown(to: until, from: m.now))
                 .font(.system(size: 52, weight: .semibold)).monospacedDigit()
                 .foregroundStyle(Theme.text)
                 .contentTransition(.numericText(countsDown: true))

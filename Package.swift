@@ -10,7 +10,7 @@ let package = Package(
         .executableTarget(
             name: "FocusModes",
             path: "Sources/FocusModes",
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
             name: "FocusModesTests",

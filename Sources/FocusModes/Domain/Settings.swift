@@ -1,10 +1,7 @@
 // Everything that used to be a constant, editable in the Settings window.
-// Stored in ~/modes/settings.json; missing keys fall back to the defaults below.
+// Stored in ~/modes/settings.json (see SettingsStore); missing keys fall back to the defaults below.
 
 import Foundation
-import Combine
-
-let settingsFile = modesDir.appendingPathComponent("settings.json")
 
 struct ActivitySetting: Codable, Hashable, Identifiable {
     var id = UUID()
@@ -40,47 +37,24 @@ struct AppSettings: Codable, Equatable {
         .map { ActivitySetting(name: $0) }
 }
 
-final class Settings: ObservableObject {
-    static let shared = Settings()
-
-    @Published var v: AppSettings { didSet { if v != oldValue { save() } } }
-
-    private init() {
-        v = Settings.load()
-        if !FileManager.default.fileExists(atPath: settingsFile.path) { save() }
-    }
-
-    private static func load() -> AppSettings {
-        guard let data = try? Data(contentsOf: settingsFile) else { return migrated(AppSettings()) }
-        return AppSettings.merged(over: data) ?? AppSettings()
-    }
-
-    // First run: take the activity list from activities.txt and the "Other" block from blocks.txt.
-    private static func migrated(_ d: AppSettings) -> AppSettings {
-        var s = d
-        if let text = try? String(contentsOf: modesDir.appendingPathComponent("activities.txt"), encoding: .utf8) {
-            let names = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-            if !names.isEmpty { s.activities = names.map { ActivitySetting(name: $0) } }
-        }
-        if let text = try? String(contentsOf: modesDir.appendingPathComponent("blocks.txt"), encoding: .utf8),
-           let first = text.split(separator: "\n").first.map({ $0.trimmingCharacters(in: .whitespaces) }), !first.isEmpty {
-            s.otherBlock = first
-            s.nightBlock = first
-        }
-        return s
-    }
-
-    func save() {
-        let enc = JSONEncoder()
-        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try? FileManager.default.createDirectory(at: modesDir, withIntermediateDirectories: true)
-        do { try enc.encode(v).write(to: settingsFile) } catch { log("error: couldn't save \(settingsFile.path): \(error)") }
-    }
-}
-
-var S: AppSettings { Settings.shared.v }
-
 extension AppSettings {
+    // Values derived from the settings.
+    var dailyFreeSeconds: Int { dailyFreeMinutes * 60 }
+    var sessionLengths: [Int] { durationOptions.filter { $0 >= minMinutes }.sorted() }
+    var defaultSessionMinutes: Int { max(defaultMinutes, minMinutes) }
+    // Free time lengths offered, never longer than one stretch may be.
+    var freeTimeLengths: [Int] { [15, 30, 45, 60, 90, 120].filter { $0 <= maxRestMinutes } }
+
+    func pomodoroPhases() -> [Phase] {
+        let rounds = max(1, pomodoroRounds)
+        return (0..<rounds).flatMap { i in
+            [Phase(isBreak: false, minutes: pomodoroWork)] + (i < rounds - 1 ? [Phase(isBreak: true, minutes: pomodoroBreak)] : [])
+        }
+    }
+
+    // Each activity has a Cold Turkey block with the same name; "Other" uses its own.
+    func block(for activity: String) -> String { activity == otherActivity ? otherBlock : activity }
+
     // Saved values are laid over the defaults, so new settings get their default.
     static func merged(over data: Data) -> AppSettings? {
         guard let saved = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -112,11 +86,4 @@ func minuteOfDay(_ d: Date, calendar: Calendar = .current) -> Int {
 // Whether `m` (minutes since midnight) is inside from..<to, which may cross midnight.
 func inWindow(_ m: Int, _ from: Int, _ to: Int) -> Bool {
     from < to ? (m >= from && m < to) : (m >= from || m < to)
-}
-
-func clockLabel(_ minutes: Int) -> String { String(format: "%02d:%02d", minutes / 60, minutes % 60) }
-
-func limitLabel(_ minutes: Int) -> String {
-    if minutes == 0 { return "No limit" }
-    return minutes % 60 == 0 ? "\(minutes / 60)h" : (minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m")
 }

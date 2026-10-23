@@ -35,8 +35,8 @@ scripts/build.sh            # builds /Applications/Focus Modes.app and starts it
 NO_START=1 scripts/build.sh # build only
 ```
 
-The build needs the Xcode command-line tools (`swiftc`). It:
-- compiles `Sources/` into `/Applications/Focus Modes.app`
+The build needs Xcode or its command-line tools (Swift 6). It:
+- builds the release binary with SwiftPM and wraps it into `/Applications/Focus Modes.app`
 - draws the icon (`scripts/make-icon.swift`)
 - signs the app with a local self-signed certificate "FocusModes Local", created once in your login keychain, so macOS remembers permissions across rebuilds
 - installs the launch agent (`launchd/com.user.focusmodes.plist`): the app starts at login and comes back within seconds if it's quit
@@ -59,16 +59,15 @@ Everything personal lives in `~/modes`, outside the repo:
 
 ## Code
 
+`swift build` and `swift test` work from the repo root (Swift 6, macOS 13+); `scripts/build.sh` wraps the release build into the app.
+
 | Path | What |
 |---|---|
-| `Sources/App.swift` | entry point, menu bar item, single-instance logic |
-| `Sources/Model.swift` | state, timer loop, sessions, rest, prompts, limits, night |
-| `Sources/Settings.swift` | `AppSettings` and its JSON storage |
-| `Sources/Rules.swift` | presence detection, values derived from settings |
-| `Sources/Activities.swift` | session history, activity styles, helper windows |
-| `Sources/Workspace.swift` | opening apps and a Chrome window, cleanup |
-| `Sources/Core.swift` | paths, process helpers, logging, Cold Turkey CLI |
-| `Sources/Views/` | Today list, panel, "What's next?"/review, main window (stats, activities, rules), theme |
+| `Sources/FocusModes/App/` | entry point and single-instance check, `Model` (state, timer, sessions, free time, night), `Clock`, `WindowCoordinator` (prompt and main windows) |
+| `Sources/FocusModes/Domain/` | pure logic: `Session` and `AppPhase`, session records, daily `Limits`, `AppSettings` and night hours |
+| `Sources/FocusModes/Services/` | Cold Turkey CLI, workspace (apps and a Chrome window), saved state, settings file, history, log, notifications |
+| `Sources/FocusModes/UI/` | Today list, panel, "What's next?"/review, main window (stats, activities, rules), theme |
+| `Tests/FocusModesTests/` | tests for the domain logic and the saved-state migration |
 
 ## Known limits
 

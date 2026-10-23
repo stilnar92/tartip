@@ -95,3 +95,61 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(c == ModeConfig())
     }
 }
+
+@Suite struct ActivityLimitsTests {
+    var settings: AppSettings {
+        var s = AppSettings()
+        s.activities = [ActivitySetting(name: "Work", dailyMinutes: 60, fromMinute: 12 * 60, toMinute: 20 * 60),
+                        ActivitySetting(name: "English")]
+        return s
+    }
+
+    @Test func timeLeftCountsTodaysSessions() {
+        let today = [SessionRecord(start: at(13), end: at(13, 40), mode: "Work", planned: "Work")]
+        let limits = Limits(settings: settings, today: today, now: at(14), calendar: cal)
+        #expect(limits.secondsLeftToday("Work") == 20 * 60)
+        #expect(limits.secondsLeftToday("English") == nil)
+        #expect(limits.canStart("Work"))
+    }
+
+    @Test func closedOutsideItsHours() {
+        let limits = Limits(settings: settings, today: [], now: at(9), calendar: cal)
+        #expect(!limits.isOpen("Work"))
+        #expect(limits.opensLabel("Work") == "from 12:00")
+        #expect(limits.isOpen("English"))
+    }
+
+    @Test func pomodoroPhases() {
+        let phases = AppSettings().pomodoroPhases()
+        #expect(phases.count == 7)
+        #expect(phases.filter(\.isBreak).count == 3)
+    }
+}
+
+@Suite struct StateStoreTests {
+    @Test func phaseSurvivesEncoding() throws {
+        var s = StoredState()
+        s.phase = .freeTime(start: at(10), end: at(10, 30))
+        let back = try JSONDecoder().decode(StoredState.self, from: JSONEncoder().encode(s))
+        #expect(back == s)
+    }
+
+    @Test func migratesTheOldKeys() throws {
+        let name = "FocusModesTests.\(UUID().uuidString)"
+        let d = try #require(UserDefaults(suiteName: name))
+        defer { d.removePersistentDomain(forName: name) }
+        let session = Session(block: "Work", phases: [Phase(isBreak: false, minutes: 30)], start: at(10), planned: "Work")
+        d.set(try JSONEncoder().encode(session), forKey: "session")
+        d.set(45, forKey: "minutes")
+        d.set(true, forKey: "restTaken")
+        d.set(try JSONEncoder().encode(DayStats(day: "2026-03-01", free: 600)), forKey: "stats")
+
+        let s = StateStore.migrate(from: d, now: at(10, 10))
+        #expect(s.phase == .session(session))
+        #expect(s.minutes == 45)
+        #expect(s.restTaken)
+        #expect(s.freeUsed.free == 600)
+        // A session that ended while the app was gone isn't restored.
+        #expect(StateStore.migrate(from: d, now: at(11)).phase == .idle)
+    }
+}
