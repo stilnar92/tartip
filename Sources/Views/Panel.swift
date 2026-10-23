@@ -162,12 +162,16 @@ struct ContentView: View {
                 .frame(width: 32, height: 32)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
+                    // Something useful under the name: the session length and when it started,
+                    // or the Pomodoro round; during a break, what to do.
                     Text(p.isBreak ? "Break · stand up, drink water"
-                                   : (s.workRounds > 1 ? "Round \(s.round(of: cur.index)) of \(s.workRounds)" : "Focus"))
+                                   : (s.workRounds > 1 ? "Pomodoro · round \(s.round(of: cur.index)) of \(s.workRounds)"
+                                                       : "\(s.totalMinutes) min · started \(f.string(from: s.start))"))
                         .font(.system(size: 12)).foregroundStyle(Theme.text2)
                 }
                 Spacer()
-                Tag(text: p.isBreak ? "Break" : "Focus", color: color, fill: color.opacity(0.14))
+                // Only a break gets a tag; while working the name says enough.
+                if p.isBreak { Tag(text: "Break", color: color, fill: color.opacity(0.14)) }
             }
 
             Text(m.remaining(cur.end))
