@@ -165,12 +165,7 @@ final class Model: ObservableObject {
     // Seconds per activity: what was actually done, or what was planned until it's reviewed,
     // split evenly when a session covered several activities.
     func secondsByActivity(since from: Date) -> [String: Int] {
-        var out: [String: Int] = [:]
-        for r in recordsSince(from) {
-            let acts = r.actual.isEmpty ? [r.planned ?? otherActivity] : r.actual
-            for a in acts { out[a, default: 0] += r.seconds / acts.count }
-        }
-        return out
+        FocusModes.secondsByActivity(recordsSince(from))
     }
 
     // Daily limit in minutes (0 = none).
@@ -289,7 +284,7 @@ final class Model: ObservableObject {
     // A session that's already running just finishes.
     private func enterNightIfNeeded() {
         if pendingStart?.auto == true { cancelPick() }
-        let end = nightEnd(after: now)
+        let end = S.nightEnd(after: now)
         if let applied = UserDefaults.standard.object(forKey: "nightUntil") as? Date, applied >= end { return }
         let mins = Int((end.timeIntervalSince(now) / 60).rounded(.up))
         runCT(["-start", S.nightBlock, "-lock", String(mins)], keep: Double(mins * 60 + 60))
@@ -303,7 +298,7 @@ final class Model: ObservableObject {
         if stats.day != dayKey(now) { stats = DayStats(day: dayKey(now)) }
         defer { if Int(now.timeIntervalSince1970) % 10 == 0 { saveStats() } }
 
-        let night = isNight(now)
+        let night = S.isNight(at: now)
         if night { enterNightIfNeeded() }
 
         if let s = session {

@@ -37,7 +37,7 @@ struct FocusModesApp: App {
         MenuBarExtra {
             ContentView(m: model)
         } label: {
-            if model.session == nil && model.restEnd == nil && isNight(model.now) {
+            if model.session == nil && model.restEnd == nil && S.isNight(at: model.now) {
                 Image(systemName: "moon.stars.fill")
             } else if model.session == nil {
                 Image(systemName: "scope")

@@ -42,6 +42,20 @@ func loadRecords() -> [SessionRecord] {
     return text.split(separator: "\n").compactMap { try? dec.decode(SessionRecord.self, from: Data($0.utf8)) }
 }
 
+// Seconds per activity: what was actually done, or what was planned until it's reviewed.
+// A session that covered several activities is split evenly; the first gets the remainder.
+func secondsByActivity(_ records: [SessionRecord]) -> [String: Int] {
+    var out: [String: Int] = [:]
+    for r in records {
+        let acts = r.actual.isEmpty ? [r.planned ?? otherActivity] : r.actual
+        let share = r.seconds / acts.count
+        for (i, a) in acts.enumerated() {
+            out[a, default: 0] += share + (i == 0 ? r.seconds % acts.count : 0)
+        }
+    }
+    return out
+}
+
 // Activity names come from Settings; activities.txt is only read once to migrate.
 func loadActivities() -> [String] { S.activities.map(\.name).filter { !$0.isEmpty } }
 

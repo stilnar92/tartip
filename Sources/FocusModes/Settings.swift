@@ -50,17 +50,9 @@ final class Settings: ObservableObject {
         if !FileManager.default.fileExists(atPath: settingsFile.path) { save() }
     }
 
-    // Loaded values are laid over the defaults, so new settings get their default.
     private static func load() -> AppSettings {
-        let defaults = AppSettings()
-        guard let data = try? Data(contentsOf: settingsFile),
-              let saved = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let base = try? JSONSerialization.jsonObject(with: JSONEncoder().encode(defaults)) as? [String: Any]
-        else { return migrated(defaults) }
-        let merged = base.merging(saved) { _, new in new }
-        guard let mergedData = try? JSONSerialization.data(withJSONObject: merged),
-              let s = try? JSONDecoder().decode(AppSettings.self, from: mergedData) else { return defaults }
-        return s
+        guard let data = try? Data(contentsOf: settingsFile) else { return migrated(AppSettings()) }
+        return AppSettings.merged(over: data) ?? AppSettings()
     }
 
     // First run: take the activity list from activities.txt and the "Other" block from blocks.txt.
@@ -88,25 +80,32 @@ final class Settings: ObservableObject {
 
 var S: AppSettings { Settings.shared.v }
 
-// Night window, which may cross midnight (e.g. 22:00–06:00).
-func isNight(_ d: Date) -> Bool {
-    guard S.nightEnabled, S.nightFrom != S.nightTo else { return false }
-    let c = Calendar.current.dateComponents([.hour, .minute], from: d)
-    let m = (c.hour ?? 0) * 60 + (c.minute ?? 0)
-    return S.nightFrom < S.nightTo ? (m >= S.nightFrom && m < S.nightTo)
-                                   : (m >= S.nightFrom || m < S.nightTo)
+extension AppSettings {
+    // Saved values are laid over the defaults, so new settings get their default.
+    static func merged(over data: Data) -> AppSettings? {
+        guard let saved = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let base = try? JSONSerialization.jsonObject(with: JSONEncoder().encode(AppSettings())) as? [String: Any],
+              let mergedData = try? JSONSerialization.data(withJSONObject: base.merging(saved) { _, new in new })
+        else { return nil }
+        return try? JSONDecoder().decode(AppSettings.self, from: mergedData)
+    }
+
+    // Night window, which may cross midnight (e.g. 22:00–06:00).
+    func isNight(at d: Date, calendar: Calendar = .current) -> Bool {
+        guard nightEnabled, nightFrom != nightTo else { return false }
+        return inWindow(minuteOfDay(d, calendar: calendar), nightFrom, nightTo)
+    }
+
+    // When the current night ends.
+    func nightEnd(after d: Date, calendar: Calendar = .current) -> Date {
+        let today = calendar.date(bySettingHour: nightTo / 60, minute: nightTo % 60, second: 0, of: d) ?? d
+        if today > d { return today }
+        return calendar.date(byAdding: .day, value: 1, to: today) ?? today.addingTimeInterval(86_400)
+    }
 }
 
-// When the current night ends.
-func nightEnd(after d: Date) -> Date {
-    let cal = Calendar.current
-    var end = cal.startOfDay(for: d).addingTimeInterval(Double(S.nightTo * 60))
-    if end <= d { end = cal.date(byAdding: .day, value: 1, to: end)! }
-    return end
-}
-
-func minuteOfDay(_ d: Date) -> Int {
-    let c = Calendar.current.dateComponents([.hour, .minute], from: d)
+func minuteOfDay(_ d: Date, calendar: Calendar = .current) -> Int {
+    let c = calendar.dateComponents([.hour, .minute], from: d)
     return (c.hour ?? 0) * 60 + (c.minute ?? 0)
 }
 

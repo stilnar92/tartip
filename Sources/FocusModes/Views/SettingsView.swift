@@ -143,7 +143,7 @@ struct SettingsView: View {
                 TextField("15, 20, 30, 45, 60", text: $optionsText)
                     .textFieldStyle(.roundedBorder).frame(width: 160)
                     .onSubmit(saveOptions)
-                    .onChange(of: optionsText) { saveOptions() }
+                    .onChange(of: optionsText) { _ in saveOptions() }
             }
             row("Default") { minuteStepper($settings.v.defaultMinutes, 5...240, step: 5) }
             row("Minimum") { minuteStepper($settings.v.minMinutes, 5...120, step: 5) }

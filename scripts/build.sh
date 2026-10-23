@@ -9,13 +9,17 @@ APP="/Applications/Focus Modes.app"
 AGENT="$HOME/Library/LaunchAgents/com.user.focusmodes.plist"
 [ -f "$AGENT" ] || [ -n "$NO_START" ] || cp launchd/com.user.focusmodes.plist "$AGENT"
 
+# Compile first, so a failed build leaves the running copy alone.
+swift build -c release --product FocusModes
+BIN="$(swift build -c release --show-bin-path)/FocusModes"
+
 # Stop the running copy (and its auto-restart) while rebuilding.
 launchctl bootout "gui/$UID/com.user.focusmodes" 2>/dev/null || true
 pkill -x FocusModes 2>/dev/null || true
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
-swiftc -parse-as-library -O Sources/*.swift Sources/Views/*.swift -o "$APP/Contents/MacOS/FocusModes"
+cp "$BIN" "$APP/Contents/MacOS/FocusModes"
 
 cat > "$APP/Contents/Info.plist" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>

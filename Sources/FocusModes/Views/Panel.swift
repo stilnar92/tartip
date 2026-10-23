@@ -25,7 +25,7 @@ struct ContentView: View {
                 freeTimeCard(r)
             } else if let s = m.session, let cur = s.current(at: m.now) {
                 sessionCard(s, cur)
-            } else if isNight(m.now) {
+            } else if S.isNight(at: m.now) {
                 nightCard
             } else {
                 TodayList(m: m)
@@ -55,7 +55,7 @@ struct ContentView: View {
         let sessions = m.recordsSince(Calendar.current.startOfDay(for: m.now)).count
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(isNight(m.now) ? "Night" : "Today")
+                Text(S.isNight(at: m.now) ? "Night" : "Today")
                     .font(.system(size: 26, weight: .bold)).foregroundStyle(Theme.text)
                 Text(f.string(from: m.now)).font(.system(size: 13)).foregroundStyle(Theme.text2)
                 Spacer()
