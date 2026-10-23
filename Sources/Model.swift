@@ -381,6 +381,8 @@ final class Model: ObservableObject {
         // Nothing running and it's not night: you always decide what's next, right away.
         // The picker can't be closed; nothing is blocked until you pick.
         guard !night, review == nil, pendingStart == nil, userPresent() else { return }
+        // Day done: every limit reached and no free time to offer, so there's nothing to choose.
+        guard !availableActivities.isEmpty || canRest else { return }
         pendingStart = PendingStart(block: focusBlock, phases: [Phase(isBreak: false, minutes: defaultMinutes)], extra: [], auto: true)
         NSSound(named: "Funk")?.play()
         log("ask   what's next")

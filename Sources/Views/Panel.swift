@@ -116,6 +116,7 @@ struct ContentView: View {
         if isNight(m.now) { return "Night until \(clockLabel(S.nightTo))" }
         if m.session != nil { return "In a session" }
         if m.restEnd != nil { return "Free time" }
+        if m.availableActivities.isEmpty && !m.canRest { return "Day done 🎉" }
         return "Pick what's next"
     }
 

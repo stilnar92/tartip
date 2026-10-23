@@ -50,6 +50,7 @@ struct SettingsView: View {
                 .padding(.horizontal, 10).padding(.vertical, 6)
                 .card(radius: 9)
             }
+            dayPlan
             HStack(spacing: 6) {
                 TextField("New activity (same name as its Cold Turkey block)", text: $newActivity)
                     .textFieldStyle(.plain).font(.system(size: 12))
@@ -99,6 +100,63 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    // MARK: day plan
+
+    // How the daily limits add up: active work, Rest (with blocking), free time,
+    // and what's left of the waking day (24 h minus night).
+    private var dayPlan: some View {
+        let v = settings.v
+        let isRest = { (a: ActivitySetting) in a.name.lowercased() == "rest" }
+        let active = v.activities.filter { !isRest($0) }.reduce(0) { $0 + $1.dailyMinutes }
+        let rest = v.activities.filter(isRest).reduce(0) { $0 + $1.dailyMinutes }
+        let free = v.dailyFreeMinutes
+        let nightLen = v.nightEnabled ? (v.nightTo - v.nightFrom + 1440) % 1440 : 0
+        let awake = 1440 - nightLen
+        let planned = active + rest + free
+        let unplanned = max(0, awake - planned)
+        let noLimit = v.activities.filter { $0.dailyMinutes == 0 }.map(\.name)
+        let parts: [(String, Int, Color)] = [("Active", active, .indigo), ("Rest", rest, .brown),
+                                             ("Free time", free, .orange), ("Unplanned", unplanned, .gray)]
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Your day").font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text("\(limitLabel(planned)) planned of \(limitLabel(awake)) awake")
+                    .font(.system(size: 11)).foregroundStyle(planned > awake ? .red : .secondary)
+            }
+            // One bar for the whole waking day.
+            GeometryReader { g in
+                HStack(spacing: 2) {
+                    ForEach(parts.filter { $0.1 > 0 }, id: \.0) { _, mins, color in
+                        RoundedRectangle(cornerRadius: 3).fill(color.gradient)
+                            .frame(width: max(4, (g.size.width - 6) * CGFloat(mins) / CGFloat(max(awake, planned))))
+                    }
+                }
+            }
+            .frame(height: 10)
+            HStack(spacing: 0) {
+                ForEach(parts, id: \.0) { name, mins, color in
+                    VStack(spacing: 2) {
+                        Text(mins > 0 ? limitLabel(mins) : "–")
+                            .font(.system(size: 15, weight: .bold, design: .rounded)).monospacedDigit().foregroundStyle(color)
+                        Text(name).font(.system(size: 10)).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            if !noLimit.isEmpty {
+                Text("No limit (not counted): \(noLimit.joined(separator: ", "))")
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+            }
+            if planned > awake {
+                Text("That's more than your waking day.").font(.system(size: 11)).foregroundStyle(.red)
+            }
+        }
+        .padding(12)
+        .card(radius: 12)
     }
 
     // MARK: building blocks
