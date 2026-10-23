@@ -1,6 +1,4 @@
 import SwiftUI
-import AppKit
-import ApplicationServices
 
 // MARK: - Stats window
 
@@ -43,28 +41,26 @@ struct StatsView: View {
             .padding(.vertical, 10)
             .card(radius: 12)
 
-            do {
-                VStack(spacing: 10) {
-                    ForEach(rows, id: \.key) { name, secs in
-                        let st = ActivityStyle.of(name)
-                        HStack(spacing: 10) {
-                            Image(systemName: st.icon).foregroundStyle(st.color).frame(width: 20)
-                            Text(name).font(.system(size: 13, weight: .medium)).frame(width: 100, alignment: .leading)
-                            GeometryReader { g in
-                                ZStack(alignment: .leading) {
-                                    Capsule().fill(st.color.opacity(0.12))
-                                    if secs > 0 {
-                                        Capsule().fill(st.color.gradient)
-                                            .frame(width: max(6, g.size.width * CGFloat(secs) / CGFloat(max(total, 1))))
-                                    }
+            VStack(spacing: 10) {
+                ForEach(rows, id: \.key) { name, secs in
+                    let st = ActivityStyle.of(name)
+                    HStack(spacing: 10) {
+                        Image(systemName: st.icon).foregroundStyle(st.color).frame(width: 20)
+                        Text(name).font(.system(size: 13, weight: .medium)).frame(width: 100, alignment: .leading)
+                        GeometryReader { g in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(st.color.opacity(0.12))
+                                if secs > 0 {
+                                    Capsule().fill(st.color.gradient)
+                                        .frame(width: max(6, g.size.width * CGFloat(secs) / CGFloat(max(total, 1))))
                                 }
                             }
-                            .frame(height: 10)
-                            // Today: show progress against the daily limit, e.g. "45m / 1h".
-                            let limit = m.limitMinutes(name)
-                            Text((secs > 0 ? formatDuration(secs) : "–") + (range == 0 && limit > 0 ? " / \(limitLabel(limit))" : "")).font(.system(size: 12, weight: .semibold))
-                                .monospacedDigit().frame(width: 92, alignment: .trailing)
                         }
+                        .frame(height: 10)
+                        // Today: show progress against the daily limit, e.g. "45m / 1h".
+                        let limit = m.limitMinutes(name)
+                        Text((secs > 0 ? formatDuration(secs) : "–") + (range == 0 && limit > 0 ? " / \(limitLabel(limit))" : "")).font(.system(size: 12, weight: .semibold))
+                            .monospacedDigit().frame(width: 92, alignment: .trailing)
                     }
                 }
             }

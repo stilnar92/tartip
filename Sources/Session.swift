@@ -1,6 +1,4 @@
-import SwiftUI
-import AppKit
-import ApplicationServices
+import Foundation
 
 struct Phase: Codable {
     var isBreak: Bool
@@ -11,10 +9,8 @@ struct Session: Codable {
     var block: String
     var phases: [Phase]
     var start: Date
-    var autoThinking: Bool? = nil   // legacy flag from older saved sessions
-    var planned: String? = nil      // activity picked before (or right after) the start
+    var planned: String? = nil      // activity picked before the start
     var note: String? = nil         // free text when the activity is "Other"
-    var pickedAt: Date? = nil       // auto-started: stats count from the pick, not the start
 
     var totalMinutes: Int { phases.reduce(0) { $0 + $1.minutes } }
     var end: Date { start.addingTimeInterval(Double(totalMinutes * 60)) }

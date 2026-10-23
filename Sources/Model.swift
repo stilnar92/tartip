@@ -1,11 +1,7 @@
 import SwiftUI
-import AppKit
-import ApplicationServices
 import Combine
 
 final class Model: ObservableObject {
-    @Published var blocks: [String] = []
-    @Published var selected: String = UserDefaults.standard.string(forKey: "selected") ?? ""
     @Published var minutes: Int = max(1, UserDefaults.standard.integer(forKey: "minutes"))
     @Published var pomodoro: Bool = UserDefaults.standard.bool(forKey: "pomodoro")
     @Published var session: Session?
@@ -37,7 +33,6 @@ final class Model: ObservableObject {
             self?.activities = v.activities.map(\.name).filter { !$0.isEmpty }
         }
         if UserDefaults.standard.integer(forKey: "minutes") < minMinutes { minutes = defaultMinutes }
-        loadBlocks()
         if let d = try? Data(contentsOf: configFile), let c = try? JSONDecoder().decode([String: ModeConfig].self, from: d) {
             configs = c
         }
@@ -57,33 +52,7 @@ final class Model: ObservableObject {
         // Unfinished questions from before a restart.
         DispatchQueue.main.async { [self] in
             if review != nil { activityWindow.show(ReviewView(m: self)) }
-            else if session != nil && session?.planned == nil { showPicker() }
         }
-    }
-
-    // MARK: blocks list (~/modes/blocks.txt, one name per line)
-
-    func loadBlocks() {
-        let text = (try? String(contentsOf: blocksFile, encoding: .utf8)) ?? ""
-        blocks = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        if !blocks.contains(selected) { selected = blocks.first ?? "" }
-    }
-
-    func saveBlocks() {
-        try? FileManager.default.createDirectory(at: modesDir, withIntermediateDirectories: true)
-        try? (blocks.joined(separator: "\n") + "\n").write(to: blocksFile, atomically: true, encoding: .utf8)
-    }
-
-    func addBlock(_ name: String) {
-        let n = name.trimmingCharacters(in: .whitespaces)
-        guard !n.isEmpty, !blocks.contains(n) else { return }
-        blocks.append(n); selected = n; saveBlocks()
-    }
-
-    func removeBlock(_ name: String) {
-        blocks.removeAll { $0 == name }
-        if selected == name { selected = blocks.first ?? "" }
-        saveBlocks()
     }
 
     // MARK: what each mode opens (~/modes/modes.json)
@@ -150,40 +119,9 @@ final class Model: ObservableObject {
 
     // MARK: activity: pick before, review after
 
-    var pendingLabel: String {
-        guard let p = pendingStart else { return "" }
-        let total = p.phases.reduce(0) { $0 + $1.minutes }
-        return p.phases.count > 1 ? "Pomodoro · \(formatDuration(total * 60))" : "\(total) min"
-    }
-
     func showPicker() {
         activities = loadActivities()
         activityWindow.show(ActivityPickerView(m: self))
-    }
-
-    func choosePlan(_ activity: String, note: String?, minutes chosen: Int) {
-        guard isOpen(activity) else { return }
-        activityWindow.hide()
-        let mins = max(minMinutes, chosen)
-        if let p = pendingStart {
-            pendingStart = nil
-            // Pomodoro keeps its rounds; otherwise the duration picked here wins.
-            let phases = p.phases.count > 1 ? p.phases : [Phase(isBreak: false, minutes: mins)]
-            start(block: blockFor(activity), phases: phases, extra: p.extra, planned: activity, note: note)
-        } else if var s = session {
-            // Auto-started session: record the plan and set its length from the pick.
-            s.planned = activity; s.note = note; s.pickedAt = Date()
-            if s.workRounds == 1 {
-                let total = Int(Date().timeIntervalSince(s.start) / 60) + mins
-                s.phases = [Phase(isBreak: false, minutes: total)]
-                // Cold Turkey can only lengthen a lock, so re-send the start for the new end.
-                let left = Int((s.end.timeIntervalSinceNow / 60).rounded(.up))
-                runCT(["-start", s.block, "-lock", String(left)], keep: Double(left * 60 + 60))
-            }
-            session = s
-            if let data = try? JSONEncoder().encode(s) { UserDefaults.standard.set(data, forKey: "session") }
-            log("plan  \(activity)\(note.map { " (\($0))" } ?? "")")
-        }
     }
 
     func cancelPick() {
@@ -192,7 +130,7 @@ final class Model: ObservableObject {
     }
 
     private func beginReview(_ s: Session) {
-        let r = SessionRecord(start: s.pickedAt ?? s.start, end: min(Date(), s.end), mode: s.block, planned: s.planned, note: s.note)
+        let r = SessionRecord(start: s.start, end: min(Date(), s.end), mode: s.block, planned: s.planned, note: s.note)
         guard r.seconds >= 60 else { return }   // ignore sessions under a minute
         review = r
         if let d = try? recordCoder().0.encode(r) { UserDefaults.standard.set(d, forKey: "review") }
@@ -219,7 +157,7 @@ final class Model: ObservableObject {
     func recordsSince(_ from: Date) -> [SessionRecord] {
         var recs = records.filter { $0.start >= from }
         if let s = session, let planned = s.planned {
-            recs.append(SessionRecord(start: s.pickedAt ?? s.start, end: min(now, s.end), mode: s.block, planned: planned))
+            recs.append(SessionRecord(start: s.start, end: min(now, s.end), mode: s.block, planned: planned))
         }
         return recs
     }
@@ -275,14 +213,13 @@ final class Model: ObservableObject {
         mainWindow.show(MainView(m: self, tab: tab))
     }
 
-    func start(block: String, phases: [Phase], extra: [String] = [], autoThinking: Bool = false,
-               planned: String? = nil, note: String? = nil) {
+    func start(block: String, phases: [Phase], extra: [String] = [], planned: String? = nil, note: String? = nil) {
         restTaken = false
         UserDefaults.standard.set(false, forKey: "restTaken")
         restEnd = nil
         UserDefaults.standard.removeObject(forKey: "restEnd")
 
-        let s = Session(block: block, phases: phases, start: Date(), autoThinking: autoThinking, planned: planned, note: note)
+        let s = Session(block: block, phases: phases, start: Date(), planned: planned, note: note)
         runCT(["-start", s.block, "-lock", String(s.totalMinutes)], keep: Double(s.totalMinutes * 60 + 60))
         message = ""
         let c = config(s.block)
@@ -299,7 +236,7 @@ final class Model: ObservableObject {
         lastPhase = 0
         if let data = try? JSONEncoder().encode(s) { UserDefaults.standard.set(data, forKey: "session") }
         let desc = s.workRounds > 1 ? "pomodoro 25/5x4" : "\(s.totalMinutes)m"
-        log("start \(s.block) (app\(autoThinking ? ", auto" : ""), \(desc), lock \(s.totalMinutes)m)")
+        log("start \(s.block) (app, \(desc), lock \(s.totalMinutes)m)")
         notify("Focus: \(s.block)", s.workRounds > 1 ? "Round 1/4 — 25 min. Go!" : "\(s.totalMinutes) min. Go!")
     }
 
@@ -403,7 +340,7 @@ final class Model: ObservableObject {
         guard !night, review == nil, pendingStart == nil, userPresent() else { return }
         // Day done: every limit reached and no free time to offer, so there's nothing to choose.
         guard !pickableActivities.isEmpty || canRest else { return }
-        pendingStart = PendingStart(block: focusBlock, phases: [Phase(isBreak: false, minutes: defaultMinutes)], extra: [], auto: true)
+        pendingStart = PendingStart(auto: true)
         NSSound(named: "Funk")?.play()
         log("ask   what's next")
         showPicker()

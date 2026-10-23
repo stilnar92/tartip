@@ -1,12 +1,9 @@
 // Paths, process helpers, logging and the Cold Turkey CLI.
 
-import SwiftUI
 import AppKit
-import ApplicationServices
 
 let ctPath = "/Applications/Cold Turkey Blocker.app/Contents/MacOS/Cold Turkey Blocker"
 let modesDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("modes")
-let blocksFile = modesDir.appendingPathComponent("blocks.txt")
 let logFile = modesDir.appendingPathComponent("logs/modes.log")
 let configFile = modesDir.appendingPathComponent("modes.json")
 

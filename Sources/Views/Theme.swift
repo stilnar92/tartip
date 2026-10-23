@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 // Craft-like look: light lavender-white background, white cards with soft shadows
 // instead of borders, grey pills, one blue accent, small grey tags.

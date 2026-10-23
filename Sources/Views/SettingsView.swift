@@ -1,27 +1,19 @@
 import SwiftUI
-import AppKit
 
 // MARK: - Settings window
 
 struct SettingsView: View {
     @ObservedObject var settings = Settings.shared
     var m: Model? = nil                      // for "what it opens"
-    @State var expanded: Set<UUID> = []
+    @State private var expanded: Set<UUID> = []
     @State private var newActivity = ""
     @State private var optionsText = Settings.shared.v.durationOptions.map(String.init).joined(separator: ", ")
 
     var body: some View {
-        ScrollView { content }
-            .frame(width: 460, height: 640)
-    }
-
-    var content: some View {
-            VStack(alignment: .leading, spacing: 18) {
-                activitiesPage
-                rulesPage
-            }
-            .padding(22)
-            .frame(width: 460)
+        VStack(alignment: .leading, spacing: 18) {
+            activitiesPage
+            rulesPage
+        }
     }
 
     // Pages of the main window's sidebar.
@@ -245,13 +237,6 @@ struct SettingsView: View {
         HStack(spacing: 6) {
             Text(limitLabel(value.wrappedValue) == "No limit" ? "0m" : limitLabel(value.wrappedValue)).monospacedDigit()
             Stepper("", value: value, in: range, step: step).labelsHidden()
-        }
-    }
-
-    private func hourStepper(_ value: Binding<Int>) -> some View {
-        HStack(spacing: 6) {
-            Text(String(format: "%02d:00", value.wrappedValue)).monospacedDigit()
-            Stepper("", value: value, in: 0...24).labelsHidden()
         }
     }
 

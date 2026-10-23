@@ -1,6 +1,5 @@
 // What each mode opens: apps, a Chrome window, and cleanup of the previous mode.
 
-import SwiftUI
 import AppKit
 import ApplicationServices
 

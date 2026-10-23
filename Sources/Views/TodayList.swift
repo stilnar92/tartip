@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 // The day's activities as one Craft-style list. It is both the overview and the picker:
 // click a row to start it. Used in the menu bar panel and in the forced "What's next?" window.

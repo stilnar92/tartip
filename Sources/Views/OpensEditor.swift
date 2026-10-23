@@ -12,25 +12,23 @@ struct OpensEditor: View {
         let tint = ActivityStyle.of(block).color
         return VStack(alignment: .leading, spacing: 8) {
             SectionLabel(text: "Opens")
-            do {
-                HStack(spacing: 8) {
-                    ForEach(c.apps, id: \.self) { path in
-                        Image(nsImage: NSWorkspace.shared.icon(forFile: path))
-                            .resizable().frame(width: 30, height: 30)
-                            .help(URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent)
-                            .contextMenu {
-                                Button("Remove", role: .destructive) { m.updateConfig(block) { $0.apps.removeAll { $0 == path } } }
-                            }
-                    }
-                    Button { m.chooseApps(for: block) } label: {
-                        Image(systemName: "plus.app")
-                            .font(.system(size: 16))
-                            .frame(width: 30, height: 30)
-                            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [3])))
-                    }
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
-                    .help("Add apps")
+            HStack(spacing: 8) {
+                ForEach(c.apps, id: \.self) { path in
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: path))
+                        .resizable().frame(width: 30, height: 30)
+                        .help(URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent)
+                        .contextMenu {
+                            Button("Remove", role: .destructive) { m.updateConfig(block) { $0.apps.removeAll { $0 == path } } }
+                        }
                 }
+                Button { m.chooseApps(for: block) } label: {
+                    Image(systemName: "plus.app")
+                        .font(.system(size: 16))
+                        .frame(width: 30, height: 30)
+                        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [3])))
+                }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
+                .help("Add apps")
             }
             ForEach(c.urls, id: \.self) { u in
                 HStack(spacing: 8) {

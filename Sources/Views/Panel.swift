@@ -1,26 +1,6 @@
 import SwiftUI
-import AppKit
-import ApplicationServices
 
 // MARK: - UI
-
-struct BlockStyle {
-    let icon: String
-    let color: Color
-
-    static func of(_ name: String) -> BlockStyle {
-        let n = name.lowercased()
-        if n.contains("interview") { return BlockStyle(icon: "person.2.wave.2.fill", color: .indigo) }
-        if n.contains("focus") { return BlockStyle(icon: "scope", color: .indigo) }
-        if n.contains("think") { return BlockStyle(icon: "brain.head.profile", color: .orange) }
-        if n.contains("strict") { return BlockStyle(icon: "lock.shield.fill", color: .red) }
-        if n.contains("educ") || n.contains("english") || n.contains("study") { return BlockStyle(icon: "graduationcap.fill", color: .teal) }
-        if n.contains("work") || n.contains("code") { return BlockStyle(icon: "laptopcomputer", color: .blue) }
-        let palette: [Color] = [.orange, .pink, .purple, .green, .mint, .cyan]
-        let i = abs(name.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }) % palette.count
-        return BlockStyle(icon: "target", color: palette[i])
-    }
-}
 
 // Craft-style section heading: small, bold, grey, sentence case.
 struct SectionLabel: View {

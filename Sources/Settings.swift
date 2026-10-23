@@ -1,8 +1,8 @@
 // Everything that used to be a constant, editable in the Settings window.
 // Stored in ~/modes/settings.json; missing keys fall back to the defaults below.
 
-import SwiftUI
-import AppKit
+import Foundation
+import Combine
 
 let settingsFile = modesDir.appendingPathComponent("settings.json")
 

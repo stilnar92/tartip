@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 enum MainTab: String, CaseIterable {
     case stats = "Stats", activities = "Activities", rules = "Rules"

@@ -1,6 +1,4 @@
 import SwiftUI
-import AppKit
-import ApplicationServices
 
 // MARK: - "What's next?" (forced when nothing runs) and the review after a session
 

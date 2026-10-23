@@ -1,12 +1,9 @@
 import SwiftUI
 import AppKit
-import ApplicationServices
 
 // MARK: - Activities (what a session is for) and session history
 
-let activitiesFile = modesDir.appendingPathComponent("activities.txt")
 let sessionsFile = modesDir.appendingPathComponent("logs/sessions.jsonl")
-let defaultActivities = ["Work", "Arabic", "AI education", "Project", "English"]
 let otherActivity = "Other"
 
 // One line per session in sessions.jsonl.
@@ -48,16 +45,6 @@ func loadRecords() -> [SessionRecord] {
 // Activity names come from Settings; activities.txt is only read once to migrate.
 func loadActivities() -> [String] { S.activities.map(\.name).filter { !$0.isEmpty } }
 
-func legacyLoadActivities() -> [String] {
-    let text = (try? String(contentsOf: activitiesFile, encoding: .utf8)) ?? ""
-    let list = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-    if list.isEmpty {
-        try? (defaultActivities.joined(separator: "\n") + "\n").write(to: activitiesFile, atomically: true, encoding: .utf8)
-        return defaultActivities
-    }
-    return list
-}
-
 struct ActivityStyle {
     let icon: String
     let color: Color
@@ -76,11 +63,8 @@ struct ActivityStyle {
     }
 }
 
-// A start that's waiting for the activity to be picked.
+// The "What's next?" window is open.
 struct PendingStart {
-    var block: String
-    var phases: [Phase]
-    var extra: [String]
     var auto = false   // opened automatically because nothing is running: no Cancel
 }
 

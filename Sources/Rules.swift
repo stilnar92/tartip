@@ -1,6 +1,5 @@
-import SwiftUI
-import AppKit
-import ApplicationServices
+import Foundation
+import CoreGraphics
 
 // MARK: - Enforcement rules
 
@@ -31,6 +30,5 @@ struct DayStats: Codable {
     var day: String
     var free = 0        // seconds of rest + idle
     var focus = 0
-    var thinking = 0
 }
 
