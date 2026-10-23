@@ -112,6 +112,21 @@ final class StatsWindow {
     }
 }
 
+// Hide (never close) the menu bar panel: a closed MenuBarExtra window can't be reopened,
+// and the menu bar icon would stop responding.
+private var loggedWindowClasses = false
+
+func hideMenuPanel(except keep: NSWindow? = nil) {
+    if !loggedWindowClasses {
+        loggedWindowClasses = true
+        log("windows: " + NSApp.windows.filter(\.isVisible).map { "\(type(of: $0))@\($0.level.rawValue)" }.joined(separator: ", "))
+    }
+    for w in NSApp.windows where w !== keep && w.isVisible
+        && String(describing: type(of: w)).contains("MenuBarExtra") {
+        w.orderOut(nil)
+    }
+}
+
 final class PromptWindow {
     private var panel: NSPanel?
 
@@ -134,11 +149,7 @@ final class PromptWindow {
         }
         guard let panel else { return }
         // Close the menu bar panel so it doesn't sit on top of the question.
-        for w in NSApp.windows where w !== panel && w.isVisible
-            && (String(describing: type(of: w)).contains("MenuBarExtra") || w.level.rawValue >= NSWindow.Level.statusBar.rawValue)
-            && !(w is NSPanel && w.level == .screenSaver) {
-            w.close()
-        }
+        hideMenuPanel(except: panel)
         let host = NSHostingView(rootView: view.background(Theme.bg).environment(\.colorScheme, .light))
         panel.contentView = host
         panel.setContentSize(host.fittingSize)

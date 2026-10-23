@@ -116,9 +116,9 @@ struct ContentView: View {
     // Floating white pill with icon buttons, like Craft's toolbar.
     private var toolbar: some View {
         HStack(spacing: 2) {
-            tool("chart.bar", "Stats") { NSApp.keyWindow?.close(); m.openMain(.stats) }
-            tool("list.bullet", "Activities") { NSApp.keyWindow?.close(); m.openMain(.activities) }
-            tool("gearshape", "Rules") { NSApp.keyWindow?.close(); m.openMain(.rules) }
+            tool("chart.bar", "Stats") { hideMenuPanel(); m.openMain(.stats) }
+            tool("list.bullet", "Activities") { hideMenuPanel(); m.openMain(.activities) }
+            tool("gearshape", "Rules") { hideMenuPanel(); m.openMain(.rules) }
         }
         .padding(4)
         .background(Capsule().fill(Theme.card).shadow(color: .black.opacity(0.08), radius: 8, y: 2))
