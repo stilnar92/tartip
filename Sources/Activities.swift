@@ -121,7 +121,8 @@ final class PromptWindow {
             p.titlebarAppearsTransparent = true
             p.titleVisibility = .hidden
             p.isMovableByWindowBackground = true
-            p.level = .floating
+            // Above everything, including the menu bar panel and full-screen apps.
+            p.level = .screenSaver
             p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             p.hidesOnDeactivate = false
             p.standardWindowButton(.closeButton)?.isHidden = true
@@ -130,6 +131,12 @@ final class PromptWindow {
             panel = p
         }
         guard let panel else { return }
+        // Close the menu bar panel so it doesn't sit on top of the question.
+        for w in NSApp.windows where w !== panel && w.isVisible
+            && (String(describing: type(of: w)).contains("MenuBarExtra") || w.level.rawValue >= NSWindow.Level.statusBar.rawValue)
+            && !(w is NSPanel && w.level == .screenSaver) {
+            w.close()
+        }
         let host = NSHostingView(rootView: view)
         panel.contentView = host
         panel.setContentSize(host.fittingSize)

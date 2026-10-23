@@ -213,7 +213,7 @@ struct ContentView: View {
                         HStack(spacing: 8) {
                             Image(systemName: done ? "checkmark.circle.fill" : st.icon)
                                 .font(.system(size: 11)).foregroundStyle(done ? .green : st.color).frame(width: 16)
-                            Text(g.name).font(.system(size: 12)).lineLimit(1).frame(width: 86, alignment: .leading)
+                            Text(g.name).font(.system(size: 12)).lineLimit(1).frame(width: 80, alignment: .leading)
                             GeometryReader { geo in
                                 ZStack(alignment: .leading) {
                                     Capsule().fill(st.color.opacity(0.15))
@@ -224,7 +224,7 @@ struct ContentView: View {
                             .frame(height: 6)
                             Text("\(formatDuration(secs)) / \(limitLabel(g.dailyMinutes))")
                                 .font(.system(size: 10, weight: .medium, design: .rounded)).monospacedDigit()
-                                .foregroundStyle(.secondary).frame(width: 62, alignment: .trailing)
+                                .foregroundStyle(.secondary).fixedSize().frame(minWidth: 70, alignment: .trailing)
                         }
                     }
                 }
