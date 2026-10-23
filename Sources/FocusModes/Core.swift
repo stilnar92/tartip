@@ -42,21 +42,3 @@ func runCT(_ args: [String], keep: TimeInterval = 60) {
 func killStrayCTCommands() {
     run("/usr/bin/pkill", ["-f", "Cold Turkey Blocker -(start|stop) "])
 }
-
-func notify(_ title: String, _ text: String) {
-    NSSound(named: "Glass")?.play()
-    let esc = { (s: String) in s.replacingOccurrences(of: "\"", with: "\\\"") }
-    run("/usr/bin/osascript", ["-e", "display notification \"\(esc(text))\" with title \"\(esc(title))\" sound name \"Glass\""])
-}
-
-func log(_ line: String) {
-    let f = DateFormatter()
-    f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-    let text = "\(f.string(from: Date())) \(line)\n"
-    try? FileManager.default.createDirectory(at: logFile.deletingLastPathComponent(), withIntermediateDirectories: true)
-    if let h = try? FileHandle(forWritingTo: logFile) {
-        h.seekToEndOfFile(); h.write(text.data(using: .utf8)!); try? h.close()
-    } else {
-        try? text.write(to: logFile, atomically: true, encoding: .utf8)
-    }
-}

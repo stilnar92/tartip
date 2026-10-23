@@ -15,16 +15,14 @@ func durationLabel(_ m: Int) -> String { m == 60 ? "1h" : "\(m)" }
 
 // At the computer: input in the last 2 minutes and screen not locked.
 func userPresent() -> Bool {
-    let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
-    if idle > 120 { return false }
+    // ~0 is kCGAnyInputEventType: the last input of any kind.
+    if let anyInput = CGEventType(rawValue: ~0),
+       CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput) > 120 { return false }
     if let d = CGSessionCopyCurrentDictionary() as? [String: Any], d["CGSSessionScreenIsLocked"] as? Bool == true { return false }
     return true
 }
 
-func dayKey(_ d: Date) -> String {
-    let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
-    return f.string(from: d)
-}
+func dayKey(_ d: Date) -> String { Fmt.dayKey.string(from: d) }
 
 struct DayStats: Codable {
     var day: String

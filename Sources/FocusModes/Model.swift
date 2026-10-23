@@ -65,7 +65,7 @@ final class Model: ObservableObject {
         configs[block] = c
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        if let d = try? enc.encode(configs) { try? d.write(to: configFile) }
+        do { try enc.encode(configs).write(to: configFile) } catch { log("error: couldn't save \(configFile.path): \(error)") }
         if !(c.apps.isEmpty && c.urls.isEmpty) { _ = axTrusted(prompt: true) }
     }
 
@@ -76,8 +76,10 @@ final class Model: ObservableObject {
         panel.allowsMultipleSelection = true
         panel.prompt = "Add"
         NSApp.activate(ignoringOtherApps: true)
-        if panel.runModal() == .OK {
-            updateConfig(block) { c in
+        // Not runModal: that would stall the run loop, and with it the timer.
+        panel.begin { [weak self] response in
+            guard response == .OK else { return }
+            self?.updateConfig(block) { c in
                 for u in panel.urls where !c.apps.contains(u.path) { c.apps.append(u.path) }
             }
         }
@@ -230,16 +232,16 @@ final class Model: ObservableObject {
         session = s
         lastPhase = 0
         if let data = try? JSONEncoder().encode(s) { UserDefaults.standard.set(data, forKey: "session") }
-        let desc = s.workRounds > 1 ? "pomodoro 25/5x4" : "\(s.totalMinutes)m"
+        let first = s.phases.first?.minutes ?? s.totalMinutes
+        let desc = s.workRounds > 1 ? "pomodoro \(first)/\(S.pomodoroBreak)x\(s.workRounds)" : "\(s.totalMinutes)m"
         log("start \(s.block) (app, \(desc), lock \(s.totalMinutes)m)")
-        notify("Focus: \(s.block)", s.workRounds > 1 ? "Round 1/4 — 25 min. Go!" : "\(s.totalMinutes) min. Go!")
+        notify("Focus: \(s.block)", s.workRounds > 1 ? "Round 1/\(s.workRounds) — \(first) min. Go!" : "\(s.totalMinutes) min. Go!")
     }
 
     func stop() {
         guard let s = session else { return }
         if Date() < s.end {
-            let f = DateFormatter(); f.dateFormat = "HH:mm"
-            message = "Locked until \(f.string(from: s.end)). Timer stopped, block stays."
+            message = "Locked until \(Fmt.clock.string(from: s.end)). Timer stopped, block stays."
         }
         runCT(["-stop", s.block])
         log("off   \(s.block) (app)")

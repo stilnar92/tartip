@@ -8,7 +8,8 @@ struct StatsView: View {
 
     var body: some View {
         let cal = Calendar.current
-        let from = range == 0 ? cal.startOfDay(for: Date()) : cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: Date()))!
+        let today = cal.startOfDay(for: Date())
+        let from = range == 0 ? today : cal.date(byAdding: .day, value: -6, to: today) ?? today
         let recs = m.recordsSince(from)
         var byActivity = m.secondsByActivity(since: from)
         for a in m.activities where byActivity[a] == nil { byActivity[a] = 0 }
@@ -89,7 +90,7 @@ struct StatsView: View {
     }
 
     private func sessionRow(_ r: SessionRecord) -> some View {
-        let f = DateFormatter(); f.dateFormat = range == 0 ? "HH:mm" : "EEE HH:mm"
+        let f = range == 0 ? Fmt.clock : Fmt.weekdayClock
         let planned = r.planned ?? "–"
         let actual = r.actual.isEmpty ? "not reviewed" : r.actual.joined(separator: ", ")
         return HStack(spacing: 8) {

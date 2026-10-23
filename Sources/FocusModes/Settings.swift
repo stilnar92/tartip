@@ -74,7 +74,7 @@ final class Settings: ObservableObject {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         try? FileManager.default.createDirectory(at: modesDir, withIntermediateDirectories: true)
-        if let d = try? enc.encode(v) { try? d.write(to: settingsFile) }
+        do { try enc.encode(v).write(to: settingsFile) } catch { log("error: couldn't save \(settingsFile.path): \(error)") }
     }
 }
 

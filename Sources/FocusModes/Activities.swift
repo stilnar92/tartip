@@ -16,7 +16,7 @@ struct SessionRecord: Codable, Equatable {
     var note: String?
 
     var seconds: Int { max(0, Int(end.timeIntervalSince(start))) }
-    var asPlanned: Bool { planned != nil && actual == [planned!] }
+    var asPlanned: Bool { planned.map { actual == [$0] } ?? false }
 }
 
 func recordCoder() -> (JSONEncoder, JSONDecoder) {
@@ -26,14 +26,9 @@ func recordCoder() -> (JSONEncoder, JSONDecoder) {
 }
 
 func appendRecord(_ r: SessionRecord) {
-    guard let data = try? recordCoder().0.encode(r), var line = String(data: data, encoding: .utf8) else { return }
-    line += "\n"
-    try? FileManager.default.createDirectory(at: sessionsFile.deletingLastPathComponent(), withIntermediateDirectories: true)
-    if let h = try? FileHandle(forWritingTo: sessionsFile) {
-        h.seekToEndOfFile(); h.write(line.data(using: .utf8)!); try? h.close()
-    } else {
-        try? line.write(to: sessionsFile, atomically: true, encoding: .utf8)
-    }
+    guard let data = try? recordCoder().0.encode(r), let line = String(data: data, encoding: .utf8),
+          appendText(line + "\n", to: sessionsFile)
+    else { return log("error: couldn't save the session to \(sessionsFile.path)") }
 }
 
 func loadRecords() -> [SessionRecord] {
@@ -115,14 +110,13 @@ final class StatsWindow {
 private var loggedWindowClasses = false
 
 func hideMenuPanel(except keep: NSWindow? = nil) {
-    if !loggedWindowClasses {
+    let panels = NSApp.windows.filter { $0 !== keep && $0.isVisible && String(describing: type(of: $0)).contains("MenuBarExtra") }
+    // The class name is private to SwiftUI; log once if it ever stops matching.
+    if panels.isEmpty && !loggedWindowClasses && NSApp.windows.contains(where: { $0 !== keep && $0.isVisible }) {
         loggedWindowClasses = true
-        log("windows: " + NSApp.windows.filter(\.isVisible).map { "\(type(of: $0))@\($0.level.rawValue)" }.joined(separator: ", "))
+        log("no MenuBarExtra window among: " + NSApp.windows.filter(\.isVisible).map { "\(type(of: $0))" }.joined(separator: ", "))
     }
-    for w in NSApp.windows where w !== keep && w.isVisible
-        && String(describing: type(of: w)).contains("MenuBarExtra") {
-        w.orderOut(nil)
-    }
+    panels.forEach { $0.orderOut(nil) }
 }
 
 final class PromptWindow {

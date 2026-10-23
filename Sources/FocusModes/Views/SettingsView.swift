@@ -66,13 +66,12 @@ struct SettingsView: View {
         let v = a.wrappedValue
         let st = ActivityStyle.of(v.name)
         let open = expanded.contains(v.id)
-        let anyTime = v.fromMinute == nil || v.toMinute == nil
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: st.icon).foregroundStyle(st.color).frame(width: 18)
                 TextField("Name", text: a.name).textFieldStyle(.plain).font(.system(size: 13))
-                if !anyTime {
-                    Text("\(clockLabel(v.fromMinute!))–\(clockLabel(v.toMinute!))")
+                if let from = v.fromMinute, let to = v.toMinute {
+                    Text("\(clockLabel(from))–\(clockLabel(to))")
                         .font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
                 }
                 Spacer()
@@ -103,7 +102,7 @@ struct SettingsView: View {
                             a.wrappedValue.toMinute = any ? nil : 20 * 60
                         }))
                         .toggleStyle(.switch).controlSize(.small)
-                    if !anyTime {
+                    if v.fromMinute != nil && v.toMinute != nil {
                         row("Can be picked from") { clockStepper(Binding(get: { a.wrappedValue.fromMinute ?? 720 }, set: { a.wrappedValue.fromMinute = $0 })) }
                         row("Until") { clockStepper(Binding(get: { a.wrappedValue.toMinute ?? 1200 }, set: { a.wrappedValue.toMinute = $0 })) }
                     }

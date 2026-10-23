@@ -51,13 +51,12 @@ struct ContentView: View {
 
     // "Today" + date, then the day in three tags.
     private var header: some View {
-        let f = DateFormatter(); f.dateFormat = "EEEE · d MMM"
         let sessions = m.recordsSince(Calendar.current.startOfDay(for: m.now)).count
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(S.isNight(at: m.now) ? "Night" : "Today")
                     .font(.system(size: 26, weight: .bold)).foregroundStyle(Theme.text)
-                Text(f.string(from: m.now)).font(.system(size: 13)).foregroundStyle(Theme.text2)
+                Text(Fmt.dayTitle.string(from: m.now)).font(.system(size: 13)).foregroundStyle(Theme.text2)
                 Spacer()
             }
             HStack(spacing: 6) {
@@ -127,7 +126,7 @@ struct ContentView: View {
         let total = Double(p.minutes * 60)
         let left = max(0, cur.end.timeIntervalSince(m.now))
         let progress = total > 0 ? 1 - left / total : 1
-        let f = DateFormatter(); f.dateFormat = "HH:mm"
+        let f = Fmt.clock
         let color = p.isBreak ? Color.green : st.color
 
         return VStack(spacing: 18) {
