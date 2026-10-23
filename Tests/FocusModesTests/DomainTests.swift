@@ -171,3 +171,13 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(s.block(for: otherActivity) == s.otherBlock)
     }
 }
+
+@Suite struct FormatTests {
+    @Test func minutes() {
+        #expect(minutesLabel(45) == "45m")
+        #expect(minutesLabel(60) == "1h")
+        #expect(minutesLabel(90) == "1h 30m")
+        #expect(limitLabel(0) == "No limit")
+        #expect(formatDuration(3_900) == "1h 5m")
+    }
+}

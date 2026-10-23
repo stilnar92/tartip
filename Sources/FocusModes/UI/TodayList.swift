@@ -3,16 +3,16 @@ import SwiftUI
 // The day's activities as one Craft-style list. It is both the overview and the picker:
 // click a row to start it. Used in the menu bar panel and in the forced "What's next?" window.
 struct TodayList: View {
-    @ObservedObject var m: Model
+    @ObservedObject var model: Model
     @ObservedObject var clock: Clock     // hours and limits change as time passes
     @State private var hovered: String?
 
     var body: some View {
-        let limits = m.limits
+        let limits = model.limits
         return VStack(alignment: .leading, spacing: 12) {
             lengthBar
             VStack(spacing: 0) {
-                let names = m.activities
+                let names = model.activities
                 ForEach(Array(names.enumerated()), id: \.element) { i, a in
                     row(a, limits)
                     if i < names.count - 1 { Divider().opacity(0.4).padding(.leading, 44) }
@@ -21,7 +21,7 @@ struct TodayList: View {
             .padding(.vertical, 4)
             .card(radius: 14)
 
-            if !m.activities.contains(where: limits.hasTimeLeft) {
+            if !model.activities.contains(where: limits.hasTimeLeft) {
                 Label("All daily goals done 🎉", systemImage: "checkmark.seal.fill")
                     .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.accent)
             }
@@ -32,23 +32,23 @@ struct TodayList: View {
     // Length for the next start: pills, plus 🍅 for Pomodoro.
     private var lengthBar: some View {
         HStack(spacing: 6) {
-            ForEach(S.sessionLengths, id: \.self) { n in
-                let sel = !m.pomodoro && m.minutes == n
-                Button { m.pomodoro = false; m.minutes = n } label: {
-                    Text(n % 60 == 0 ? "\(n / 60)h" : "\(n)m")
+            ForEach(Settings.current.sessionLengths, id: \.self) { n in
+                let sel = !model.pomodoro && model.minutes == n
+                Button { model.pomodoro = false; model.minutes = n } label: {
+                    Text(minutesLabel(n))
                         .font(.system(size: 12, weight: sel ? .semibold : .medium))
                         .frame(maxWidth: .infinity).padding(.vertical, 6)
                         .pill(selected: sel)
                 }
                 .buttonStyle(.plain)
             }
-            Button { m.pomodoro.toggle() } label: {
+            Button { model.pomodoro.toggle() } label: {
                 Text("🍅").font(.system(size: 12))
                     .frame(maxWidth: .infinity).padding(.vertical, 6)
-                    .pill(selected: m.pomodoro)
+                    .pill(selected: model.pomodoro)
             }
             .buttonStyle(.plain)
-            .help("Pomodoro \(S.pomodoroWork)/\(S.pomodoroBreak) min × \(S.pomodoroRounds)")
+            .help("Pomodoro \(Settings.current.pomodoroWork)/\(Settings.current.pomodoroBreak) min × \(Settings.current.pomodoroRounds)")
         }
     }
 
@@ -58,9 +58,9 @@ struct TodayList: View {
         let left = limits.secondsLeftToday(a)
         let done = left == 0
         let closed = limits.opensLabel(a)
-        let canStart = !done && closed == nil && m.phase.canStart
+        let canStart = !done && closed == nil && model.phase.canStart
         let hover = hovered == a && canStart
-        return Button { m.startActivity(a) } label: {
+        return Button { model.startActivity(a) } label: {
             HStack(spacing: 10) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
@@ -77,7 +77,7 @@ struct TodayList: View {
                     .lineLimit(1)
                 Spacer(minLength: 6)
                 if hover {
-                    Label(m.pomodoro ? "Start 🍅" : "Start \(m.minutes)m", systemImage: "play.fill")
+                    Label(model.pomodoro ? "Start 🍅" : "Start \(model.minutes)m", systemImage: "play.fill")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 9).padding(.vertical, 4)
@@ -99,10 +99,10 @@ struct TodayList: View {
         .onHover { hovered = $0 ? a : (hovered == a ? nil : hovered) }
         // Right-click: start with a specific length.
         .contextMenu {
-            ForEach(S.sessionLengths, id: \.self) { n in
-                Button("Start for \(n % 60 == 0 ? "\(n / 60) h" : "\(n) min")") { m.startActivity(a, minutes: n, pomodoro: false) }
+            ForEach(Settings.current.sessionLengths, id: \.self) { n in
+                Button("Start for \(minutesLabel(n))") { model.startActivity(a, minutes: n, pomodoro: false) }
             }
-            Button("Start Pomodoro") { m.startActivity(a, pomodoro: true) }
+            Button("Start Pomodoro") { model.startActivity(a, pomodoro: true) }
         }
     }
 
@@ -111,22 +111,22 @@ struct TodayList: View {
         HStack(spacing: 8) {
             Text("🍿").font(.system(size: 15))
             VStack(alignment: .leading, spacing: 1) {
-                Text("Free time").font(.system(size: 14)).foregroundStyle(m.canRest ? Theme.text : Theme.text2)
+                Text("Free time").font(.system(size: 14)).foregroundStyle(model.canRest ? Theme.text : Theme.text2)
                     .help("Nothing blocked")
-                Text(m.restTaken ? "after a session" : "\(m.freeLeft / 60)m left")
+                Text(model.restTaken ? "after a session" : "\(model.freeLeft / 60)m left")
                     .font(.system(size: 11)).foregroundStyle(Theme.text2)
             }
             Spacer()
-            ForEach(S.freeTimeLengths.filter { $0 <= 60 }, id: \.self) { n in
-                Button { m.startRest(minutes: n) } label: {
-                    Text(n % 60 == 0 ? "\(n / 60)h" : "\(n)m")
+            ForEach(Settings.current.freeTimeLengths.filter { $0 <= 60 }, id: \.self) { n in
+                Button { model.startRest(minutes: n) } label: {
+                    Text(minutesLabel(n))
                         .font(.system(size: 11, weight: .medium))
                         .padding(.horizontal, 8).padding(.vertical, 5)
                         .pill()
                 }
                 .buttonStyle(.plain)
-                .disabled(!m.canRest || m.freeLeft < n * 60)
-                .opacity(m.canRest && m.freeLeft >= n * 60 ? 1 : 0.35)
+                .disabled(!model.canRest || model.freeLeft < n * 60)
+                .opacity(model.canRest && model.freeLeft >= n * 60 ? 1 : 0.35)
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 9)

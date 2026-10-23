@@ -3,30 +3,30 @@ import SwiftUI
 // MARK: - Stats window
 
 struct StatsView: View {
-    @ObservedObject var m: Model
+    @ObservedObject var model: Model
     @State private var range = 0   // 0 = today, 1 = 7 days
 
     var body: some View {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
         let from = range == 0 ? today : cal.date(byAdding: .day, value: -6, to: today) ?? today
-        let recs = m.recordsSince(from)
-        var byActivity = m.secondsByActivity(since: from)
-        for a in m.activities where byActivity[a] == nil { byActivity[a] = 0 }
+        let recs = model.recordsSince(from)
+        var byActivity = model.secondsByActivity(since: from)
+        for a in model.activities where byActivity[a] == nil { byActivity[a] = 0 }
         // Every activity from the list is shown, busiest first; empty ones stay at the bottom.
-        let order = m.activities + [otherActivity]
+        let order = model.activities + [otherActivity]
         let rows = byActivity.sorted {
             $0.value != $1.value ? $0.value > $1.value
                 : (order.firstIndex(of: $0.key) ?? 99) < (order.firstIndex(of: $1.key) ?? 99)
         }
         let total = rows.reduce(0) { $0 + $1.value }
-        let limits = m.limits
+        let limits = model.limits
         let reviewed = recs.filter { !$0.actual.isEmpty && $0.planned != nil }
         let kept = reviewed.filter(\.asPlanned).count
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Stats").font(.system(size: 26, weight: .bold)).foregroundStyle(Theme.text)
+                PageTitle(title: "Stats")
                 Spacer()
                 Picker("", selection: $range) {
                     Text("Today").tag(0)
@@ -79,7 +79,7 @@ struct StatsView: View {
             }
         }
         .padding(22)
-        .onAppear { m.reloadRecords() }
+        .onAppear { model.reloadRecords() }
     }
 
     private func summary(_ value: String, _ label: String) -> some View {

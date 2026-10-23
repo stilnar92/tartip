@@ -15,26 +15,26 @@ struct SectionLabel: View {
 // The menu bar panel: a "Today" page. Idle = the day's list (click a row to start);
 // in a session = the session card; free time and night have their own cards.
 struct ContentView: View {
-    @ObservedObject var m: Model
+    @ObservedObject var model: Model
     @ObservedObject var clock: Clock
     let openMain: (MainTab) -> Void
     @State private var showLink = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if m.session == nil { header }
-            if let end = m.freeTimeEnd {
+            if model.session == nil { header }
+            if let end = model.freeTimeEnd {
                 freeTimeCard(end)
-            } else if let s = m.session, let cur = s.current(at: m.now) {
+            } else if let s = model.session, let cur = s.current(at: model.now) {
                 sessionCard(s, cur)
-            } else if S.isNight(at: m.now) {
+            } else if Settings.current.isNight(at: model.now) {
                 nightCard
             } else {
-                TodayList(m: m, clock: clock)
+                TodayList(model: model, clock: clock)
                 siteRow
             }
-            if !m.message.isEmpty {
-                Label(m.message, systemImage: "exclamationmark.triangle.fill")
+            if !model.message.isEmpty {
+                Label(model.message, systemImage: "exclamationmark.triangle.fill")
                     .font(.system(size: 12)).foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -44,8 +44,8 @@ struct ContentView: View {
         .frame(width: 360)
         .background(Theme.bg)
         .environment(\.colorScheme, .light)
-        .animation(.snappy(duration: 0.2), value: m.session == nil)
-        .animation(.snappy(duration: 0.2), value: m.freeTimeEnd == nil)
+        .animation(.snappy(duration: 0.2), value: model.session == nil)
+        .animation(.snappy(duration: 0.2), value: model.freeTimeEnd == nil)
         .animation(.snappy(duration: 0.2), value: showLink)
     }
 
@@ -53,19 +53,19 @@ struct ContentView: View {
 
     // "Today" + date, then the day in three tags.
     private var header: some View {
-        let sessions = m.recordsSince(Calendar.current.startOfDay(for: m.now)).count
+        let sessions = model.recordsSince(Calendar.current.startOfDay(for: model.now)).count
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(S.isNight(at: m.now) ? "Night" : "Today")
-                    .font(.system(size: 26, weight: .bold)).foregroundStyle(Theme.text)
-                Text(Fmt.dayTitle.string(from: m.now)).font(.system(size: 13)).foregroundStyle(Theme.text2)
+                Text(Settings.current.isNight(at: model.now) ? "Night" : "Today")
+                    .font(Theme.title).foregroundStyle(Theme.text)
+                Text(Fmt.dayTitle.string(from: model.now)).font(.system(size: 13)).foregroundStyle(Theme.text2)
                 Spacer()
             }
             HStack(spacing: 6) {
-                Tag(text: "⏱ \(formatDuration(m.focusedToday))", color: Theme.accent, fill: Theme.accentTint)
+                Tag(text: "⏱ \(formatDuration(model.focusedToday))", color: Theme.accent, fill: Theme.accentTint)
                 Tag(text: "\(sessions) sessions")
-                Tag(text: "🍿 \(m.freeLeft / 60)m", color: m.freeLeft > 0 ? Theme.text2 : Theme.red,
-                    fill: m.freeLeft > 0 ? Theme.pill : Theme.redTint)
+                Tag(text: "🍿 \(model.freeLeft / 60)m", color: model.freeLeft > 0 ? Theme.text2 : Theme.red,
+                    fill: model.freeLeft > 0 ? Theme.pill : Theme.redTint)
             }
         }
     }
@@ -78,17 +78,17 @@ struct ContentView: View {
             if showLink {
                 HStack(spacing: 6) {
                     Image(systemName: "link").foregroundStyle(Theme.text2)
-                    TextField("Paste a site to open with the next session…", text: $m.oneTimeLink).textFieldStyle(.plain)
+                    TextField("Paste a site to open with the next session…", text: $model.oneTimeLink).textFieldStyle(.plain)
                 }
                 .font(.system(size: 13))
                 .padding(.horizontal, 12).padding(.vertical, 9)
                 .card(radius: 10)
             }
             Button { showLink.toggle() } label: {
-                Label(m.oneTimeLink.isEmpty ? "Open a site with the next session" : "Site added for the next session",
+                Label(model.oneTimeLink.isEmpty ? "Open a site with the next session" : "Site added for the next session",
                       systemImage: "safari")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(m.oneTimeLink.isEmpty ? Theme.text2 : Theme.accent)
+                    .foregroundStyle(model.oneTimeLink.isEmpty ? Theme.text2 : Theme.accent)
             }
             .buttonStyle(.plain)
         }
@@ -126,7 +126,7 @@ struct ContentView: View {
         let name = s.planned ?? s.block.replacingOccurrences(of: "_", with: " ")
         let st = ActivityStyle.of(name)
         let total = Double(p.minutes * 60)
-        let left = max(0, cur.end.timeIntervalSince(m.now))
+        let left = max(0, cur.end.timeIntervalSince(model.now))
         let progress = total > 0 ? 1 - left / total : 1
         let f = Fmt.clock
         let color = p.isBreak ? Color.green : st.color
@@ -151,7 +151,7 @@ struct ContentView: View {
                     .rotationEffect(.degrees(-90))
                     .animation(.linear(duration: 1), value: progress)
                 VStack(spacing: 2) {
-                    Text(countdown(to: cur.end, from: m.now))
+                    Text(countdown(to: cur.end, from: model.now))
                         .font(.system(size: 56, weight: .semibold))
                         .monospacedDigit()
                         .foregroundStyle(Theme.text)
@@ -164,7 +164,7 @@ struct ContentView: View {
 
             if !p.isBreak { dailyProgress(name, color) }
 
-            Button { m.stop() } label: {
+            Button { model.stop() } label: {
                 Text("Stop session").font(.system(size: 12)).foregroundStyle(Theme.text2).underline()
             }
             .buttonStyle(.plain)
@@ -178,7 +178,7 @@ struct ContentView: View {
     // Today's progress on this activity, counting this session live. Centered like the rest:
     // "25m left today", a bar, then "34m of 1h".
     private func dailyProgress(_ name: String, _ color: Color) -> some View {
-        let limits = m.limits
+        let limits = model.limits
         let used = limits.usedToday(name)
         let limit = limits.limitMinutes(name)
         let left = limits.secondsLeftToday(name) ?? 0
@@ -210,16 +210,16 @@ struct ContentView: View {
                 Text("🍿").font(.system(size: 24))
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Free time").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
-                    Text("Nothing blocked · \(m.freeLeft / 60)m left today").font(.system(size: 12)).foregroundStyle(Theme.text2)
+                    Text("Nothing blocked · \(model.freeLeft / 60)m left today").font(.system(size: 12)).foregroundStyle(Theme.text2)
                 }
                 Spacer()
             }
-            Text(countdown(to: until, from: m.now))
+            Text(countdown(to: until, from: model.now))
                 .font(.system(size: 52, weight: .semibold)).monospacedDigit()
                 .foregroundStyle(Theme.text)
                 .contentTransition(.numericText(countsDown: true))
                 .frame(maxWidth: .infinity)
-            Button { m.endRest() } label: {
+            Button { model.endRest() } label: {
                 Text("Back to work").font(.system(size: 13, weight: .semibold))
                     .frame(maxWidth: .infinity).padding(.vertical, 9)
                     .pill(selected: true)
@@ -238,7 +238,7 @@ struct ContentView: View {
                 .font(.system(size: 34))
                 .foregroundStyle(.purple)
             Text("Time to sleep").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
-            Text("\(S.nightBlock) is on until \(clockLabel(S.nightTo)). Nothing to do until morning.")
+            Text("\(Settings.current.nightBlock) is on until \(clockLabel(Settings.current.nightTo)). Nothing to do until morning.")
                 .font(.system(size: 12)).foregroundStyle(Theme.text2).multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)

@@ -17,16 +17,15 @@ enum Fmt {
 
 func clockLabel(_ minutes: Int) -> String { String(format: "%02d:%02d", minutes / 60, minutes % 60) }
 
-func limitLabel(_ minutes: Int) -> String {
-    if minutes == 0 { return "No limit" }
-    return minutes % 60 == 0 ? "\(minutes / 60)h" : (minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m")
+// "45m", "1h", "1h 30m": the one way minutes are shown.
+func minutesLabel(_ minutes: Int) -> String {
+    if minutes < 60 { return "\(minutes)m" }
+    return minutes % 60 == 0 ? "\(minutes / 60)h" : "\(minutes / 60)h \(minutes % 60)m"
 }
 
-func formatDuration(_ secs: Int) -> String {
-    let m = secs / 60
-    if m < 60 { return "\(m)m" }
-    return m % 60 == 0 ? "\(m / 60)h" : "\(m / 60)h \(m % 60)m"
-}
+func limitLabel(_ minutes: Int) -> String { minutes == 0 ? "No limit" : minutesLabel(minutes) }
+
+func formatDuration(_ secs: Int) -> String { minutesLabel(secs / 60) }
 
 // "4:05" until `end`.
 func countdown(to end: Date, from now: Date) -> String {

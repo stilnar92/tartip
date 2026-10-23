@@ -13,6 +13,10 @@ enum Theme {
     static let separator = Color.black.opacity(0.06)
     static let red = Color(red: 0.92, green: 0.26, blue: 0.32)
     static let redTint = Color(red: 1.0, green: 0.91, blue: 0.92)
+
+    // Type scale.
+    static let title = Font.system(size: 26, weight: .bold)      // page and window titles
+    static let subtitle = Font.system(size: 13)                   // the line under a title
 }
 
 extension View {
@@ -49,5 +53,21 @@ struct Tag: View {
             .foregroundStyle(color)
             .padding(.horizontal, 7).padding(.vertical, 3)
             .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(fill))
+    }
+}
+
+// A page or window title with an optional line under it.
+struct PageTitle: View {
+    let title: String
+    var subtitle: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(Theme.title).foregroundStyle(Theme.text)
+            if let subtitle {
+                Text(subtitle).font(Theme.subtitle).foregroundStyle(Theme.text2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }

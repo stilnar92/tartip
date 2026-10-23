@@ -4,10 +4,10 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settings = Settings.shared
-    var m: Model? = nil                      // for "what it opens"
+    var model: Model? = nil                      // for "what it opens"
     @State private var expanded: Set<UUID> = []
     @State private var newActivity = ""
-    @State private var optionsText = Settings.shared.v.durationOptions.map(String.init).joined(separator: ", ")
+    @State private var optionsText = Settings.shared.value.durationOptions.map(String.init).joined(separator: ", ")
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -19,14 +19,14 @@ struct SettingsView: View {
     // Pages of the main window's sidebar.
     var activitiesPage: some View {
         VStack(alignment: .leading, spacing: 18) {
-            pageTitle("Activities", "Each one locks a Cold Turkey block: the one with its name, unless you pick another.")
+            PageTitle(title: "Activities", subtitle: "Each one locks a Cold Turkey block: the one with its name, unless you pick another.")
             activitiesSection
         }
     }
 
     var rulesPage: some View {
         VStack(alignment: .leading, spacing: 22) {
-            pageTitle("Rules", "Night, free time and session length.")
+            PageTitle(title: "Rules", subtitle: "Night, free time and session length.")
             nightSection
             freeTimeSection
             durationSection
@@ -35,18 +35,11 @@ struct SettingsView: View {
         }
     }
 
-    private func pageTitle(_ title: String, _ subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.system(size: 26, weight: .bold)).foregroundStyle(Theme.text)
-            Text(subtitle).font(.system(size: 13)).foregroundStyle(Theme.text2)
-        }
-    }
-
     // MARK: sections
 
     private var activitiesSection: some View {
         group("Your list", "Set a daily limit with the stepper; tap ⌄ for hours and what it opens.") {
-            ForEach($settings.v.activities) { $a in
+            ForEach($settings.value.activities) { $a in
                 activityRow($a)
             }
             HStack(spacing: 6) {
@@ -63,31 +56,31 @@ struct SettingsView: View {
     }
 
     private func activityRow(_ a: Binding<ActivitySetting>) -> some View {
-        let v = a.wrappedValue
-        let st = ActivityStyle.of(v)
-        let open = expanded.contains(v.id)
+        let item = a.wrappedValue
+        let st = ActivityStyle.of(item)
+        let open = expanded.contains(item.id)
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: st.icon).foregroundStyle(st.color).frame(width: 18)
                 TextField("Name", text: a.name).textFieldStyle(.plain).font(.system(size: 13))
-                if let from = v.fromMinute, let to = v.toMinute {
+                if let from = item.fromMinute, let to = item.toMinute {
                     Text("\(clockLabel(from))–\(clockLabel(to))")
                         .font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
                 }
                 Spacer()
-                Text(limitLabel(v.dailyMinutes))
+                Text(limitLabel(item.dailyMinutes))
                     .font(.system(size: 12, weight: .medium)).monospacedDigit()
-                    .foregroundStyle(v.dailyMinutes == 0 ? .secondary : .primary)
+                    .foregroundStyle(item.dailyMinutes == 0 ? .secondary : .primary)
                     .frame(width: 60, alignment: .trailing)
                 Stepper("", value: a.dailyMinutes, in: 0...720, step: 15).labelsHidden().controlSize(.small)
                 Button {
-                    if open { expanded.remove(v.id) } else { expanded.insert(v.id) }
+                    if open { expanded.remove(item.id) } else { expanded.insert(item.id) }
                 } label: {
                     Image(systemName: open ? "chevron.up" : "chevron.down").font(.system(size: 11, weight: .semibold))
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
                 .help("Hours, block, look and what it opens")
-                Button { settings.v.activities.removeAll { $0.id == v.id } } label: {
+                Button { settings.value.activities.removeAll { $0.id == item.id } } label: {
                     Image(systemName: "trash").font(.system(size: 11))
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
@@ -102,7 +95,7 @@ struct SettingsView: View {
                             a.wrappedValue.toMinute = any ? nil : 20 * 60
                         }))
                         .toggleStyle(.switch).controlSize(.small)
-                    if v.fromMinute != nil && v.toMinute != nil {
+                    if item.fromMinute != nil && item.toMinute != nil {
                         row("Can be picked from") { clockStepper(Binding(get: { a.wrappedValue.fromMinute ?? 720 }, set: { a.wrappedValue.fromMinute = $0 })) }
                         row("Until") { clockStepper(Binding(get: { a.wrappedValue.toMinute ?? 1200 }, set: { a.wrappedValue.toMinute = $0 })) }
                     }
@@ -112,9 +105,9 @@ struct SettingsView: View {
                     Divider()
                     SectionLabel(text: "Look")
                     lookPicker(a, st)
-                    if let m {
+                    if let model {
                         Divider()
-                        OpensEditor(m: m, activity: v)
+                        OpensEditor(model: model, activity: item)
                     }
                 }
                 .padding(.leading, 26)
@@ -126,19 +119,19 @@ struct SettingsView: View {
 
     private var nightSection: some View {
         group("Night", "Nothing is asked and no timers run; the night block stays on so you go to sleep.") {
-            Toggle("Night mode", isOn: $settings.v.nightEnabled).toggleStyle(.switch).controlSize(.small)
-            if settings.v.nightEnabled {
-                row("From") { clockStepper($settings.v.nightFrom) }
-                row("To") { clockStepper($settings.v.nightTo) }
-                row("Cold Turkey block") { textField($settings.v.nightBlock) }
+            Toggle("Night mode", isOn: $settings.value.nightEnabled).toggleStyle(.switch).controlSize(.small)
+            if settings.value.nightEnabled {
+                row("From") { clockStepper($settings.value.nightFrom) }
+                row("To") { clockStepper($settings.value.nightTo) }
+                row("Cold Turkey block") { textField($settings.value.nightBlock) }
             }
         }
     }
 
     private var freeTimeSection: some View {
         group("Free time", "Nothing blocked: movies, YouTube, anything. Only when you take it on purpose; idle time doesn't count.") {
-            row("Per day") { minuteStepper($settings.v.dailyFreeMinutes, 0...240, step: 5) }
-            row("One stretch at most") { minuteStepper($settings.v.maxRestMinutes, 5...120, step: 5) }
+            row("Per day") { minuteStepper($settings.value.dailyFreeMinutes, 0...240, step: 5) }
+            row("One stretch at most") { minuteStepper($settings.value.maxRestMinutes, 5...120, step: 5) }
         }
     }
 
@@ -150,14 +143,14 @@ struct SettingsView: View {
                     .onSubmit(saveOptions)
                     .onChange(of: optionsText) { _ in saveOptions() }
             }
-            row("Default") { minuteStepper($settings.v.defaultMinutes, 5...240, step: 5) }
-            row("Minimum") { minuteStepper($settings.v.minMinutes, 5...120, step: 5) }
-            row("Pomodoro work") { minuteStepper($settings.v.pomodoroWork, 5...90, step: 5) }
-            row("Pomodoro break") { minuteStepper($settings.v.pomodoroBreak, 1...30, step: 1) }
+            row("Default") { minuteStepper($settings.value.defaultMinutes, 5...240, step: 5) }
+            row("Minimum") { minuteStepper($settings.value.minMinutes, 5...120, step: 5) }
+            row("Pomodoro work") { minuteStepper($settings.value.pomodoroWork, 5...90, step: 5) }
+            row("Pomodoro break") { minuteStepper($settings.value.pomodoroBreak, 1...30, step: 1) }
             row("Pomodoro rounds") {
                 HStack(spacing: 6) {
-                    Text("\(settings.v.pomodoroRounds)").monospacedDigit()
-                    Stepper("", value: $settings.v.pomodoroRounds, in: 1...8).labelsHidden()
+                    Text("\(settings.value.pomodoroRounds)").monospacedDigit()
+                    Stepper("", value: $settings.value.pomodoroRounds, in: 1...8).labelsHidden()
                 }
             }
         }
@@ -168,16 +161,16 @@ struct SettingsView: View {
     // How the daily limits add up: active work, Rest (with blocking), free time,
     // and what's left of the waking day (24 h minus night).
     private var dayPlan: some View {
-        let v = settings.v
+        let s = settings.value
         let isRest = { (a: ActivitySetting) in a.name.lowercased() == "rest" }
-        let active = v.activities.filter { !isRest($0) }.reduce(0) { $0 + $1.dailyMinutes }
-        let rest = v.activities.filter(isRest).reduce(0) { $0 + $1.dailyMinutes }
-        let free = v.dailyFreeMinutes
-        let nightLen = v.nightEnabled ? (v.nightTo - v.nightFrom + 1440) % 1440 : 0
+        let active = s.activities.filter { !isRest($0) }.reduce(0) { $0 + $1.dailyMinutes }
+        let rest = s.activities.filter(isRest).reduce(0) { $0 + $1.dailyMinutes }
+        let free = s.dailyFreeMinutes
+        let nightLen = s.nightEnabled ? (s.nightTo - s.nightFrom + 1440) % 1440 : 0
         let awake = 1440 - nightLen
         let planned = active + rest + free
         let unplanned = max(0, awake - planned)
-        let noLimit = v.activities.filter { $0.dailyMinutes == 0 }.map(\.name)
+        let noLimit = s.activities.filter { $0.dailyMinutes == 0 }.map(\.name)
         let parts: [(String, Int, Color)] = [("Active", active, .indigo), ("Rest", rest, .brown),
                                              ("Free time", free, .orange), ("Unplanned", unplanned, .gray)]
 
@@ -185,7 +178,7 @@ struct SettingsView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Your day").font(.system(size: 13, weight: .semibold))
                 Spacer()
-                Text("\(limitLabel(planned)) planned of \(limitLabel(awake)) awake")
+                Text("\(minutesLabel(planned)) planned of \(minutesLabel(awake)) awake")
                     .font(.system(size: 11)).foregroundStyle(planned > awake ? .red : .secondary)
             }
             // One bar for the whole waking day.
@@ -201,7 +194,7 @@ struct SettingsView: View {
             HStack(spacing: 0) {
                 ForEach(parts, id: \.0) { name, mins, color in
                     VStack(spacing: 2) {
-                        Text(mins > 0 ? limitLabel(mins) : "–")
+                        Text(mins > 0 ? minutesLabel(mins) : "–")
                             .font(.system(size: 15, weight: .bold)).monospacedDigit().foregroundStyle(color)
                         Text(name).font(.system(size: 10)).foregroundStyle(.secondary)
                     }
@@ -240,7 +233,7 @@ struct SettingsView: View {
 
     private func minuteStepper(_ value: Binding<Int>, _ range: ClosedRange<Int>, step: Int) -> some View {
         HStack(spacing: 6) {
-            Text(limitLabel(value.wrappedValue) == "No limit" ? "0m" : limitLabel(value.wrappedValue)).monospacedDigit()
+            Text(minutesLabel(value.wrappedValue)).monospacedDigit()
             Stepper("", value: value, in: range, step: step).labelsHidden()
         }
     }
@@ -286,12 +279,12 @@ struct SettingsView: View {
     private func addActivity() {
         let n = newActivity.trimmingCharacters(in: .whitespaces)
         newActivity = ""
-        guard !n.isEmpty, !settings.v.activities.contains(where: { $0.name.lowercased() == n.lowercased() }) else { return }
-        settings.v.activities.append(ActivitySetting(name: n))
+        guard !n.isEmpty, !settings.value.activities.contains(where: { $0.name.lowercased() == n.lowercased() }) else { return }
+        settings.value.activities.append(ActivitySetting(name: n))
     }
 
     private func saveOptions() {
         let list = optionsText.split(whereSeparator: { $0 == "," || $0 == " " }).compactMap { Int($0) }.filter { $0 > 0 }
-        if !list.isEmpty { settings.v.durationOptions = Array(Set(list)).sorted() }
+        if !list.isEmpty { settings.value.durationOptions = Array(Set(list)).sorted() }
     }
 }

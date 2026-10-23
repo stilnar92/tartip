@@ -4,18 +4,14 @@ import SwiftUI
 
 // The same Today list as the panel, in its own window that stays on top.
 struct ActivityPickerView: View {
-    @ObservedObject var m: Model
+    @ObservedObject var model: Model
     @ObservedObject var clock: Clock
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("What's next?").font(.system(size: 26, weight: .bold)).foregroundStyle(Theme.text)
-                Text("Click an activity to start it, or take free time. Nothing is blocked until you choose.")
-                    .font(.system(size: 13)).foregroundStyle(Theme.text2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            TodayList(m: m, clock: clock)
+            PageTitle(title: "What's next?",
+                      subtitle: "Click an activity to start it, or take free time. Nothing is blocked until you choose.")
+            TodayList(model: model, clock: clock)
         }
         .padding(24)
         .frame(width: 420)
@@ -25,26 +21,26 @@ struct ActivityPickerView: View {
 // After a session: the activity list as a checklist with the plan already checked.
 // One click on "Save" confirms; tick or untick to change what you actually did.
 struct ReviewView: View {
-    @ObservedObject var m: Model
+    @ObservedObject var model: Model
     @State private var picked: [String]? = nil
 
     var body: some View {
-        let r = m.review
+        let r = model.review
         let mins = (r?.seconds ?? 0) / 60
         let checked = picked ?? (r?.planned.map { [$0] } ?? [])
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Session done").font(.system(size: 26, weight: .bold)).foregroundStyle(Theme.text)
+                PageTitle(title: "Session done")
                 HStack(spacing: 6) {
                     Tag(text: "\(mins) min", color: Theme.accent, fill: Theme.accentTint)
                     if let planned = r?.planned { Tag(text: "planned: \(planned)") }
                 }
                 Text("What did you actually do? The plan is checked; change it if needed.")
-                    .font(.system(size: 13)).foregroundStyle(Theme.text2)
+                    .font(Theme.subtitle).foregroundStyle(Theme.text2)
             }
 
             VStack(spacing: 0) {
-                let names = m.activities
+                let names = model.activities
                 ForEach(Array(names.enumerated()), id: \.element) { i, a in
                     let on = checked.contains(a)
                     let st = ActivityStyle.of(a)
@@ -76,7 +72,7 @@ struct ReviewView: View {
             .padding(.vertical, 4)
             .card(radius: 14)
 
-            Button { m.saveReview(actual: checked) } label: {
+            Button { model.saveReview(actual: checked) } label: {
                 Text(checked == (r?.planned.map { [$0] } ?? []) && !checked.isEmpty ? "Yes, as planned" : "Save")
                     .font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
                     .frame(maxWidth: .infinity).padding(.vertical, 11)

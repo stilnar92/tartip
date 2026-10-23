@@ -5,18 +5,21 @@ import Combine
 final class Settings: ObservableObject {
     static let shared = Settings()
 
-    @Published var v: AppSettings { didSet { if v != oldValue { save() } } }
+    @Published var value: AppSettings { didSet { if value != oldValue { save() } } }
+
+    // The current settings.
+    static var current: AppSettings { shared.value }
 
     private init() {
         var s = Settings.load()
         let moved = Settings.moveModeConfigs(into: &s)
-        v = s
+        value = s
         if moved || !FileManager.default.fileExists(atPath: settingsFile.path) { save() }
     }
 
     func updateActivity(_ id: UUID, _ change: (inout ActivitySetting) -> Void) {
-        guard let i = v.activities.firstIndex(where: { $0.id == id }) else { return }
-        change(&v.activities[i])
+        guard let i = value.activities.firstIndex(where: { $0.id == id }) else { return }
+        change(&value.activities[i])
     }
 
     private static func load() -> AppSettings {
@@ -60,9 +63,7 @@ final class Settings: ObservableObject {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         try? FileManager.default.createDirectory(at: modesDir, withIntermediateDirectories: true)
-        do { try enc.encode(v).write(to: settingsFile) } catch { log("error: couldn't save \(settingsFile.path): \(error)") }
+        do { try enc.encode(value).write(to: settingsFile) } catch { log("error: couldn't save \(settingsFile.path): \(error)") }
     }
 }
 
-// The current settings.
-@MainActor var S: AppSettings { Settings.shared.v }

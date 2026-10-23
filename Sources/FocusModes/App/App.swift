@@ -60,9 +60,9 @@ struct FocusModesApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            ContentView(m: model, clock: clock, openMain: AppRoot.shared.windows.openMain)
+            ContentView(model: model, clock: clock, openMain: AppRoot.shared.windows.openMain)
         } label: {
-            if model.session == nil && model.freeTimeEnd == nil && S.isNight(at: clock.now) {
+            if model.session == nil && model.freeTimeEnd == nil && Settings.current.isNight(at: clock.now) {
                 Image(systemName: "moon.stars.fill")
             } else if model.session == nil && model.freeTimeEnd == nil {
                 Image(systemName: "scope")

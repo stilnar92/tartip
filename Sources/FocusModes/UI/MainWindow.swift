@@ -15,7 +15,7 @@ enum MainTab: String, CaseIterable {
 // One window for everything that isn't "now": a Craft-style sidebar on the left,
 // the selected page on the right.
 struct MainView: View {
-    @ObservedObject var m: Model
+    @ObservedObject var model: Model
     @State var tab: MainTab
 
     var body: some View {
@@ -25,9 +25,9 @@ struct MainView: View {
             ScrollView {
                 Group {
                     switch tab {
-                    case .stats: StatsView(m: m)
-                    case .activities: SettingsView(m: m).activitiesPage.padding(28)
-                    case .rules: SettingsView(m: m).rulesPage.padding(28)
+                    case .stats: StatsView(model: model)
+                    case .activities: SettingsView(model: model).activitiesPage.padding(28)
+                    case .rules: SettingsView(model: model).rulesPage.padding(28)
                     }
                 }
                 .frame(maxWidth: 560, alignment: .leading)

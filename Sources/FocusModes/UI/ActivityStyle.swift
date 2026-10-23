@@ -15,7 +15,7 @@ struct ActivityStyle {
 
     // History can name activities that no longer exist; those get the guess.
     @MainActor static func of(_ name: String) -> ActivityStyle {
-        S.activity(named: name).map(of) ?? guess(name)
+        Settings.current.activity(named: name).map(of) ?? guess(name)
     }
 
     static func of(_ a: ActivitySetting) -> ActivityStyle {

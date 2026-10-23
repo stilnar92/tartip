@@ -21,13 +21,13 @@ final class WindowCoordinator {
     func openMain(_ tab: MainTab) {
         hideMenuPanel()
         model.reloadRecords()
-        main.show(MainView(m: model, tab: tab))
+        main.show(MainView(model: model, tab: tab))
     }
 
     private func show(for phase: AppPhase) {
         switch phase {
-        case .picking: prompt.show(ActivityPickerView(m: model, clock: model.clock))
-        case .reviewing: prompt.show(ReviewView(m: model))
+        case .picking: prompt.show(ActivityPickerView(model: model, clock: model.clock))
+        case .reviewing: prompt.show(ReviewView(model: model))
         case .idle, .session, .freeTime: prompt.hide()
         }
     }

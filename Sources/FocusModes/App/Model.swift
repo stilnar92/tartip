@@ -30,7 +30,7 @@ final class Model: ObservableObject {
         self.state = state
         records = loadRecords()
 
-        if self.state.minutes < S.minMinutes { self.state.minutes = S.defaultSessionMinutes }
+        if self.state.minutes < Settings.current.minMinutes { self.state.minutes = Settings.current.defaultSessionMinutes }
         if let s = state.phase.session, Date() < s.end {
             // Restarted mid-session: make sure the block is on for the time that's left.
             blocker.lock(s.block, until: s.end)
@@ -58,7 +58,7 @@ final class Model: ObservableObject {
     var review: SessionRecord? { phase.review }
     var freeTimeEnd: Date? { phase.freeTimeEnd }
     var restTaken: Bool { state.restTaken }
-    var activities: [String] { S.activities.map(\.name).filter { !$0.isEmpty } }
+    var activities: [String] { Settings.current.activities.map(\.name).filter { !$0.isEmpty } }
 
     // Length for the next start, kept across restarts.
     var minutes: Int {
@@ -84,7 +84,7 @@ final class Model: ObservableObject {
     }
 
     var limits: Limits {
-        Limits(settings: S, today: recordsSince(Calendar.current.startOfDay(for: now)), now: now)
+        Limits(settings: Settings.current, today: recordsSince(Calendar.current.startOfDay(for: now)), now: now)
     }
 
     // Time in sessions today, by the clock, counting the running one.
@@ -99,7 +99,7 @@ final class Model: ObservableObject {
     func updateOpens(_ activity: UUID, _ change: (inout ModeConfig) -> Void) {
         Settings.shared.updateActivity(activity) { change(&$0.opens) }
         // Stretching windows needs Accessibility; ask as soon as there's something to stretch.
-        if S.activities.contains(where: { $0.id == activity && !$0.opens.isEmpty }) { _ = axTrusted(prompt: true) }
+        if Settings.current.activities.contains(where: { $0.id == activity && !$0.opens.isEmpty }) { _ = axTrusted(prompt: true) }
     }
 
     func chooseApps(for activity: UUID) {
@@ -126,18 +126,18 @@ final class Model: ObservableObject {
         guard phase.canStart, limits.canStart(activity) else { return }
         if let chosen { minutes = chosen }
         if let usePomodoro { pomodoro = usePomodoro }
-        if minutes < S.minMinutes { minutes = S.minMinutes }
+        if minutes < Settings.current.minMinutes { minutes = Settings.current.minMinutes }
         let extra = oneTimeLink.trimmingCharacters(in: .whitespaces)
         oneTimeLink = ""
-        let phases = pomodoro ? S.pomodoroPhases() : [Phase(isBreak: false, minutes: minutes)]
-        start(Session(block: S.block(for: activity), phases: phases, start: Date(), planned: activity),
+        let phases = pomodoro ? Settings.current.pomodoroPhases() : [Phase(isBreak: false, minutes: minutes)]
+        start(Session(block: Settings.current.block(for: activity), phases: phases, start: Date(), planned: activity),
               extraURLs: extra.isEmpty ? [] : [extra])
     }
 
     private func start(_ s: Session, extraURLs: [String]) {
         blocker.lock(s.block, until: s.end)
         message = ""
-        let c = s.planned.flatMap { S.activity(named: $0)?.opens } ?? ModeConfig()
+        let c = s.planned.flatMap { Settings.current.activity(named: $0)?.opens } ?? ModeConfig()
         let opensSomething = !c.isEmpty || !extraURLs.isEmpty
         if opensSomething && c.maximize && !axTrusted(prompt: true) {
             message = "Allow Focus Modes in Privacy & Security → Accessibility to resize windows."
@@ -150,7 +150,7 @@ final class Model: ObservableObject {
         state.phase = .session(s)
         lastPhaseIndex = 0
         let first = s.phases.first?.minutes ?? s.totalMinutes
-        let desc = s.workRounds > 1 ? "pomodoro \(first)/\(S.pomodoroBreak)x\(s.workRounds)" : "\(s.totalMinutes)m"
+        let desc = s.workRounds > 1 ? "pomodoro \(first)/\(Settings.current.pomodoroBreak)x\(s.workRounds)" : "\(s.totalMinutes)m"
         log("start \(s.block) (app, \(desc), lock \(s.totalMinutes)m)")
         notify("Focus: \(s.block)", s.workRounds > 1 ? "Round 1/\(s.workRounds) — \(first) min. Go!" : "\(s.totalMinutes) min. Go!")
     }
@@ -183,7 +183,7 @@ final class Model: ObservableObject {
 
     // MARK: free time (nothing blocked, from the daily budget, only taken on purpose)
 
-    var freeLeft: Int { max(0, S.dailyFreeSeconds - freeUsedToday - freeTimeElapsed) }
+    var freeLeft: Int { max(0, Settings.current.dailyFreeSeconds - freeUsedToday - freeTimeElapsed) }
 
     // Free time can't be taken twice in a row: a session has to run in between.
     var canRest: Bool { freeLeft >= 60 && !state.restTaken }
@@ -198,7 +198,7 @@ final class Model: ObservableObject {
 
     func startRest(minutes: Int) {
         guard phase.canStart, canRest else { return }
-        let secs = min(min(minutes, S.maxRestMinutes) * 60, freeLeft)   // one stretch is capped (Settings)
+        let secs = min(min(minutes, Settings.current.maxRestMinutes) * 60, freeLeft)   // one stretch is capped (Settings)
         let start = Date()
         state.restTaken = true
         state.phase = .freeTime(start: start, end: start.addingTimeInterval(Double(secs)))
@@ -217,7 +217,7 @@ final class Model: ObservableObject {
 
     private func tick() {
         clock.now = Date()
-        let night = S.isNight(at: now)
+        let night = Settings.current.isNight(at: now)
         if night { enterNightIfNeeded() }
 
         switch phase {
@@ -258,12 +258,12 @@ final class Model: ObservableObject {
     // A session that's already running just finishes.
     private func enterNightIfNeeded() {
         if phase == .picking { state.phase = .idle }
-        let end = S.nightEnd(after: now)
+        let end = Settings.current.nightEnd(after: now)
         if let applied = state.nightUntil, applied >= end { return }
-        blocker.lock(S.nightBlock, until: end)
+        blocker.lock(Settings.current.nightBlock, until: end)
         state.nightUntil = end
-        log("night \(S.nightBlock) until \(clockLabel(S.nightTo))")
-        notify("Night mode", "\(S.nightBlock) is on until \(clockLabel(S.nightTo)). Time to sleep 🌙")
+        log("night \(Settings.current.nightBlock) until \(clockLabel(Settings.current.nightTo))")
+        notify("Night mode", "\(Settings.current.nightBlock) is on until \(clockLabel(Settings.current.nightTo)). Time to sleep 🌙")
     }
 
     // MARK: display

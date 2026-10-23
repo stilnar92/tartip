@@ -3,7 +3,7 @@ import AppKit
 
 // What an activity opens when its session starts: apps, links, and whether to stretch windows.
 struct OpensEditor: View {
-    @ObservedObject var m: Model
+    @ObservedObject var model: Model
     let activity: ActivitySetting
     @State private var newLink = ""
 
@@ -19,10 +19,10 @@ struct OpensEditor: View {
                         .resizable().frame(width: 30, height: 30)
                         .help(URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent)
                         .contextMenu {
-                            Button("Remove", role: .destructive) { m.updateOpens(id) { $0.apps.removeAll { $0 == path } } }
+                            Button("Remove", role: .destructive) { model.updateOpens(id) { $0.apps.removeAll { $0 == path } } }
                         }
                 }
-                Button { m.chooseApps(for: id) } label: {
+                Button { model.chooseApps(for: id) } label: {
                     Image(systemName: "plus.app")
                         .font(.system(size: 16))
                         .frame(width: 30, height: 30)
@@ -37,7 +37,7 @@ struct OpensEditor: View {
                     Text(u.replacingOccurrences(of: "https://", with: "").replacingOccurrences(of: "http://", with: ""))
                         .lineLimit(1).truncationMode(.middle)
                     Spacer()
-                    Button { m.updateOpens(id) { $0.urls.removeAll { $0 == u } } } label: {
+                    Button { model.updateOpens(id) { $0.urls.removeAll { $0 == u } } } label: {
                         Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
                     }
                     .buttonStyle(.plain).foregroundStyle(.secondary)
@@ -53,7 +53,7 @@ struct OpensEditor: View {
             .padding(.horizontal, 10).padding(.vertical, 7)
             .card(radius: 9)
             Toggle(isOn: Binding(get: { activity.opens.maximize },
-                                 set: { v in m.updateOpens(id) { $0.maximize = v } })) {
+                                 set: { v in model.updateOpens(id) { $0.maximize = v } })) {
                 Text("Stretch windows to fill the screen").font(.system(size: 12))
             }
             .toggleStyle(.switch).controlSize(.mini).tint(tint)
@@ -64,6 +64,6 @@ struct OpensEditor: View {
         let l = newLink.trimmingCharacters(in: .whitespaces)
         newLink = ""
         guard !l.isEmpty else { return }
-        m.updateOpens(activity.id) { if !$0.urls.contains(l) { $0.urls.append(l) } }
+        model.updateOpens(activity.id) { if !$0.urls.contains(l) { $0.urls.append(l) } }
     }
 }
