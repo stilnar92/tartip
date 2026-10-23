@@ -6,7 +6,7 @@ import Foundation
 struct ActivitySetting: Codable, Hashable, Identifiable {
     var id = UUID()
     var name: String
-    var block: String              // Cold Turkey block it locks: the name at first, kept when the name changes
+    var block: String              // block it locks (blocks.json): the name at first, kept when the name changes
     var dailyMinutes = 0           // 0 = no daily limit
     var fromMinute: Int? = nil     // hours it can be picked, minutes since midnight;
     var toMinute: Int? = nil       // nil = any time. May cross midnight.
@@ -81,7 +81,7 @@ struct AppSettings: Codable, Equatable {
     var nightBlock = "Focus_Mode"
 
     // Workspace
-    var otherBlock = "Focus_Mode"         // Cold Turkey block for "Other"
+    var otherBlock = "Focus_Mode"         // block for "Other"
 
     var activities: [ActivitySetting] = ["Work", "Arabic", "AI education", "Project", "English", "Interview", "Rest"]
         .map { ActivitySetting(name: $0) }
@@ -104,7 +104,7 @@ extension AppSettings {
 
     func activity(named name: String) -> ActivitySetting? { activities.first { $0.name == name } }
 
-    // The Cold Turkey block an activity locks; "Other" has its own setting.
+    // The block an activity locks; "Other" has its own setting.
     func block(for activity: String) -> String {
         if activity == otherActivity { return otherBlock }
         guard let b = self.activity(named: activity)?.block, !b.isEmpty else { return activity }

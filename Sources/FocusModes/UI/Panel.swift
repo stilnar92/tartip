@@ -168,7 +168,7 @@ struct ContentView: View {
                 Text("Stop session").font(.system(size: 12)).foregroundStyle(Theme.text2).underline()
             }
             .buttonStyle(.plain)
-            .help("The Cold Turkey block stays on until \(f.string(from: s.end))")
+            .help("The block stays on until \(f.string(from: s.end))")
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20).padding(.horizontal, 16)

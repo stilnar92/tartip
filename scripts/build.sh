@@ -34,6 +34,7 @@ cat > "$APP/Contents/Info.plist" <<'EOF'
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
   <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>NSAppleEventsUsageDescription</key><string>Focus Modes opens your links in Chrome and sends blocked tabs to a "Not now" page.</string>
 </dict>
 </plist>
 EOF

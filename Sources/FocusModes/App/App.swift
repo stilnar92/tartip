@@ -1,11 +1,11 @@
-// Focus Modes: a menu bar app that starts Cold Turkey blocks with a timer and keeps you honest.
+// Focus Modes: a menu bar app that blocks apps and sites for a timed session and keeps you honest.
 
 import SwiftUI
 import AppKit
 import UserNotifications
 
 // Builds the app's objects once, in order: the single-instance check has to run
-// before the model starts sending Cold Turkey commands.
+// before the model starts quitting blocked apps.
 @MainActor
 final class AppRoot {
     static let shared = AppRoot()

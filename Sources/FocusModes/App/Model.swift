@@ -24,7 +24,7 @@ final class Model: ObservableObject {
     private var ticker: Task<Void, Never>?
     private var settingsSub: AnyCancellable?
 
-    init(clock: Clock? = nil, blocker: Blocker = ColdTurkey(), state: StoredState = StateStore.load()) {
+    init(clock: Clock? = nil, blocker: Blocker = NativeBlocker.shared, state: StoredState = StateStore.load()) {
         self.clock = clock ?? Clock()
         self.blocker = blocker
         self.state = state
@@ -35,8 +35,6 @@ final class Model: ObservableObject {
             // Restarted mid-session: make sure the block is on for the time that's left.
             blocker.lock(s.block, until: s.end)
             lastPhaseIndex = s.current(at: Date())?.index
-        } else {
-            blocker.clearStrayCommands()
         }
         // Settings edits refresh the panel and the activity list right away.
         settingsSub = Settings.shared.objectWillChange.sink { [weak self] _ in
@@ -178,7 +176,6 @@ final class Model: ObservableObject {
         if Date() < s.end {
             message = "Locked until \(Fmt.clock.string(from: s.end)). Timer stopped, block stays."
         }
-        blocker.stop(s.block)
         log("off   \(s.block) (app)")
         finish(s)
     }
@@ -237,12 +234,12 @@ final class Model: ObservableObject {
         clock.now = Date()
         let night = Settings.current.isNight(at: now)
         if night { enterNightIfNeeded() }
+        blocker.tick(now)
 
         switch phase {
         case .session(let s):
             guard let cur = s.current(at: now) else {
                 log("done  \(s.block) (app)")
-                blocker.stop(s.block)
                 notify("Focus: \(s.block)", "Session done 🎉")
                 finish(s)
                 return
