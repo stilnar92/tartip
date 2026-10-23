@@ -19,7 +19,7 @@ struct SettingsView: View {
     // Pages of the main window's sidebar.
     var activitiesPage: some View {
         VStack(alignment: .leading, spacing: 18) {
-            PageTitle(title: "Activities", subtitle: "Each one locks a Cold Turkey block: the one with its name, unless you pick another.")
+            PageTitle(title: "Activities", subtitle: "Each one locks a block while it runs: the one with its name, unless you pick another.")
             activitiesSection
         }
     }
@@ -43,7 +43,7 @@ struct SettingsView: View {
                 activityRow($a)
             }
             HStack(spacing: 6) {
-                TextField("New activity (locks the Cold Turkey block with its name)", text: $newActivity)
+                TextField("New activity (locks the block with its name)", text: $newActivity)
                     .textFieldStyle(.plain).font(.system(size: 12))
                     .padding(.horizontal, 10).padding(.vertical, 7)
                     .card(radius: 9)
@@ -100,8 +100,8 @@ struct SettingsView: View {
                         row("Until") { clockStepper(Binding(get: { a.wrappedValue.toMinute ?? 1200 }, set: { a.wrappedValue.toMinute = $0 })) }
                     }
                     Divider()
-                    SectionLabel(text: "Cold Turkey")
                     row("Block it locks") { textField(a.block) }
+                    BlockEditor(block: item.block.isEmpty ? item.name : item.block)
                     Divider()
                     SectionLabel(text: "Look")
                     lookPicker(a, st)
@@ -123,7 +123,11 @@ struct SettingsView: View {
             if settings.value.nightEnabled {
                 row("From") { clockStepper($settings.value.nightFrom) }
                 row("To") { clockStepper($settings.value.nightTo) }
-                row("Cold Turkey block") { textField($settings.value.nightBlock) }
+                row("Block") { textField($settings.value.nightBlock) }
+                Text("The night block is also what \"Other\" sessions lock.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                BlockEditor(block: settings.value.nightBlock)
+                    .padding(10).card(radius: 9)
             }
         }
     }
