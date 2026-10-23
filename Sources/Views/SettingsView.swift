@@ -5,6 +5,8 @@ import AppKit
 
 struct SettingsView: View {
     @ObservedObject var settings = Settings.shared
+    var m: Model? = nil                      // for "what it opens"
+    @State var expanded: Set<UUID> = []
     @State private var newActivity = ""
     @State private var optionsText = Settings.shared.v.durationOptions.map(String.init).joined(separator: ", ")
 
@@ -30,27 +32,10 @@ struct SettingsView: View {
     // MARK: sections
 
     private var activitiesSection: some View {
-        group("Activities · daily limit", "Each activity starts the Cold Turkey block with the same name. When today's limit is used up, it disappears from the picker.") {
+        group("Activities", "Each activity starts the Cold Turkey block with the same name. Tap ⌄ for its hours and what it opens.") {
             ForEach($settings.v.activities) { $a in
-                let st = ActivityStyle.of(a.name)
-                HStack(spacing: 8) {
-                    Image(systemName: st.icon).foregroundStyle(st.color).frame(width: 18)
-                    TextField("Name", text: $a.name).textFieldStyle(.plain).font(.system(size: 13))
-                    Spacer()
-                    Text(limitLabel(a.dailyMinutes))
-                        .font(.system(size: 12, weight: .medium, design: .rounded)).monospacedDigit()
-                        .foregroundStyle(a.dailyMinutes == 0 ? .secondary : .primary)
-                        .frame(width: 66, alignment: .trailing)
-                    Stepper("", value: $a.dailyMinutes, in: 0...720, step: 15).labelsHidden().controlSize(.small)
-                    Button { settings.v.activities.removeAll { $0.id == a.id } } label: {
-                        Image(systemName: "trash").font(.system(size: 11))
-                    }
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 10).padding(.vertical, 6)
-                .card(radius: 9)
+                activityRow($a)
             }
-            dayPlan
             HStack(spacing: 6) {
                 TextField("New activity (same name as its Cold Turkey block)", text: $newActivity)
                     .textFieldStyle(.plain).font(.system(size: 12))
@@ -60,7 +45,65 @@ struct SettingsView: View {
                 Button("Add", action: addActivity)
                     .disabled(newActivity.trimmingCharacters(in: .whitespaces).isEmpty)
             }
+            dayPlan
         }
+    }
+
+    private func activityRow(_ a: Binding<ActivitySetting>) -> some View {
+        let v = a.wrappedValue
+        let st = ActivityStyle.of(v.name)
+        let open = expanded.contains(v.id)
+        let anyTime = v.fromMinute == nil || v.toMinute == nil
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: st.icon).foregroundStyle(st.color).frame(width: 18)
+                TextField("Name", text: a.name).textFieldStyle(.plain).font(.system(size: 13))
+                if !anyTime {
+                    Text("\(clockLabel(v.fromMinute!))–\(clockLabel(v.toMinute!))")
+                        .font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
+                }
+                Spacer()
+                Text(limitLabel(v.dailyMinutes))
+                    .font(.system(size: 12, weight: .medium, design: .rounded)).monospacedDigit()
+                    .foregroundStyle(v.dailyMinutes == 0 ? .secondary : .primary)
+                    .frame(width: 60, alignment: .trailing)
+                Stepper("", value: a.dailyMinutes, in: 0...720, step: 15).labelsHidden().controlSize(.small)
+                Button {
+                    if open { expanded.remove(v.id) } else { expanded.insert(v.id) }
+                } label: {
+                    Image(systemName: open ? "chevron.up" : "chevron.down").font(.system(size: 11, weight: .semibold))
+                }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
+                .help("Hours and what it opens")
+                Button { settings.v.activities.removeAll { $0.id == v.id } } label: {
+                    Image(systemName: "trash").font(.system(size: 11))
+                }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
+            }
+            if open {
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionLabel(text: "Hours")
+                    Toggle("Any time", isOn: Binding(
+                        get: { a.wrappedValue.fromMinute == nil || a.wrappedValue.toMinute == nil },
+                        set: { any in
+                            a.wrappedValue.fromMinute = any ? nil : 12 * 60
+                            a.wrappedValue.toMinute = any ? nil : 20 * 60
+                        }))
+                        .toggleStyle(.switch).controlSize(.small)
+                    if !anyTime {
+                        row("Can be picked from") { clockStepper(Binding(get: { a.wrappedValue.fromMinute ?? 720 }, set: { a.wrappedValue.fromMinute = $0 })) }
+                        row("Until") { clockStepper(Binding(get: { a.wrappedValue.toMinute ?? 1200 }, set: { a.wrappedValue.toMinute = $0 })) }
+                    }
+                    if let m {
+                        Divider()
+                        OpensEditor(m: m, block: v.name)
+                    }
+                }
+                .padding(.leading, 26)
+            }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .card(open ? st.color : nil, radius: 9)
     }
 
     private var nightSection: some View {

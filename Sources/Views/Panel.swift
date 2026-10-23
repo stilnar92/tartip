@@ -51,11 +51,9 @@ struct ContentView: View {
     @State private var adding = false
     @State private var custom = false
     @State private var hovered: String?
-    @State private var newLink = ""
 
     private let presets = durationOptions
 
-    @State private var editing = false
     @State private var customText = ""
     @FocusState private var customFocused: Bool
     @State private var showLink = false
@@ -67,8 +65,6 @@ struct ContentView: View {
                 resting(r)
             } else if let s = m.session, let cur = s.current(at: m.now) {
                 running(s, cur)
-            } else if editing {
-                editor
             } else if isNight(m.now) {
                 nightView
             } else {
@@ -84,7 +80,6 @@ struct ContentView: View {
         .padding(16)
         .frame(width: 340)
         .animation(.snappy(duration: 0.2), value: m.session == nil)
-        .animation(.snappy(duration: 0.2), value: editing)
         .animation(.snappy(duration: 0.2), value: showLink)
         .animation(.snappy(duration: 0.2), value: custom)
     }
@@ -117,15 +112,13 @@ struct ContentView: View {
         if m.session != nil { return "In a session" }
         if m.restEnd != nil { return "Free time" }
         if m.availableActivities.isEmpty && !m.canRest { return "Day done 🎉" }
+        if m.pickableActivities.isEmpty && !m.canRest { return "Nothing open right now" }
         return "Pick what's next"
     }
 
     // Footer: four equal tools, icon above a caption, so nothing wraps.
     private var footer: some View {
         HStack(spacing: 4) {
-            if m.session == nil && m.restEnd == nil {
-                tool(editing ? "checkmark" : "slider.horizontal.3", editing ? "Done" : "Edit") { editing.toggle() }
-            }
             tool("chart.bar.fill", "Stats") {
                 // Close the menu bar panel first so it doesn't cover the window.
                 NSApp.keyWindow?.close()
@@ -282,94 +275,6 @@ struct ContentView: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .help("Free time: nothing blocked (\(m.freeLeft / 60) min left today)")
-    }
-
-    // MARK: editor (add/remove modes, what each opens)
-
-    private var editor: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("What each activity opens when it starts. Add or rename activities in Settings; each needs a Cold Turkey block with the same name.")
-                .font(.system(size: 11)).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            ForEach(m.activities, id: \.self) { b in
-                let st = ActivityStyle.of(b)
-                HStack(spacing: 8) {
-                    Image(systemName: st.icon).foregroundStyle(st.color).frame(width: 18)
-                    Text(b)
-                        .font(.system(size: 12, weight: m.selected == b ? .semibold : .regular))
-                    Spacer()
-                }
-                .padding(.horizontal, 8).padding(.vertical, 5)
-                .card(m.selected == b ? st.color : nil, radius: 8)
-                .contentShape(Rectangle())
-                .onTapGesture { m.selected = b }
-            }
-            if !m.selected.isEmpty {
-                Divider()
-                opens(m.selected)
-            }
-        }
-    }
-
-    private func opens(_ block: String) -> some View {
-        let c = m.config(block)
-        let tint = BlockStyle.of(block).color
-        return VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: "Opens")
-            do {
-                HStack(spacing: 8) {
-                    ForEach(c.apps, id: \.self) { path in
-                        Image(nsImage: NSWorkspace.shared.icon(forFile: path))
-                            .resizable().frame(width: 30, height: 30)
-                            .help(URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent)
-                            .contextMenu {
-                                Button("Remove", role: .destructive) { m.updateConfig(block) { $0.apps.removeAll { $0 == path } } }
-                            }
-                    }
-                    Button { m.chooseApps(for: block) } label: {
-                        Image(systemName: "plus.app")
-                            .font(.system(size: 16))
-                            .frame(width: 30, height: 30)
-                            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [3])))
-                    }
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
-                    .help("Add apps")
-                }
-            }
-            ForEach(c.urls, id: \.self) { u in
-                HStack(spacing: 8) {
-                    Image(systemName: "globe").foregroundStyle(tint)
-                    Text(u.replacingOccurrences(of: "https://", with: "").replacingOccurrences(of: "http://", with: ""))
-                        .lineLimit(1).truncationMode(.middle)
-                    Spacer()
-                    Button { m.updateConfig(block) { $0.urls.removeAll { $0 == u } } } label: {
-                        Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
-                    }
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
-                }
-                .font(.system(size: 12))
-            }
-            HStack(spacing: 6) {
-                Image(systemName: "link").foregroundStyle(.secondary)
-                TextField("Paste a link and press Enter", text: $newLink)
-                    .textFieldStyle(.plain)
-                    .onSubmit { addLink(block) }
-            }
-            .padding(.horizontal, 10).padding(.vertical, 7)
-            .card(radius: 9)
-            Toggle(isOn: Binding(get: { m.config(block).maximize },
-                                 set: { v in m.updateConfig(block) { $0.maximize = v } })) {
-                Text("Stretch windows to fill the screen").font(.system(size: 12))
-            }
-            .toggleStyle(.switch).controlSize(.mini).tint(tint)
-        }
-    }
-
-    private func addLink(_ block: String) {
-        let l = newLink.trimmingCharacters(in: .whitespaces)
-        newLink = ""
-        guard !l.isEmpty else { return }
-        m.updateConfig(block) { if !$0.urls.contains(l) { $0.urls.append(l) } }
     }
 
     private func chip(_ title: String, selected: Bool, wide: Bool = false, action: @escaping () -> Void) -> some View {

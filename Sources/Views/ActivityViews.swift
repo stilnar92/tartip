@@ -76,10 +76,14 @@ struct ActivityPickerView: View {
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                 ForEach(available, id: \.self) { a in
+                    // Outside its hours: greyed out with "from 12:00".
+                    let open = m.isOpen(a)
                     ActivityChip(name: a, selected: false,
-                                 detail: m.secondsLeftToday(a).map { "\(formatDuration($0)) left today" }) {
+                                 detail: m.opensLabel(a) ?? m.secondsLeftToday(a).map { "\(formatDuration($0)) left today" }) {
                         m.choosePlan(a, note: nil, minutes: chosen)
                     }
+                    .disabled(!open)
+                    .opacity(open ? 1 : 0.4)
                 }
             }
             Divider()

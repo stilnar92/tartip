@@ -10,6 +10,8 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
     var id = UUID()
     var name: String
     var dailyMinutes = 0          // 0 = no daily limit
+    var fromMinute: Int? = nil    // hours it can be picked, minutes since midnight;
+    var toMinute: Int? = nil      // nil = any time. May cross midnight.
 }
 
 struct AppSettings: Codable, Equatable {
@@ -101,6 +103,16 @@ func nightEnd(after d: Date) -> Date {
     var end = cal.startOfDay(for: d).addingTimeInterval(Double(S.nightTo * 60))
     if end <= d { end = cal.date(byAdding: .day, value: 1, to: end)! }
     return end
+}
+
+func minuteOfDay(_ d: Date) -> Int {
+    let c = Calendar.current.dateComponents([.hour, .minute], from: d)
+    return (c.hour ?? 0) * 60 + (c.minute ?? 0)
+}
+
+// Whether `m` (minutes since midnight) is inside from..<to, which may cross midnight.
+func inWindow(_ m: Int, _ from: Int, _ to: Int) -> Bool {
+    from < to ? (m >= from && m < to) : (m >= from || m < to)
 }
 
 func clockLabel(_ minutes: Int) -> String { String(format: "%02d:%02d", minutes / 60, minutes % 60) }

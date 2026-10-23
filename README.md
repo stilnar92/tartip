@@ -6,11 +6,12 @@ A small macOS menu bar app that helps you **start** working and keeps you from d
 
 1. **Start.** Click ◎ in the menu bar → **Start** → pick a length (default 30 min, never under 15) and an activity (Work, Arabic, English, …).
 2. **Blocking.** The Cold Turkey block **with the same name as the activity** is locked for the session. **Rest** is an activity too: a short break between tasks with its own block, so a break doesn't turn into a movie.
-3. **Workspace.** The app opens the activity's apps and links (set them up in **Edit**). For a one-off site, use **Open a site** before pressing Start.
+3. **Workspace.** The app opens the activity's apps and links (set them up in Settings → Activities → ⌄). For a one-off site, use **Open a site** before pressing Start.
 4. **Review.** When time's up (or you stop), it asks what you did: confirm the plan, or pick what you did instead. That goes into the stats.
 5. **Always decide.** Whenever nothing is running (no session, no free time) and it isn't night, the "What's next?" window opens right away and can't be closed. Nothing is blocked until you pick an activity or free time.
 6. **Free time.** 🍿 Free time blocks nothing (movies, YouTube) and comes from a budget of 60 min a day. It's offered in the "What's next?" window and in the panel, and is only ever taken on purpose. It can't be taken twice in a row; a session has to run in between.
 7. **Daily limits.** Each activity can have a daily limit (e.g. Work 1h). Once it's used up, the activity disappears from the picker for the rest of the day. When nothing is left, the picker says so.
+   **Hours.** An activity can also have hours (e.g. Work 12:00–20:00). Outside them it\'s greyed out in the picker with "from 12:00".
 8. **Night.** From 00:00 to 08:00 the night block (`Focus_Mode`) is locked until morning. No prompts, no timers, and nothing can be started.
 
 All the numbers above are defaults and can be changed in **Settings** (the gear in the panel).
@@ -67,7 +68,7 @@ Everything personal lives in `~/modes`, outside the repo:
 | `Sources/Activities.swift` | session history, activity styles, helper windows |
 | `Sources/Workspace.swift` | opening apps and a Chrome window, cleanup |
 | `Sources/Core.swift` | paths, process helpers, logging, Cold Turkey CLI |
-| `Sources/Views/` | panel, picker/review, free time row, stats, settings |
+| `Sources/Views/` | panel, picker/review, free time row, stats, settings, what an activity opens |
 
 ## Known limits
 

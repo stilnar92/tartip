@@ -161,6 +161,7 @@ final class Model: ObservableObject {
     }
 
     func choosePlan(_ activity: String, note: String?, minutes chosen: Int) {
+        guard isOpen(activity) else { return }
         activityWindow.hide()
         let mins = max(minMinutes, chosen)
         if let p = pendingStart {
@@ -251,9 +252,25 @@ final class Model: ObservableObject {
         activities.filter { (secondsLeftToday($0) ?? 1) > 0 }
     }
 
+    // Activity hours (Settings): outside them the activity is greyed out in the picker.
+    func isOpen(_ activity: String) -> Bool {
+        guard let a = S.activities.first(where: { $0.name == activity }),
+              let from = a.fromMinute, let to = a.toMinute, from != to else { return true }
+        return inWindow(minuteOfDay(now), from, to)
+    }
+
+    // "from 12:00" for an activity that's closed right now.
+    func opensLabel(_ activity: String) -> String? {
+        guard !isOpen(activity), let from = S.activities.first(where: { $0.name == activity })?.fromMinute else { return nil }
+        return "from \(clockLabel(from))"
+    }
+
+    // Activities that can actually be picked now.
+    var pickableActivities: [String] { availableActivities.filter(isOpen) }
+
     func openStats() { statsWindow.show(StatsView(m: self)) }
 
-    func openSettings() { settingsWindow.show(SettingsView()) }
+    func openSettings() { settingsWindow.show(SettingsView(m: self)) }
 
     func start(block: String, phases: [Phase], extra: [String] = [], autoThinking: Bool = false,
                planned: String? = nil, note: String? = nil) {
@@ -382,7 +399,7 @@ final class Model: ObservableObject {
         // The picker can't be closed; nothing is blocked until you pick.
         guard !night, review == nil, pendingStart == nil, userPresent() else { return }
         // Day done: every limit reached and no free time to offer, so there's nothing to choose.
-        guard !availableActivities.isEmpty || canRest else { return }
+        guard !pickableActivities.isEmpty || canRest else { return }
         pendingStart = PendingStart(block: focusBlock, phases: [Phase(isBreak: false, minutes: defaultMinutes)], extra: [], auto: true)
         NSSound(named: "Funk")?.play()
         log("ask   what's next")
