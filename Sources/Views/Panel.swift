@@ -186,6 +186,8 @@ struct ContentView: View {
             .frame(height: 6)
             .animation(.linear(duration: 1), value: progress)
 
+            dailyLine(name)
+
             HStack {
                 Label("Blocked until \(f.string(from: s.end))", systemImage: "lock.fill")
                     .font(.system(size: 12)).foregroundStyle(Theme.text2)
@@ -200,6 +202,25 @@ struct ContentView: View {
         }
         .padding(16)
         .card(radius: 16)
+    }
+
+    // How much of today's limit for this activity is used (counting this session live).
+    private func dailyLine(_ name: String) -> some View {
+        let used = m.secondsByActivity(since: Calendar.current.startOfDay(for: m.now))[name] ?? 0
+        let limit = m.limitMinutes(name)
+        let left = m.secondsLeftToday(name)
+        return HStack(spacing: 6) {
+            Text("\(name) today").font(.system(size: 12)).foregroundStyle(Theme.text2)
+            Spacer()
+            if limit > 0 {
+                Tag(text: "\(formatDuration(used)) of \(limitLabel(limit))")
+                Tag(text: (left ?? 0) > 0 ? "\(formatDuration(left ?? 0)) left" : "limit reached",
+                    color: (left ?? 0) > 0 ? Theme.accent : Theme.red,
+                    fill: (left ?? 0) > 0 ? Theme.accentTint : Theme.redTint)
+            } else {
+                Tag(text: "\(formatDuration(used)) · no limit")
+            }
+        }
     }
 
     // MARK: free time
