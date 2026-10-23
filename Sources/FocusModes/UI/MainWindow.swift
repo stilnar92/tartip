@@ -26,8 +26,7 @@ struct MainView: View {
                 Group {
                     switch tab {
                     case .stats: StatsView(model: model)
-                    case .activities: SettingsView(model: model).activitiesPage.padding(28)
-                    case .rules: SettingsView(model: model).rulesPage.padding(28)
+                    case .activities, .rules: SettingsView(model: model, page: tab).padding(28)
                     }
                 }
                 .frame(maxWidth: 560, alignment: .leading)

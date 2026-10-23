@@ -5,26 +5,30 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var settings = Settings.shared
     var model: Model? = nil                      // for "what it opens"
+    let page: MainTab
     @State private var expanded: Set<UUID> = []
     @State private var newActivity = ""
     @State private var optionsText = Settings.shared.value.durationOptions.map(String.init).joined(separator: ", ")
 
+    // The window shows this view itself, not one of its pages as a property:
+    // only then does SwiftUI keep its @State (open rows, text being typed).
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            activitiesPage
-            rulesPage
+        switch page {
+        case .activities: activitiesPage
+        case .rules: rulesPage
+        case .stats: EmptyView()
         }
     }
 
     // Pages of the main window's sidebar.
-    var activitiesPage: some View {
+    private var activitiesPage: some View {
         VStack(alignment: .leading, spacing: 18) {
             PageTitle(title: "Activities", subtitle: "Each one locks a block while it runs: the one with its name, unless you pick another.")
             activitiesSection
         }
     }
 
-    var rulesPage: some View {
+    private var rulesPage: some View {
         VStack(alignment: .leading, spacing: 22) {
             PageTitle(title: "Rules", subtitle: "Night, free time and session length.")
             nightSection
