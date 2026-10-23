@@ -225,6 +225,46 @@ final class Model: ObservableObject {
 
     func reloadRecords() { records = loadRecords(); activities = loadActivities() }
 
+    // MARK: daily limits
+
+    // Sessions since `from`, plus the running one (under its planned activity).
+    func recordsSince(_ from: Date) -> [SessionRecord] {
+        var recs = records.filter { $0.start >= from }
+        if let s = session, let planned = s.planned {
+            recs.append(SessionRecord(start: s.pickedAt ?? s.start, end: min(now, s.end), mode: s.block, planned: planned))
+        }
+        return recs
+    }
+
+    // Seconds per activity: what was actually done, or what was planned until it's reviewed,
+    // split evenly when a session covered several activities.
+    func secondsByActivity(since from: Date) -> [String: Int] {
+        var out: [String: Int] = [:]
+        for r in recordsSince(from) {
+            let acts = r.actual.isEmpty ? [r.planned ?? otherActivity] : r.actual
+            for a in acts { out[a, default: 0] += r.seconds / acts.count }
+        }
+        return out
+    }
+
+    // Daily limit in minutes (0 = none).
+    func limitMinutes(_ activity: String) -> Int {
+        S.activities.first { $0.name == activity }?.dailyMinutes ?? 0
+    }
+
+    // Seconds left today, or nil when the activity has no limit.
+    func secondsLeftToday(_ activity: String) -> Int? {
+        let limit = limitMinutes(activity)
+        guard limit > 0 else { return nil }
+        let used = secondsByActivity(since: Calendar.current.startOfDay(for: now))[activity] ?? 0
+        return max(0, limit * 60 - used)
+    }
+
+    // What the picker offers: activities without a limit, or with time left today.
+    var availableActivities: [String] {
+        activities.filter { (secondsLeftToday($0) ?? 1) > 0 }
+    }
+
     func openStats() { statsWindow.show(StatsView(m: self)) }
 
     func openSettings() { settingsWindow.show(SettingsView()) }

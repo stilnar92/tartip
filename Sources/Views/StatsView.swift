@@ -11,19 +11,9 @@ struct StatsView: View {
     var body: some View {
         let cal = Calendar.current
         let from = range == 0 ? cal.startOfDay(for: Date()) : cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: Date()))!
-        var recs = m.records.filter { $0.start >= from }
-        // The running session counts live, under its planned activity.
-        if let s = m.session, let planned = s.planned {
-            recs.append(SessionRecord(start: s.pickedAt ?? s.start, end: min(m.now, s.end), mode: s.block, planned: planned))
-        }
-        // Split each session's time evenly between what was actually done
-        // (or what was planned, until it's reviewed).
-        var byActivity: [String: Int] = [:]
-        for a in m.activities + [otherActivity] { byActivity[a] = 0 }
-        for r in recs {
-            let acts = r.actual.isEmpty ? [r.planned ?? otherActivity] : r.actual
-            for a in acts { byActivity[a, default: 0] += r.seconds / acts.count }
-        }
+        let recs = m.recordsSince(from)
+        var byActivity = m.secondsByActivity(since: from)
+        for a in m.activities + [otherActivity] where byActivity[a] == nil { byActivity[a] = 0 }
         // Every activity from the list is shown, busiest first; empty ones stay at the bottom.
         let order = m.activities + [otherActivity]
         let rows = byActivity.sorted {
@@ -70,8 +60,10 @@ struct StatsView: View {
                                 }
                             }
                             .frame(height: 10)
-                            Text(secs > 0 ? formatDuration(secs) : "–").font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .monospacedDigit().frame(width: 60, alignment: .trailing)
+                            // Today: show progress against the daily limit, e.g. "45m / 1h".
+                            let limit = m.limitMinutes(name)
+                            Text((secs > 0 ? formatDuration(secs) : "–") + (range == 0 && limit > 0 ? " / \(limitLabel(limit))" : "")).font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .monospacedDigit().frame(width: 92, alignment: .trailing)
                         }
                     }
                 }

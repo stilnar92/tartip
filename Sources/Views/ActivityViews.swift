@@ -7,6 +7,7 @@ import ApplicationServices
 struct ActivityChip: View {
     let name: String
     let selected: Bool
+    var detail: String? = nil      // e.g. "35m left"
     let action: () -> Void
 
     var body: some View {
@@ -19,7 +20,10 @@ struct ActivityChip: View {
                     .frame(width: 26, height: 26)
                     .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .fill(selected ? AnyShapeStyle(st.color.gradient) : AnyShapeStyle(st.color.opacity(0.15))))
-                Text(name).font(.system(size: 13, weight: selected ? .semibold : .medium)).lineLimit(1)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(name).font(.system(size: 13, weight: selected ? .semibold : .medium)).lineLimit(1)
+                    if let detail { Text(detail).font(.system(size: 10)).foregroundStyle(.secondary) }
+                }
                 Spacer(minLength: 0)
                 if selected { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(st.color) }
             }
@@ -66,9 +70,17 @@ struct ActivityPickerView: View {
                     }
                 }
             }
+            let available = m.availableActivities
+            if available.isEmpty {
+                Label("All daily goals done 🎉 Anything else goes under Other.", systemImage: "checkmark.seal.fill")
+                    .font(.system(size: 13, weight: .medium)).foregroundStyle(.green)
+            }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                ForEach(m.activities, id: \.self) { a in
-                    ActivityChip(name: a, selected: false) { m.choosePlan(a, note: nil, minutes: chosen) }
+                ForEach(available, id: \.self) { a in
+                    ActivityChip(name: a, selected: false,
+                                 detail: m.secondsLeftToday(a).map { "\(formatDuration($0)) left today" }) {
+                        m.choosePlan(a, note: nil, minutes: chosen)
+                    }
                 }
             }
             HStack(spacing: 6) {
