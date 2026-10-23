@@ -10,6 +10,7 @@ final class Model: ObservableObject {
     @Published var configs: [String: ModeConfig] = [:]
     @Published var oneTimeLink = ""
     @Published var restEnd: Date? = UserDefaults.standard.object(forKey: "restEnd") as? Date
+    private var restStart: Date? = UserDefaults.standard.object(forKey: "restStart") as? Date
     @Published var restTaken = UserDefaults.standard.bool(forKey: "restTaken")
     @Published var stats: DayStats = UserDefaults.standard.data(forKey: "stats")
         .flatMap { try? JSONDecoder().decode(DayStats.self, from: $0) } ?? DayStats(day: dayKey(Date()))
@@ -33,6 +34,8 @@ final class Model: ObservableObject {
             self?.activities = v.activities.map(\.name).filter { !$0.isEmpty }
         }
         if UserDefaults.standard.integer(forKey: "minutes") < minMinutes { minutes = defaultMinutes }
+        // Free time from before restStart existed was already counted into stats.free.
+        if restEnd != nil && restStart == nil { restStart = Date() }
         if let d = try? Data(contentsOf: configFile), let c = try? JSONDecoder().decode([String: ModeConfig].self, from: d) {
             configs = c
         }
@@ -91,7 +94,18 @@ final class Model: ObservableObject {
 
     // Each activity has a Cold Turkey block with the same name; "Other" uses Focus_Mode.
     func blockFor(_ activity: String) -> String { activity == otherActivity ? focusBlock : activity }
-    var freeLeft: Int { max(0, dailyFreeSeconds - stats.free) }
+    var freeLeft: Int { max(0, dailyFreeSeconds - stats.free - freeTimeElapsed) }
+
+    // The running free time so far; it's added to stats.free when it ends.
+    private var freeTimeElapsed: Int {
+        guard let start = restStart, let end = restEnd else { return 0 }
+        return max(0, Int(min(now, end).timeIntervalSince(start)))
+    }
+
+    // Time in sessions today, by the clock, counting the running one.
+    var focusedToday: Int {
+        secondsByActivity(since: Calendar.current.startOfDay(for: now)).values.reduce(0, +)
+    }
 
     // One click on a row in the Today list: start it now with the chosen length (or Pomodoro).
     func startActivity(_ activity: String, minutes chosen: Int? = nil, pomodoro usePomodoro: Bool? = nil) {
@@ -157,11 +171,11 @@ final class Model: ObservableObject {
 
     // Sessions since `from`, plus the running one (under its planned activity).
     func recordsSince(_ from: Date) -> [SessionRecord] {
-        var recs = records.filter { $0.start >= from }
+        var recs = records
         if let s = session, let planned = s.planned {
             recs.append(SessionRecord(start: s.start, end: min(now, s.end), mode: s.block, planned: planned))
         }
-        return recs
+        return FocusModes.records(recs, since: from)
     }
 
     // Seconds per activity: what was actually done, or what was planned until it's reviewed,
@@ -213,8 +227,7 @@ final class Model: ObservableObject {
     func start(block: String, phases: [Phase], extra: [String] = [], planned: String? = nil, note: String? = nil) {
         restTaken = false
         UserDefaults.standard.set(false, forKey: "restTaken")
-        restEnd = nil
-        UserDefaults.standard.removeObject(forKey: "restEnd")
+        if restEnd != nil { endRest() }
 
         let s = Session(block: block, phases: phases, start: Date(), planned: planned, note: note)
         runCT(["-start", s.block, "-lock", String(s.totalMinutes)], keep: Double(s.totalMinutes * 60 + 60))
@@ -266,13 +279,19 @@ final class Model: ObservableObject {
         UserDefaults.standard.set(true, forKey: "restTaken")
         if pendingStart != nil { cancelPick() }
         let secs = min(min(minutes, S.maxRestMinutes) * 60, freeLeft)   // one stretch is capped (Settings)
-        restEnd = Date().addingTimeInterval(Double(secs))
+        restStart = Date()
+        restEnd = restStart?.addingTimeInterval(Double(secs))
+        UserDefaults.standard.set(restStart, forKey: "restStart")
         UserDefaults.standard.set(restEnd, forKey: "restEnd")
         log("rest  \(secs / 60)m (\(freeLeft / 60)m left today)")
     }
 
     func endRest() {
+        stats.free += freeTimeElapsed
+        saveStats()
+        restStart = nil
         restEnd = nil
+        UserDefaults.standard.removeObject(forKey: "restStart")
         UserDefaults.standard.removeObject(forKey: "restEnd")
     }
 
@@ -297,8 +316,7 @@ final class Model: ObservableObject {
 
     private func tick() {
         now = Date()
-        if stats.day != dayKey(now) { stats = DayStats(day: dayKey(now)) }
-        defer { if Int(now.timeIntervalSince1970) % 10 == 0 { saveStats() } }
+        if stats.day != dayKey(now) { stats = DayStats(day: dayKey(now)); saveStats() }
 
         let night = S.isNight(at: now)
         if night { enterNightIfNeeded() }
@@ -312,7 +330,6 @@ final class Model: ObservableObject {
                 beginReview(s)
                 return
             }
-            stats.focus += 1
             if cur.index != lastPhase {
                 lastPhase = cur.index
                 let p = s.phases[cur.index]
@@ -323,10 +340,7 @@ final class Model: ObservableObject {
         }
 
         if let r = restEnd {
-            if now < r {
-                stats.free += 1
-                return
-            }
+            if now < r { return }
             endRest()
             notify("Free time is over", "Pick what's next.")
             return

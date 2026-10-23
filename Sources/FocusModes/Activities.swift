@@ -37,6 +37,17 @@ func loadRecords() -> [SessionRecord] {
     return text.split(separator: "\n").compactMap { try? dec.decode(SessionRecord.self, from: Data($0.utf8)) }
 }
 
+// The part of each session after `from`: a session that crosses midnight counts
+// on each day only for the time it ran that day.
+func records(_ all: [SessionRecord], since from: Date) -> [SessionRecord] {
+    all.compactMap { r in
+        guard r.end > from else { return nil }
+        var clipped = r
+        clipped.start = max(r.start, from)
+        return clipped
+    }
+}
+
 // Seconds per activity: what was actually done, or what was planned until it's reviewed.
 // A session that covered several activities is split evenly; the first gets the remainder.
 func secondsByActivity(_ records: [SessionRecord]) -> [String: Int] {

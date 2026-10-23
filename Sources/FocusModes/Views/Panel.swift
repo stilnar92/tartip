@@ -60,7 +60,7 @@ struct ContentView: View {
                 Spacer()
             }
             HStack(spacing: 6) {
-                Tag(text: "⏱ \(formatDuration(m.stats.focus))", color: Theme.accent, fill: Theme.accentTint)
+                Tag(text: "⏱ \(formatDuration(m.focusedToday))", color: Theme.accent, fill: Theme.accentTint)
                 Tag(text: "\(sessions) sessions")
                 Tag(text: "🍿 \(m.freeLeft / 60)m", color: m.freeLeft > 0 ? Theme.text2 : Theme.red,
                     fill: m.freeLeft > 0 ? Theme.pill : Theme.redTint)

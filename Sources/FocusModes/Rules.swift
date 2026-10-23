@@ -24,9 +24,9 @@ func userPresent() -> Bool {
 
 func dayKey(_ d: Date) -> String { Fmt.dayKey.string(from: d) }
 
+// Free time used on `day`, in seconds, not counting the stretch that's running.
 struct DayStats: Codable {
     var day: String
-    var free = 0        // seconds of rest + idle
-    var focus = 0
+    var free = 0
 }
 

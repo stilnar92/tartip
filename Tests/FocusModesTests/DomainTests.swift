@@ -67,6 +67,13 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(secondsByActivity([r]) == ["Work": 1800])
     }
 
+    @Test func sessionCrossingMidnightCountsOnlyItsPartOfTheDay() {
+        let r = SessionRecord(start: at(23, 40), end: at(0, 20, day: 2), mode: "Work", planned: "Work")
+        let today = records([r], since: at(0, day: 2))
+        #expect(today.first?.seconds == 1200)
+        #expect(records([r], since: at(1, day: 2)).isEmpty)
+    }
+
     @Test func splitKeepsEverySecond() {
         let r = SessionRecord(start: at(10), end: at(10, 0).addingTimeInterval(100), mode: "Work",
                               planned: "Work", actual: ["A", "B", "C"])
