@@ -11,6 +11,18 @@ struct ActivityPickerView: View {
         VStack(alignment: .leading, spacing: 14) {
             PageTitle(title: "What's next?",
                       subtitle: "Click an activity to start it, or take free time. Nothing is blocked until you choose.")
+            // If nobody answers, an activity starts by itself; say which and when.
+            if let at = model.autoStartAt, let activity = model.autoStartActivity {
+                HStack(spacing: 8) {
+                    Image(systemName: "timer").foregroundStyle(Theme.accent)
+                    Text("\(activity) starts by itself in \(countdown(to: at, from: clock.now)) for \(Settings.current.autoStartMinutes) min")
+                        .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text)
+                        .monospacedDigit()
+                }
+                .padding(.horizontal, 12).padding(.vertical, 9)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.accentTint))
+            }
             TodayList(model: model, clock: clock)
         }
         .padding(24)

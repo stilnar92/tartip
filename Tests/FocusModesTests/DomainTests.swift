@@ -119,6 +119,33 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(limits.isOpen("English"))
     }
 
+    @Test func autoPickPrefersTheActivityFurthestBehind() {
+        var s = AppSettings()
+        s.activities = [ActivitySetting(name: "Work", dailyMinutes: 60),
+                        ActivitySetting(name: "Arabic", dailyMinutes: 90),
+                        ActivitySetting(name: "English"),
+                        ActivitySetting(name: "Rest", dailyMinutes: 30)]
+        let names = s.activities.map(\.name)
+        let today = [SessionRecord(start: at(10), end: at(11), mode: "Arabic", planned: "Arabic")]
+        // Work has 60m left, Arabic 30m: Work is furthest behind.
+        #expect(Limits(settings: s, today: today, now: at(14), calendar: cal).autoPick(from: names) == "Work")
+        // Work used up: Arabic is the only limited one left.
+        let workDone = today + [SessionRecord(start: at(12), end: at(13), mode: "Work", planned: "Work")]
+        #expect(Limits(settings: s, today: workDone, now: at(14), calendar: cal).autoPick(from: names) == "Arabic")
+    }
+
+    @Test func autoPickSkipsClosedAndRest() {
+        var s = AppSettings()
+        s.activities = [ActivitySetting(name: "Work", dailyMinutes: 60, fromMinute: 12 * 60, toMinute: 20 * 60),
+                        ActivitySetting(name: "Rest", dailyMinutes: 30),
+                        ActivitySetting(name: "English")]
+        let names = s.activities.map(\.name)
+        // At 9:00 Work is closed; Rest is skipped while something else can start.
+        #expect(Limits(settings: s, today: [], now: at(9), calendar: cal).autoPick(from: names) == "English")
+        // Only Rest can start: then it's Rest.
+        #expect(Limits(settings: s, today: [], now: at(9), calendar: cal).autoPick(from: ["Work", "Rest"]) == "Rest")
+    }
+
     @Test func pomodoroPhases() {
         let phases = AppSettings().pomodoroPhases()
         #expect(phases.count == 7)

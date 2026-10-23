@@ -15,6 +15,7 @@ struct StoredState: Codable, Equatable {
     var freeUsed = DayStats(day: "")
     var opened: OpenedWorkspace?       // what the last start opened, to clean up on the next
     var nightUntil: Date?              // the night lock already sent
+    var pickingSince: Date?            // when "What's next?" opened, for auto-start
 }
 
 // One UserDefaults key holds the whole StoredState.

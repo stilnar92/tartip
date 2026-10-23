@@ -144,6 +144,13 @@ struct SettingsView: View {
                     .onChange(of: optionsText) { _ in saveOptions() }
             }
             row("Default") { minuteStepper($settings.value.defaultMinutes, 5...240, step: 5) }
+            row("Auto-start if unanswered for") {
+                HStack(spacing: 6) {
+                    Text(settings.value.autoStartAfterMinutes == 0 ? "never" : "\(settings.value.autoStartAfterMinutes) min").monospacedDigit()
+                    Stepper("", value: $settings.value.autoStartAfterMinutes, in: 0...60, step: 5).labelsHidden()
+                }
+            }
+            row("Auto-started session") { minuteStepper($settings.value.autoStartMinutes, 15...120, step: 5) }
             row("Minimum") { minuteStepper($settings.value.minMinutes, 5...120, step: 5) }
             row("Pomodoro work") { minuteStepper($settings.value.pomodoroWork, 5...90, step: 5) }
             row("Pomodoro break") { minuteStepper($settings.value.pomodoroBreak, 1...30, step: 1) }

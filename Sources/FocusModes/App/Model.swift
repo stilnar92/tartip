@@ -127,9 +127,27 @@ final class Model: ObservableObject {
         if let chosen { minutes = chosen }
         if let usePomodoro { pomodoro = usePomodoro }
         if minutes < Settings.current.minMinutes { minutes = Settings.current.minMinutes }
+        startNow(activity, phases: pomodoro ? Settings.current.pomodoroPhases() : [Phase(isBreak: false, minutes: minutes)])
+    }
+
+    // When auto-start fires, and which activity it would pick right now.
+    var autoStartAt: Date? {
+        guard phase == .picking, Settings.current.autoStartAfterMinutes > 0, let since = state.pickingSince else { return nil }
+        return since.addingTimeInterval(Double(Settings.current.autoStartAfterMinutes * 60))
+    }
+    var autoStartActivity: String? { limits.autoPick(from: activities) }
+
+    // "What's next?" went unanswered: start an activity for the auto-start length.
+    // The length chosen in the panel isn't changed.
+    private func autoStart() {
+        guard let activity = autoStartActivity else { return }
+        log("auto  \(activity) after \(Settings.current.autoStartAfterMinutes)m unanswered")
+        startNow(activity, phases: [Phase(isBreak: false, minutes: max(Settings.current.minMinutes, Settings.current.autoStartMinutes))])
+    }
+
+    private func startNow(_ activity: String, phases: [Phase]) {
         let extra = oneTimeLink.trimmingCharacters(in: .whitespaces)
         oneTimeLink = ""
-        let phases = pomodoro ? Settings.current.pomodoroPhases() : [Phase(isBreak: false, minutes: minutes)]
         start(Session(block: Settings.current.block(for: activity), phases: phases, start: Date(), planned: activity),
               extraURLs: extra.isEmpty ? [] : [extra])
     }
@@ -239,7 +257,10 @@ final class Model: ObservableObject {
             guard now >= end else { return }
             endRest()
             notify("Free time is over", "Pick what's next.")
-        case .picking, .reviewing:
+        case .picking:
+            if state.pickingSince == nil { state.pickingSince = now }
+            if let at = autoStartAt, now >= at { autoStart() }
+        case .reviewing:
             return
         case .idle:
             // Nothing running and it's not night: you always decide what's next, right away.
@@ -249,6 +270,7 @@ final class Model: ObservableObject {
             let limits = limits
             guard activities.contains(where: limits.canStart) || canRest else { return }
             state.phase = .picking
+            state.pickingSince = now
             NSSound(named: "Funk")?.play()
             log("ask   what's next")
         }

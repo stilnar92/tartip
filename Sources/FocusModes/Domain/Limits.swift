@@ -43,5 +43,17 @@ struct Limits {
 
     func canStart(_ activity: String) -> Bool { isOpen(activity) && hasTimeLeft(activity) }
 
+    // What auto-start picks when "What's next?" goes unanswered: of the activities that can
+    // start now, the one furthest behind its daily limit (most time left), then ones without
+    // a limit, in list order. Rest only if nothing else can start.
+    func autoPick(from activities: [String]) -> String? {
+        let open = activities.filter(canStart)
+        let work = open.filter { $0.lowercased() != "rest" }
+        let pool = work.isEmpty ? open : work
+        let limited = pool.filter { secondsLeftToday($0) != nil }
+        if let best = limited.max(by: { (secondsLeftToday($0) ?? 0) < (secondsLeftToday($1) ?? 0) }) { return best }
+        return pool.first
+    }
+
     private func setting(_ activity: String) -> ActivitySetting? { settings.activities.first { $0.name == activity } }
 }
