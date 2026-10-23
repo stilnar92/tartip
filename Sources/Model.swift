@@ -377,12 +377,27 @@ final class Model: ObservableObject {
         if let d = try? JSONEncoder().encode(stats) { UserDefaults.standard.set(d, forKey: "stats") }
     }
 
+    // Night: the night block is locked until morning, once per night; nothing is asked.
+    // A session that's already running just finishes.
+    private func enterNightIfNeeded() {
+        if prompt != nil { dismissPrompt() }
+        if pendingStart?.auto == true { cancelPick() }
+        let end = nightEnd(after: now)
+        if let applied = UserDefaults.standard.object(forKey: "nightUntil") as? Date, applied >= end { return }
+        let mins = Int((end.timeIntervalSince(now) / 60).rounded(.up))
+        runCT(["-start", S.nightBlock, "-lock", String(mins)], keep: Double(mins * 60 + 60))
+        UserDefaults.standard.set(end, forKey: "nightUntil")
+        log("night \(S.nightBlock) until \(clockLabel(S.nightTo)) (lock \(mins)m)")
+        notify("Night mode", "\(S.nightBlock) is on until \(clockLabel(S.nightTo)). Time to sleep 🌙")
+    }
+
     private func tick() {
         now = Date()
         if stats.day != dayKey(now) { stats = DayStats(day: dayKey(now)) }
         let enforce = enforcementActive(now)
         defer { if Int(now.timeIntervalSince1970) % 10 == 0 { saveStats() } }
 
+        if isNight(now) { enterNightIfNeeded() }
         if let p = prompt, now >= p.deadline { promptDefault() }
 
         if let s = session {

@@ -69,6 +69,8 @@ struct ContentView: View {
                 running(s, cur)
             } else if editing {
                 editor
+            } else if isNight(m.now) {
+                nightView
             } else {
                 setup
             }
@@ -382,6 +384,21 @@ struct ContentView: View {
         .disabled(disabled)
         .opacity(disabled ? 0.45 : 1)
         .keyboardShortcut(.defaultAction)
+    }
+
+    // MARK: night
+
+    private var nightView: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "moon.stars.fill")
+                .font(.system(size: 40))
+                .foregroundStyle(LinearGradient(colors: [.indigo, .purple], startPoint: .top, endPoint: .bottom))
+            Text("Night").font(.system(size: 20, weight: .bold, design: .rounded))
+            Text("\(S.nightBlock) is on until \(clockLabel(S.nightTo)).\nNothing to do now but sleep.")
+                .font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
     }
 
     // MARK: rest
