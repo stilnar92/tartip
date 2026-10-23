@@ -92,7 +92,7 @@ struct RestPicker: View {
                     .font(.system(size: 11)).foregroundStyle(m.canRest ? Color.secondary : Color.red)
             }
             HStack(spacing: 6) {
-                ForEach([5, 10, 15], id: \.self) { n in
+                ForEach(restOptions, id: \.self) { n in
                     let ok = m.canRest
                     Button { m.startRest(minutes: n) } label: {
                         Text("☕ \(min(n, max(leftMin, 1)))m")

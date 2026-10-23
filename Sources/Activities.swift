@@ -45,7 +45,10 @@ func loadRecords() -> [SessionRecord] {
     return text.split(separator: "\n").compactMap { try? dec.decode(SessionRecord.self, from: Data($0.utf8)) }
 }
 
-func loadActivities() -> [String] {
+// Activity names come from Settings; activities.txt is only read once to migrate.
+func loadActivities() -> [String] { S.activities.map(\.name).filter { !$0.isEmpty } }
+
+func legacyLoadActivities() -> [String] {
     let text = (try? String(contentsOf: activitiesFile, encoding: .utf8)) ?? ""
     let list = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
     if list.isEmpty {
@@ -81,16 +84,19 @@ struct PendingStart {
     var auto = false   // opened by the 15-min prompt: no Cancel
 }
 
-// Normal closable window for stats.
+// Normal closable window (stats, settings).
 final class StatsWindow {
     private var window: NSWindow?
+    private let title: String
+
+    init(title: String = "Focus stats") { self.title = title }
 
     func show<V: View>(_ view: V) {
         if window == nil {
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 520),
                              styleMask: [.titled, .closable, .fullSizeContentView],
                              backing: .buffered, defer: false)
-            w.title = "Focus stats"
+            w.title = title
             w.titlebarAppearsTransparent = true
             w.isReleasedWhenClosed = false
             w.collectionBehavior = [.moveToActiveSpace]

@@ -127,6 +127,11 @@ struct ContentView: View {
                 m.openStats()
             } label: { Label("Stats", systemImage: "chart.bar.fill") }
             Button {
+                NSApp.keyWindow?.close()
+                m.openSettings()
+            } label: { Image(systemName: "gearshape.fill") }
+            .help("Settings")
+            Button {
                 NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Cold Turkey Blocker.app"))
             } label: {
                 Label("Cold Turkey", systemImage: "arrow.up.forward.app")
@@ -210,7 +215,7 @@ struct ContentView: View {
     private var restMenu: some View {
         Menu {
             Section(m.restTaken ? "Rest used · start a mode first" : "Rest · nothing blocked · \(m.freeLeft / 60) min left today") {
-                ForEach([5, 10, 15], id: \.self) { n in
+                ForEach(restOptions, id: \.self) { n in
                     Button("☕ \(n) min") { m.startRest(minutes: n) }
                         .disabled(!m.canRest)
                 }
@@ -232,7 +237,7 @@ struct ContentView: View {
 
     private var editor: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("What each activity opens on Desktop \(m.desktop). Rename or add activities in ~/modes/activities.txt; each needs a Cold Turkey block with the same name.")
+            Text("What each activity opens on Desktop \(m.desktop). Add or rename activities in Settings; each needs a Cold Turkey block with the same name.")
                 .font(.system(size: 11)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             ForEach(m.activities + [m.focusBlock], id: \.self) { b in

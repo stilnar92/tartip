@@ -4,21 +4,24 @@ import ApplicationServices
 
 // MARK: - Enforcement rules
 
-let dailyFreeSeconds = 60 * 60        // rest + idle allowed per day
-let idleNudgeSeconds = 15 * 60        // idle this long → prompt
-let promptCountdown: Double = 60      // prompt auto-starts after this
-let autoMinutes = 15                  // auto-start locks the minimum; the picker can extend it
-let minMinutes = 15                   // no session shorter than this
-let durationOptions = [15, 20, 30, 45, 60]
-let defaultMinutes = 30
+// All of these come from Settings (~/modes/settings.json).
+var dailyFreeSeconds: Int { S.dailyFreeMinutes * 60 }       // rest + idle allowed per day
+var idleNudgeSeconds: Int { S.idleNudgeMinutes * 60 }       // idle this long → prompt
+var promptCountdown: Double { Double(S.promptCountdownSeconds) }
+var minMinutes: Int { S.minMinutes }                         // no session shorter than this
+var durationOptions: [Int] { S.durationOptions.filter { $0 >= S.minMinutes }.sorted() }
+var defaultMinutes: Int { max(S.defaultMinutes, S.minMinutes) }
+// Rest lengths offered, never longer than the per-stretch cap.
+var restOptions: [Int] { [5, 10, 15, 20, 30].filter { $0 <= S.maxRestMinutes } }
+
 func durationLabel(_ m: Int) -> String { m == 60 ? "1h" : "\(m)" }
 
-// Weekdays 10:00–22:00.
+// Guard days and hours from Settings (default weekdays 10:00–22:00). Never at night.
 func enforcementActive(_ d: Date) -> Bool {
     let cal = Calendar.current
     let wd = cal.component(.weekday, from: d)          // 1 = Sunday
     let h = cal.component(.hour, from: d)
-    return (2...6).contains(wd) && (10..<22).contains(h)
+    return S.guardDays.contains(wd) && h >= S.guardFromHour && h < S.guardToHour && !isNight(d)
 }
 
 // At the computer: input in the last 2 minutes and screen not locked.

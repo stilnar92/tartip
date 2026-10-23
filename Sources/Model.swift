@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import ApplicationServices
+import Combine
 
 final class Model: ObservableObject {
     @Published var blocks: [String] = []
@@ -11,8 +12,9 @@ final class Model: ObservableObject {
     @Published var now = Date()
     @Published var message = ""
     @Published var configs: [String: ModeConfig] = [:]
-    @Published var desktop: Int = UserDefaults.standard.object(forKey: "desktop") as? Int ?? 7 {
-        didSet { UserDefaults.standard.set(desktop, forKey: "desktop") }
+    var desktop: Int {
+        get { S.desktop }
+        set { Settings.shared.v.desktop = newValue }
     }
     @Published var oneTimeLink = ""
     @Published var restEnd: Date? = UserDefaults.standard.object(forKey: "restEnd") as? Date
@@ -29,11 +31,19 @@ final class Model: ObservableObject {
     @Published var records: [SessionRecord] = loadRecords()
     private let activityWindow = PromptWindow()
     private let statsWindow = StatsWindow()
+    private let settingsWindow = StatsWindow(title: "Focus settings")
 
     private var lastPhase: Int?
     private var timer: Timer?
 
+    private var settingsSub: AnyCancellable?
+
     init() {
+        // Settings edits refresh the panel and the activity list right away.
+        settingsSub = Settings.shared.$v.dropFirst().sink { [weak self] v in
+            self?.objectWillChange.send()
+            self?.activities = v.activities.map(\.name).filter { !$0.isEmpty }
+        }
         if UserDefaults.standard.integer(forKey: "minutes") < minMinutes { minutes = defaultMinutes }
         loadBlocks()
         if let d = try? Data(contentsOf: configFile), let c = try? JSONDecoder().decode([String: ModeConfig].self, from: d) {
@@ -114,7 +124,7 @@ final class Model: ObservableObject {
 
     // MARK: session
 
-    var focusBlock: String { blocks.first ?? "Focus_Mode" }
+    var focusBlock: String { S.otherBlock }
 
     // Each activity has a Cold Turkey block with the same name; "Other" uses Focus_Mode.
     func blockFor(_ activity: String) -> String { activity == otherActivity ? focusBlock : activity }
@@ -123,9 +133,10 @@ final class Model: ObservableObject {
     private func chosenPhases() -> [Phase] {
         guard pomodoro else { return [Phase(isBreak: false, minutes: minutes)] }
         var phases: [Phase] = []
-        for i in 0..<4 {
-            phases.append(Phase(isBreak: false, minutes: 25))
-            if i < 3 { phases.append(Phase(isBreak: true, minutes: 5)) }
+        let rounds = max(1, S.pomodoroRounds)
+        for i in 0..<rounds {
+            phases.append(Phase(isBreak: false, minutes: S.pomodoroWork))
+            if i < rounds - 1 { phases.append(Phase(isBreak: true, minutes: S.pomodoroBreak)) }
         }
         return phases
     }
@@ -159,7 +170,7 @@ final class Model: ObservableObject {
     }
 
     func showPicker() {
-        activities = loadActivities()   // pick up edits to activities.txt
+        activities = loadActivities()
         activityWindow.show(ActivityPickerView(m: self))
     }
 
@@ -215,6 +226,8 @@ final class Model: ObservableObject {
     func reloadRecords() { records = loadRecords(); activities = loadActivities() }
 
     func openStats() { statsWindow.show(StatsView(m: self)) }
+
+    func openSettings() { settingsWindow.show(SettingsView()) }
 
     func start(block: String, phases: [Phase], extra: [String] = [], autoThinking: Bool = false,
                planned: String? = nil, note: String? = nil) {
@@ -275,7 +288,7 @@ final class Model: ObservableObject {
         restTaken = true
         UserDefaults.standard.set(true, forKey: "restTaken")
         dismissPrompt()
-        let secs = min(min(minutes, 15) * 60, freeLeft)   // one stretch is at most 15 min
+        let secs = min(min(minutes, S.maxRestMinutes) * 60, freeLeft)   // one stretch is capped (Settings)
         restEnd = Date().addingTimeInterval(Double(secs))
         UserDefaults.standard.set(restEnd, forKey: "restEnd")
         log("rest  \(secs / 60)m (\(freeLeft / 60)m left today)")
