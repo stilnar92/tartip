@@ -47,7 +47,7 @@ struct ActivityPickerView: View {
         let auto = m.pendingStart?.auto ?? true
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("What's next?").font(.system(size: 18, weight: .bold, design: .rounded))
+                Text("What's next?").font(.system(size: 18, weight: .bold))
                 Text(auto ? "Pick an activity (its block starts right away) or take free time."
                           : (showsDuration ? "Pick how long and what, then it starts" : "Pick one to start · \(m.pendingLabel)"))
                     .font(.system(size: 12)).foregroundStyle(.secondary)
@@ -61,9 +61,7 @@ struct ActivityPickerView: View {
                                 .font(.system(size: 12, weight: sel ? .semibold : .medium))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 7)
-                                .foregroundStyle(sel ? Color.white : Color.primary)
-                                .background(Capsule().fill(sel ? AnyShapeStyle(Color.indigo.gradient) : AnyShapeStyle(.quaternary.opacity(0.6))))
-                                .contentShape(Capsule())
+                                .pill(selected: sel)
                         }
                         .buttonStyle(.plain)
                     }
@@ -110,7 +108,7 @@ struct ReviewView: View {
         let mins = (r?.seconds ?? 0) / 60
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Session done · \(mins) min").font(.system(size: 18, weight: .bold, design: .rounded))
+                Text("Session done · \(mins) min").font(.system(size: 18, weight: .bold))
                 Text("What did you actually do?").font(.system(size: 12)).foregroundStyle(.secondary)
             }
 
@@ -121,11 +119,11 @@ struct ReviewView: View {
                         Image(systemName: "checkmark.circle.fill")
                         Text("Yes, \(planned)\(r?.note.map { " · \($0)" } ?? "")").lineLimit(1)
                     }
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(st.color.gradient))
+                    .background(Capsule().fill(Theme.accent))
                     .contentShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)

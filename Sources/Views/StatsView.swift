@@ -26,7 +26,7 @@ struct StatsView: View {
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Where the time went").font(.system(size: 18, weight: .bold, design: .rounded))
+                Text("Where the time went").font(.system(size: 18, weight: .bold))
                 Spacer()
                 Picker("", selection: $range) {
                     Text("Today").tag(0)
@@ -62,7 +62,7 @@ struct StatsView: View {
                             .frame(height: 10)
                             // Today: show progress against the daily limit, e.g. "45m / 1h".
                             let limit = m.limitMinutes(name)
-                            Text((secs > 0 ? formatDuration(secs) : "–") + (range == 0 && limit > 0 ? " / \(limitLabel(limit))" : "")).font(.system(size: 12, weight: .semibold, design: .rounded))
+                            Text((secs > 0 ? formatDuration(secs) : "–") + (range == 0 && limit > 0 ? " / \(limitLabel(limit))" : "")).font(.system(size: 12, weight: .semibold))
                                 .monospacedDigit().frame(width: 92, alignment: .trailing)
                         }
                     }
@@ -87,7 +87,7 @@ struct StatsView: View {
 
     private func summary(_ value: String, _ label: String) -> some View {
         VStack(spacing: 2) {
-            Text(value).font(.system(size: 18, weight: .bold, design: .rounded)).monospacedDigit()
+            Text(value).font(.system(size: 18, weight: .bold)).monospacedDigit()
             Text(label).font(.system(size: 10)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)

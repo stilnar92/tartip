@@ -5,6 +5,10 @@ import AppKit
 import ApplicationServices
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.appearance = NSAppearance(named: .aqua)   // Craft-like light look everywhere
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         log("quit pid=\(ProcessInfo.processInfo.processIdentifier)")
     }

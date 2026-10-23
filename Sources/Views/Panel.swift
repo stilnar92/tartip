@@ -22,26 +22,13 @@ struct BlockStyle {
     }
 }
 
-extension View {
-    @ViewBuilder func card(_ tint: Color? = nil, radius: CGFloat = 14) -> some View {
-        self.background(
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(tint.map { AnyShapeStyle($0.opacity(0.14)) } ?? AnyShapeStyle(.quaternary.opacity(0.5)))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .strokeBorder(tint?.opacity(0.55) ?? Color.primary.opacity(0.06), lineWidth: 1)
-        )
-    }
-}
-
+// Craft-style section heading: small, bold, grey, sentence case.
 struct SectionLabel: View {
     let text: String
     var body: some View {
-        Text(text.uppercased())
-            .font(.system(size: 10, weight: .semibold))
-            .tracking(0.8)
-            .foregroundStyle(.secondary)
+        Text(text)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Theme.text2)
     }
 }
 
@@ -79,6 +66,8 @@ struct ContentView: View {
         }
         .padding(16)
         .frame(width: 340)
+        .background(Theme.bg)
+        .environment(\.colorScheme, .light)
         .animation(.snappy(duration: 0.2), value: m.session == nil)
         .animation(.snappy(duration: 0.2), value: showLink)
         .animation(.snappy(duration: 0.2), value: custom)
@@ -86,45 +75,43 @@ struct ContentView: View {
 
     // MARK: header / footer
 
+    // Craft-style title: big "Today", then "Thursday · 23 Oct" and a status tag.
     private var header: some View {
-        HStack(spacing: 10) {
-            Image(systemName: isNight(m.now) ? "moon.stars.fill" : "scope")
-                .font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
-                .frame(width: 32, height: 32)
-                .background(Circle().fill(LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)))
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Focus").font(.system(size: 16, weight: .bold, design: .rounded))
-                HStack(spacing: 5) {
-                    Circle().fill(guardColor).frame(width: 6, height: 6)
-                    Text(guardText).font(.system(size: 11)).foregroundStyle(.secondary)
-                }
+        let f = DateFormatter(); f.dateFormat = "EEEE · d MMM"
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(isNight(m.now) ? "Night" : "Today")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(Theme.text)
+                Spacer()
+                Tag(text: statusText, color: statusColor, fill: statusColor.opacity(0.12))
             }
-            Spacer()
+            Text(f.string(from: m.now)).font(.system(size: 14)).foregroundStyle(Theme.text2)
         }
     }
 
-    private var guardColor: Color {
-        isNight(m.now) ? .purple : (m.session != nil ? .green : (m.restEnd != nil ? .orange : .secondary))
+    private var statusColor: Color {
+        isNight(m.now) ? .purple : (m.session != nil ? Theme.accent : (m.restEnd != nil ? .orange : Theme.text2))
     }
 
-    private var guardText: String {
-        if isNight(m.now) { return "Night until \(clockLabel(S.nightTo))" }
+    private var statusText: String {
+        if isNight(m.now) { return "until \(clockLabel(S.nightTo))" }
         if m.session != nil { return "In a session" }
         if m.restEnd != nil { return "Free time" }
         if m.availableActivities.isEmpty && !m.canRest { return "Day done 🎉" }
-        if m.pickableActivities.isEmpty && !m.canRest { return "Nothing open right now" }
+        if m.pickableActivities.isEmpty && !m.canRest { return "Nothing open" }
         return "Pick what's next"
     }
 
-    // Footer: four equal tools, icon above a caption, so nothing wraps.
+    // Footer: a floating white pill with icon buttons, like Craft's toolbar.
     private var footer: some View {
-        HStack(spacing: 4) {
-            tool("chart.bar.fill", "Stats") {
+        HStack(spacing: 2) {
+            tool("chart.bar", "Stats") {
                 // Close the menu bar panel first so it doesn't cover the window.
                 NSApp.keyWindow?.close()
                 m.openStats()
             }
-            tool("gearshape.fill", "Settings") {
+            tool("gearshape", "Settings") {
                 NSApp.keyWindow?.close()
                 m.openSettings()
             }
@@ -132,19 +119,18 @@ struct ContentView: View {
                 NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Cold Turkey Blocker.app"))
             }
         }
+        .padding(4)
+        .background(Capsule().fill(Theme.card).shadow(color: .black.opacity(0.08), radius: 8, y: 2))
+        .frame(maxWidth: .infinity)
     }
 
     private func tool(_ icon: String, _ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 13, weight: .semibold))
-                Text(title).font(.system(size: 10, weight: .medium)).lineLimit(1)
-            }
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 7)
-            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(.quaternary.opacity(0.35)))
-            .contentShape(Rectangle())
+            Label(title, systemImage: icon)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.text)
+                .padding(.horizontal, 12).padding(.vertical, 7)
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -152,30 +138,30 @@ struct ContentView: View {
     // MARK: setup
 
     private var setup: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             todayCard
 
-            // Pomodoro switch; otherwise the length is picked in the "What will you work on?" window.
+            // Pomodoro switch; otherwise the length is picked in the "What's next?" window.
             HStack(spacing: 10) {
-                Text("🍅").font(.system(size: 18))
+                Text("🍅").font(.system(size: 16))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Pomodoro").font(.system(size: 13, weight: .medium))
+                    Text("Pomodoro").font(.system(size: 14)).foregroundStyle(Theme.text)
                     Text(m.pomodoro ? "\(S.pomodoroWork)/\(S.pomodoroBreak) min × \(S.pomodoroRounds)" : "Off · length picked at start")
-                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                        .font(.system(size: 12)).foregroundStyle(Theme.text2)
                 }
                 Spacer()
-                Toggle("", isOn: $m.pomodoro).labelsHidden().toggleStyle(.switch).controlSize(.small)
+                Toggle("", isOn: $m.pomodoro).labelsHidden().toggleStyle(.switch).controlSize(.small).tint(Theme.accent)
             }
-            .padding(.horizontal, 12).padding(.vertical, 8)
+            .padding(.horizontal, 12).padding(.vertical, 9)
             .card(radius: 12)
 
             if showLink {
                 HStack(spacing: 6) {
-                    Image(systemName: "link").foregroundStyle(.secondary)
+                    Image(systemName: "link").foregroundStyle(Theme.text2)
                     TextField("Paste a site to open with this session…", text: $m.oneTimeLink).textFieldStyle(.plain)
                 }
-                .font(.system(size: 12))
-                .padding(.horizontal, 12).padding(.vertical, 8)
+                .font(.system(size: 13))
+                .padding(.horizontal, 12).padding(.vertical, 9)
                 .card(radius: 10)
             }
 
@@ -189,43 +175,46 @@ struct ContentView: View {
         }
     }
 
-    // Today: totals plus progress for every activity that has a daily limit.
+    // Today: three numbers as tags, then the daily goals as a Craft-style checklist.
     private var todayCard: some View {
         let today = Calendar.current.startOfDay(for: m.now)
         let used = m.secondsByActivity(since: today)
         let goals = S.activities.filter { $0.dailyMinutes > 0 }
         let sessions = m.recordsSince(today).count
         return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 0) {
-                todayStat(formatDuration(m.stats.focus), "Focused", .indigo)
-                todayStat("\(sessions)", "Sessions", .primary)
-                todayStat("\(m.freeLeft / 60)m", "Free left", m.freeLeft > 0 ? .green : .red)
+            HStack(spacing: 6) {
+                Tag(text: "⏱ \(formatDuration(m.stats.focus)) focused", color: Theme.accent, fill: Theme.accentTint)
+                Tag(text: "\(sessions) sessions")
+                Tag(text: "🍿 \(m.freeLeft / 60)m free",
+                    color: m.freeLeft > 0 ? Theme.text2 : Theme.red, fill: m.freeLeft > 0 ? Theme.pill : Theme.redTint)
             }
             if goals.isEmpty {
                 Text("Set daily goals for activities in Settings.")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .font(.system(size: 12)).foregroundStyle(Theme.text2)
             } else {
-                VStack(spacing: 6) {
-                    ForEach(goals) { g in
+                VStack(spacing: 0) {
+                    ForEach(Array(goals.enumerated()), id: \.element.id) { i, g in
                         let secs = used[g.name] ?? 0
-                        let st = ActivityStyle.of(g.name)
                         let done = secs >= g.dailyMinutes * 60
-                        HStack(spacing: 8) {
-                            Image(systemName: done ? "checkmark.circle.fill" : st.icon)
-                                .font(.system(size: 11)).foregroundStyle(done ? .green : st.color).frame(width: 16)
-                            Text(g.name).font(.system(size: 12)).lineLimit(1).frame(width: 80, alignment: .leading)
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    Capsule().fill(st.color.opacity(0.15))
-                                    Capsule().fill(done ? AnyShapeStyle(Color.green.gradient) : AnyShapeStyle(st.color.gradient))
-                                        .frame(width: geo.size.width * min(1, CGFloat(secs) / CGFloat(g.dailyMinutes * 60)))
-                                }
+                        HStack(spacing: 10) {
+                            // Craft's square checkbox: blue and checked once the goal is reached.
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill(done ? Theme.accent : Color.clear)
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .strokeBorder(done ? Theme.accent : Theme.text2.opacity(0.5), lineWidth: 1.2)
+                                if done { Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(.white) }
                             }
-                            .frame(height: 6)
-                            Text("\(formatDuration(secs)) / \(limitLabel(g.dailyMinutes))")
-                                .font(.system(size: 10, weight: .medium, design: .rounded)).monospacedDigit()
-                                .foregroundStyle(.secondary).fixedSize().frame(minWidth: 70, alignment: .trailing)
+                            .frame(width: 16, height: 16)
+                            Text(g.name).font(.system(size: 14)).foregroundStyle(done ? Theme.text2 : Theme.text)
+                                .strikethrough(done, color: Theme.text2)
+                                .lineLimit(1)
+                            Spacer()
+                            Tag(text: "\(formatDuration(secs)) / \(limitLabel(g.dailyMinutes))",
+                                color: done ? Theme.accent : Theme.text2, fill: done ? Theme.accentTint : Theme.pill)
                         }
+                        .padding(.vertical, 7)
+                        if i < goals.count - 1 { Divider().opacity(0.5) }
                     }
                 }
             }
@@ -234,23 +223,13 @@ struct ContentView: View {
         .card(radius: 14)
     }
 
-    private func todayStat(_ value: String, _ label: String, _ color: Color) -> some View {
-        VStack(spacing: 2) {
-            Text(value).font(.system(size: 17, weight: .bold, design: .rounded)).monospacedDigit().foregroundStyle(color)
-            Text(label).font(.system(size: 10)).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
     private func secondary(_ icon: String, _ title: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: icon)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 9)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(active ? AnyShapeStyle(Color.accentColor.opacity(0.22)) : AnyShapeStyle(.quaternary.opacity(0.6))))
-                .contentShape(RoundedRectangle(cornerRadius: 10))
+                .pill(selected: active)
         }
         .buttonStyle(.plain)
     }
@@ -259,17 +238,16 @@ struct ContentView: View {
         Menu {
             Section(m.restTaken ? "Free time used · do a session first" : "Free time · nothing blocked · \(m.freeLeft / 60) min left today") {
                 ForEach(restOptions, id: \.self) { n in
-                    Button("☕ \(n) min") { m.startRest(minutes: n) }
+                    Button("🍿 \(n) min") { m.startRest(minutes: n) }
                         .disabled(!m.canRest)
                 }
             }
         } label: {
-            Label(m.canRest ? "Free time · \(m.freeLeft / 60)m" : "Free time used", systemImage: "popcorn.fill")
-                .font(.system(size: 12, weight: .medium))
+            Label(m.canRest ? "Free time · \(m.freeLeft / 60)m" : "Free time used", systemImage: "popcorn")
+                .font(.system(size: 13, weight: .medium))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 9)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.quaternary.opacity(0.6)))
-                .contentShape(RoundedRectangle(cornerRadius: 10))
+                .pill()
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
@@ -309,23 +287,20 @@ struct ContentView: View {
     }
 
     private var startButton: some View {
-        let color = BlockStyle.of(m.selected).color
-        let disabled = m.selected.isEmpty || (!m.pomodoro && m.minutes < 1)
+        let color = Theme.accent
+        let disabled = !m.pomodoro && m.minutes < 1
         return Button(action: m.start) {
             HStack(spacing: 8) {
                 Image(systemName: "play.fill")
                 Text(startLabel)
             }
-            .font(.system(size: 15, weight: .semibold, design: .rounded))
+            .font(.system(size: 15, weight: .semibold))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .frame(height: 44)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(LinearGradient(colors: [color, color.opacity(0.75)], startPoint: .topLeading, endPoint: .bottomTrailing))
-            )
-            .shadow(color: color.opacity(0.35), radius: 8, y: 3)
-            .contentShape(RoundedRectangle(cornerRadius: 12))
+            .background(Capsule().fill(color))
+            .shadow(color: color.opacity(0.25), radius: 6, y: 2)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .disabled(disabled)
@@ -340,7 +315,7 @@ struct ContentView: View {
             Image(systemName: "moon.stars.fill")
                 .font(.system(size: 40))
                 .foregroundStyle(LinearGradient(colors: [.indigo, .purple], startPoint: .top, endPoint: .bottom))
-            Text("Night").font(.system(size: 20, weight: .bold, design: .rounded))
+            Text("Night").font(.system(size: 20, weight: .bold))
             Text("\(S.nightBlock) is on until \(clockLabel(S.nightTo)).\nNothing to do now but sleep.")
                 .font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }
@@ -354,7 +329,7 @@ struct ContentView: View {
         VStack(spacing: 14) {
             Text("🍿").font(.system(size: 44))
             Text(m.remaining(until))
-                .font(.system(size: 42, weight: .semibold, design: .rounded))
+                .font(.system(size: 42, weight: .semibold))
                 .monospacedDigit()
                 .contentTransition(.numericText(countsDown: true))
             Text("Free time · nothing blocked · \(m.freeLeft / 60) min left today")
@@ -405,7 +380,7 @@ struct ContentView: View {
                     .animation(.linear(duration: 1), value: progress)
                 VStack(spacing: 2) {
                     Text(m.remaining(cur.end))
-                        .font(.system(size: 36, weight: .semibold, design: .rounded))
+                        .font(.system(size: 36, weight: .semibold))
                         .monospacedDigit()
                         .contentTransition(.numericText(countsDown: true))
                     Text(p.isBreak ? "Stand up · drink water" : "Stay on it")

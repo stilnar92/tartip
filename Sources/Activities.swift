@@ -103,7 +103,7 @@ final class StatsWindow {
             window = w
         }
         guard let window else { return }
-        window.contentView = NSHostingView(rootView: view)
+        window.contentView = NSHostingView(rootView: view.background(Theme.bg).environment(\.colorScheme, .light))
         window.center()
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
@@ -137,7 +137,7 @@ final class PromptWindow {
             && !(w is NSPanel && w.level == .screenSaver) {
             w.close()
         }
-        let host = NSHostingView(rootView: view)
+        let host = NSHostingView(rootView: view.background(Theme.bg).environment(\.colorScheme, .light))
         panel.contentView = host
         panel.setContentSize(host.fittingSize)
         panel.center()

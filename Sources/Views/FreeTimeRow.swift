@@ -24,8 +24,7 @@ struct FreeTimeRow: View {
                             .font(.system(size: 12, weight: .medium))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 7)
-                            .background(Capsule().fill(.quaternary.opacity(0.6)))
-                            .contentShape(Capsule())
+                            .pill()
                     }
                     .buttonStyle(.plain)
                     .disabled(!ok)

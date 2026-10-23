@@ -17,7 +17,7 @@ struct SettingsView: View {
 
     var content: some View {
             VStack(alignment: .leading, spacing: 18) {
-                Text("Settings").font(.system(size: 20, weight: .bold, design: .rounded))
+                Text("Settings").font(.system(size: 20, weight: .bold))
                 activitiesSection
                 nightSection
                 freeTimeSection
@@ -64,7 +64,7 @@ struct SettingsView: View {
                 }
                 Spacer()
                 Text(limitLabel(v.dailyMinutes))
-                    .font(.system(size: 12, weight: .medium, design: .rounded)).monospacedDigit()
+                    .font(.system(size: 12, weight: .medium)).monospacedDigit()
                     .foregroundStyle(v.dailyMinutes == 0 ? .secondary : .primary)
                     .frame(width: 60, alignment: .trailing)
                 Stepper("", value: a.dailyMinutes, in: 0...720, step: 15).labelsHidden().controlSize(.small)
@@ -184,7 +184,7 @@ struct SettingsView: View {
                 ForEach(parts, id: \.0) { name, mins, color in
                     VStack(spacing: 2) {
                         Text(mins > 0 ? limitLabel(mins) : "–")
-                            .font(.system(size: 15, weight: .bold, design: .rounded)).monospacedDigit().foregroundStyle(color)
+                            .font(.system(size: 15, weight: .bold)).monospacedDigit().foregroundStyle(color)
                         Text(name).font(.system(size: 10)).foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity)
