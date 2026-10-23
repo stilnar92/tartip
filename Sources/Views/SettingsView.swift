@@ -136,12 +136,6 @@ struct SettingsView: View {
 
     private var workspaceSection: some View {
         group("Workspace", nil) {
-            row("Open on desktop") {
-                HStack(spacing: 6) {
-                    Text(settings.v.desktop == 0 ? "current" : "\(settings.v.desktop)").monospacedDigit()
-                    Stepper("", value: $settings.v.desktop, in: 0...9).labelsHidden()
-                }
-            }
             row("Block for \"Other\"") { textField($settings.v.otherBlock) }
         }
     }

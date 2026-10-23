@@ -177,7 +177,7 @@ struct ContentView: View {
             if showLink {
                 HStack(spacing: 6) {
                     Image(systemName: "link").foregroundStyle(.secondary)
-                    TextField("Also open this link this time…", text: $m.oneTimeLink).textFieldStyle(.plain)
+                    TextField("Paste a site to open with this session…", text: $m.oneTimeLink).textFieldStyle(.plain)
                 }
                 .font(.system(size: 12))
                 .padding(.horizontal, 12).padding(.vertical, 8)
@@ -187,7 +187,7 @@ struct ContentView: View {
             startButton
 
             HStack(spacing: 8) {
-                secondary("link", m.oneTimeLink.isEmpty ? "Extra link" : "Link added",
+                secondary("safari", m.oneTimeLink.isEmpty ? "Open a site" : "Site added",
                           active: showLink || !m.oneTimeLink.isEmpty) { showLink.toggle() }
                 restMenu
             }
@@ -286,7 +286,7 @@ struct ContentView: View {
 
     private var editor: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("What each activity opens on Desktop \(m.desktop). Add or rename activities in Settings; each needs a Cold Turkey block with the same name.")
+            Text("What each activity opens when it starts. Add or rename activities in Settings; each needs a Cold Turkey block with the same name.")
                 .font(.system(size: 11)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             ForEach(m.activities + [m.focusBlock], id: \.self) { b in
@@ -360,13 +360,6 @@ struct ContentView: View {
                 Text("Stretch windows to fill the screen").font(.system(size: 12))
             }
             .toggleStyle(.switch).controlSize(.mini).tint(tint)
-            HStack {
-                Image(systemName: "rectangle.on.rectangle").foregroundStyle(.secondary)
-                Text(m.desktop == 0 ? "Open on the current desktop" : "Open on Desktop \(m.desktop)")
-                    .font(.system(size: 12))
-                Spacer()
-                Stepper("", value: $m.desktop, in: 0...9).labelsHidden().controlSize(.mini)
-            }
         }
     }
 

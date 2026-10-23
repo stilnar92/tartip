@@ -1,12 +1,12 @@
 # Focus Modes
 
-A small macOS menu bar app that helps you **start** working and keeps you from drifting off. You pick what you'll work on; the app turns on the matching [Cold Turkey](https://getcoldturkey.com/) block for a set time, opens what you need on a dedicated desktop, and afterwards asks what you actually did. If you sit at the computer without doing anything, it nudges you, and then makes you pick.
+A small macOS menu bar app that helps you **start** working and keeps you from drifting off. You pick what you'll work on; the app turns on the matching [Cold Turkey](https://getcoldturkey.com/) block for a set time, opens the apps and sites you need, and afterwards asks what you actually did. If you sit at the computer without doing anything, it nudges you, and then makes you pick.
 
 ## How a day works
 
 1. **Start.** Click ◎ in the menu bar → **Start** → pick a length (default 30 min, never under 15) and an activity (Work, Arabic, English, …).
 2. **Blocking.** The Cold Turkey block **with the same name as the activity** is locked for the session. Anything typed under "Other" uses `Focus_Mode`.
-3. **Workspace.** The app switches to Desktop 7 and opens the activity's apps and links (set them up in **Edit modes**).
+3. **Workspace.** The app opens the activity's apps and links (set them up in **Edit**). For a one-off site, use **Open a site** before pressing Start.
 4. **Review.** When time's up (or you stop), it asks what you did: confirm the plan, or pick what you did instead. That goes into the stats.
 5. **Idle guard.** On weekdays 10:00–22:00, after 15 minutes at the computer without a session, a window counts down 60 s and then opens the picker. Nothing is blocked until you pick.
 6. **Free time.** ☕ Rest unblocks nothing for 5–15 min. Rest and idle time share one budget of 60 min a day. Rest can't be taken twice in a row; a session has to run in between.
@@ -42,8 +42,7 @@ The build needs the Xcode command-line tools (`swiftc`). It:
 
 ### 3. Permissions (once)
 
-- **Accessibility** (System Settings → Privacy & Security → Accessibility → Focus Modes): needed to switch desktops and resize windows.
-- **Desktop shortcut:** the app enables "Switch to Desktop N" (⌃N) itself; Desktop 7 must exist in Mission Control.
+- **Accessibility** (System Settings → Privacy & Security → Accessibility → Focus Modes): needed to stretch opened windows to fill the screen.
 - **Chrome automation:** allow "Focus Modes" to control Google Chrome when asked; links open in a separate Chrome window that's closed when you switch activities.
 
 ## Data
@@ -66,7 +65,7 @@ Everything personal lives in `~/modes`, outside the repo:
 | `Sources/Settings.swift` | `AppSettings` and its JSON storage |
 | `Sources/Rules.swift` | guard hours, presence detection, values derived from settings |
 | `Sources/Activities.swift` | session history, activity styles, helper windows |
-| `Sources/Workspace.swift` | desktop switch, opening apps/Chrome, cleanup |
+| `Sources/Workspace.swift` | opening apps and a Chrome window, cleanup |
 | `Sources/Core.swift` | paths, process helpers, logging, Cold Turkey CLI |
 | `Sources/Views/` | panel, prompt, picker/review, stats, settings |
 

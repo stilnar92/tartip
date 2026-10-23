@@ -12,10 +12,6 @@ final class Model: ObservableObject {
     @Published var now = Date()
     @Published var message = ""
     @Published var configs: [String: ModeConfig] = [:]
-    var desktop: Int {
-        get { S.desktop }
-        set { Settings.shared.v.desktop = newValue }
-    }
     @Published var oneTimeLink = ""
     @Published var restEnd: Date? = UserDefaults.standard.object(forKey: "restEnd") as? Date
     @Published var prompt: Prompt?
@@ -283,11 +279,11 @@ final class Model: ObservableObject {
         message = ""
         let c = config(s.block)
         let hasStuff = !(c.apps.isEmpty && c.urls.isEmpty && extra.isEmpty)
-        if (hasStuff || desktop > 0) && !axTrusted(prompt: true) {
-            message = "Allow Focus Modes in Privacy & Security → Accessibility to switch desktops and resize windows."
+        if hasStuff && c.maximize && !axTrusted(prompt: true) {
+            message = "Allow Focus Modes in Privacy & Security → Accessibility to resize windows."
         }
         let prev = UserDefaults.standard.data(forKey: "opened").flatMap { try? JSONDecoder().decode(OpenedWorkspace.self, from: $0) }
-        openWorkspace(mode: s.block, c, extraURLs: extra, desktop: desktop, prev: prev) { opened in
+        openWorkspace(mode: s.block, c, extraURLs: extra, prev: prev) { opened in
             if let data = try? JSONEncoder().encode(opened) { UserDefaults.standard.set(data, forKey: "opened") }
         }
 

@@ -39,7 +39,6 @@ struct AppSettings: Codable, Equatable {
     var nightBlock = "Focus_Mode"
 
     // Workspace
-    var desktop = 7
     var otherBlock = "Focus_Mode"         // Cold Turkey block for "Other"
 
     var activities: [ActivitySetting] = ["Work", "Arabic", "AI education", "Project", "English", "Interview", "Rest"]
@@ -81,7 +80,6 @@ final class Settings: ObservableObject {
             s.otherBlock = first
             s.nightBlock = first
         }
-        if let desktop = UserDefaults.standard.object(forKey: "desktop") as? Int { s.desktop = desktop }
         return s
     }
 
