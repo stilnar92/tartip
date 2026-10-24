@@ -1,6 +1,6 @@
 # Focus Modes
 
-A small macOS menu bar app that helps you **start** working and keeps you from drifting off. You pick what you'll work on; for a set time the app blocks the apps and sites that activity doesn't need, opens the ones it does, and afterwards asks what you actually did. Whenever nothing is running, it asks what's next, so the decision is always yours and always made.
+A small macOS menu bar app that **makes** you focus instead of waiting for you to decide to: deciding to start is the hard part, so the app does the pushing. It helps you **start** working and keeps you from drifting off. You pick what you'll work on; for a set time the app blocks the apps and sites that activity doesn't need, opens the ones it does, and afterwards asks what you actually did. Whenever nothing is running, it asks what's next, so the decision is always yours and always made.
 
 ## How a day works
 

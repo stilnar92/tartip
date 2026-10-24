@@ -26,7 +26,8 @@ struct GetStartedView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 26) {
             PageTitle(title: "Welcome to Focus",
-                      subtitle: "A couple of minutes to set up. Nothing is blocked until you press Start.")
+                      subtitle: "Set it up once, and from then on it does the pushing. Nothing happens until you press Start.")
+            idea
             howItWorks
             section("1", "Your activities", "What do you want to spend focused time on? Add your own, or start from a template.") {
                 activities
@@ -41,16 +42,37 @@ struct GetStartedView: View {
         }
     }
 
-    // MARK: how it works
+    // MARK: the idea
 
+    // What sets the app apart: it doesn't wait for you to decide to focus, it makes you.
+    private var idea: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("You don't have to make yourself start.")
+                .font(.system(size: 19, weight: .bold)).foregroundStyle(Theme.text)
+            Text("Most focus apps wait until you decide to focus, and deciding is the hard part. Focus doesn't wait: it asks, it starts, and it holds you to it. You only choose what to work on.")
+                .font(.system(size: 13)).foregroundStyle(Theme.text)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .card(Theme.accent, radius: 14)
+    }
+
+    // The loop the app runs every day, in the app's own voice.
     private var howItWorks: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let s = settings.value
+        let wait = s.autoStartAfterMinutes
+        return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
-                step("hand.tap.fill", "Pick", "Choose an activity and how long: 15 min, an hour, or Pomodoro.")
-                step("lock.fill", "Stay on it", "Distracting apps close and sites don't open until the timer ends.")
-                step("checkmark.circle.fill", "Look back", "Say what you actually did; Stats shows your day.")
+                step("questionmark.bubble.fill", "It asks",
+                     "Whenever nothing is running, \"What's next?\" comes up over everything and can't be closed.")
+                step("hand.point.up.left.fill", wait > 0 ? "You pick, or it picks" : "You pick",
+                     wait > 0 ? "Choose an activity and a length. Leave it unanswered for \(wait) min and Focus starts one for you."
+                              : "Choose an activity and a length.")
+                step("lock.fill", "It holds you to it",
+                     "Distracting apps close and sites don't open until the timer ends. Stopping early doesn't lift the block.")
             }
-            Text("When nothing is running, Focus asks \"What's next?\" so the day doesn't drift. Free time (1 h a day) blocks nothing.")
+            Text("Afterwards you say what you actually did. The only break from it is free time: \(minutesLabel(s.dailyFreeMinutes)) a day, taken on purpose. At night it leaves you alone and keeps distractions blocked.")
                 .font(.system(size: 12)).foregroundStyle(Theme.text2)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -208,7 +230,8 @@ struct GetStartedView: View {
     private var summary: String {
         let appNames = Self.installed.filter { apps.contains($0.id) }.map(\.app.name)
         let siteNames = siteGroups.filter { sites.contains($0.name) }.map { $0.name.lowercased() }
-        let and = { (list: [String]) in ListFormatter.localizedString(byJoining: list) }
+        // "a, b and c" in English: the UI isn't localized, so the system language mustn't leak in.
+        let and = { (l: [String]) in l.count < 2 ? l.joined() : l.dropLast().joined(separator: ", ") + " and " + l.last! }
         let what = [appNames.isEmpty ? nil : "closes " + and(appNames),
                     siteNames.isEmpty ? nil : "blocks " + and(siteNames) + " sites"]
             .compactMap { $0 }
@@ -220,6 +243,8 @@ struct GetStartedView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(summary).font(.system(size: 13)).foregroundStyle(Theme.text)
                 .fixedSize(horizontal: false, vertical: true)
+            Text("After Start, Focus takes over: \"What's next?\" comes up right away.")
+                .font(.system(size: 12)).foregroundStyle(Theme.text2)
             HStack(spacing: 12) {
                 Button { start() } label: {
                     Text("Start").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
