@@ -24,6 +24,13 @@ let activityTemplates: [ActivityTemplate] = [
     .init(name: "Rest", icon: "cup.and.saucer.fill", color: "brown"),
 ]
 
+// The blocks Start on Get started fills: every block an activity, the night or "Other" locks,
+// unless it already has rules (e.g. imported from Cold Turkey before the first launch).
+func blocksToFill(_ s: AppSettings, existing: [String: BlockRule]) -> [String] {
+    let names = Set(s.activities.map { s.block(for: $0.name) } + [s.nightBlock, s.otherBlock])
+    return names.filter { (existing[$0] ?? BlockRule()) == BlockRule() }.sorted()
+}
+
 struct DistractionApp: Hashable, Sendable {
     let name: String
     let bundleIDs: [String]   // any one of them installed counts

@@ -100,13 +100,10 @@ final class Model: ObservableObject {
     func finishSetup(base: BlockRule) {
         let rules = NativeBlocker.shared
         rules.load()   // blocks.json may have been imported while setup was open
-        let s = Settings.current
-        let names = Set(s.activities.map { s.block(for: $0.name) } + [s.nightBlock, s.otherBlock])
-        for name in names.sorted() where rules.rule(name) == BlockRule() {
-            rules.update(name) { $0 = base }
-        }
+        let names = blocksToFill(Settings.current, existing: rules.rules)
+        for name in names { rules.update(name) { $0 = base } }
         Setup.markDone()
-        log("setup blocks: \(base.apps.count) apps, \(base.web.count) sites → \(names.sorted().joined(separator: ", "))")
+        log("setup blocks: \(base.apps.count) apps, \(base.web.count) sites → \(names.joined(separator: ", "))")
     }
 
     // MARK: what each activity opens

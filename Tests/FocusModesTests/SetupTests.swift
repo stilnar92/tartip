@@ -56,4 +56,13 @@ import Testing
         let a = ActivitySetting(template: t)
         #expect(a.name == t.name && a.icon == t.icon && a.color == t.color && a.block == t.name)
     }
+
+    @Test func startFillsOnlyEmptyBlocks() {
+        var s = AppSettings()
+        s.activities = [ActivitySetting(name: "Work"), ActivitySetting(name: "Study"), ActivitySetting(name: "Rest")]
+        s.activities[1].block = "Deep"                     // renamed link to a block
+        let imported = ["Work": BlockRule(web: ["google.com"]), "Rest": BlockRule()]
+        // Work was imported and stays; Rest exists but is empty, so it's filled; night and Other share Focus_Mode.
+        #expect(blocksToFill(s, existing: imported) == ["Deep", "Focus_Mode", "Rest"])
+    }
 }
