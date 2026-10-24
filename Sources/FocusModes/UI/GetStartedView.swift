@@ -10,8 +10,9 @@ struct GetStartedView: View {
     @StateObject private var perms = Permissions()
     let done: () -> Void
 
-    @State private var apps: Set<String> = Set(Self.installed.filter { $0.app.suggested }.map(\.id))
-    @State private var sites: Set<String> = Self.hasChrome ? Set(siteGroups.filter(\.suggested).flatMap(\.sites)) : []
+    // Nothing is ticked for the user: every choice on this page is theirs.
+    @State private var apps: Set<String> = []
+    @State private var sites: Set<String> = []
     @State private var newName = ""
     @State private var newIcon = "circle.fill"
 
@@ -82,7 +83,7 @@ struct GetStartedView: View {
             Text("Afterwards you say what you actually did. "
                  + (s.dailyFreeMinutes > 0 ? "The only break from it is free time: \(minutesLabel(s.dailyFreeMinutes)) a day, taken on purpose. "
                                            : "There's no free time, so there's no break from it. ")
-                 + "At night it leaves you alone and keeps distractions blocked.")
+                 + (s.nightEnabled ? "At night it leaves you alone and keeps distractions blocked." : ""))
                 .font(.system(size: 12)).foregroundStyle(Theme.text2)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -164,7 +165,16 @@ struct GetStartedView: View {
 
     private var blocking: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Apps").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.text2)
+            HStack {
+                Text("Apps").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.text2)
+                Spacer()
+                // Only on request: chat apps, games, social and video sites; never media players or work tools.
+                Button("Tick the usual ones") {
+                    apps.formUnion(Self.installed.filter { $0.app.suggested }.map(\.id))
+                    if Self.hasChrome { sites.formUnion(siteGroups.filter(\.suggested).flatMap(\.sites)) }
+                }
+                .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.accent)
+            }
             if Self.installed.isEmpty {
                 Text("None of the usual distractions are installed. You can add any app later in Activities → ⌄ → Blocks.")
                     .font(.system(size: 12)).foregroundStyle(Theme.text2)
@@ -378,13 +388,6 @@ struct GetStartedView: View {
                 if !canStart {
                     Text("Add at least one activity").font(.system(size: 12)).foregroundStyle(Theme.text2)
                 }
-                Spacer()
-                Button("Use a simple setup") {
-                    if !canStart, let work = activityTemplates.first { settings.value.activities.append(ActivitySetting(template: work)) }
-                    start()
-                }
-                .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.accent)
-                .help("Adds Work if you have no activity yet, keeps the ticked apps and sites, and starts.")
             }
         }
         .padding(16)

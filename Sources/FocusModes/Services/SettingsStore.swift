@@ -27,9 +27,15 @@ final class Settings: ObservableObject {
         return AppSettings.merged(over: data) ?? AppSettings()
     }
 
-    // First run: take the activity list from activities.txt and the "Other" block from blocks.txt.
+    // No settings.json yet. A new install starts with free time and night off, so Get started
+    // doesn't choose for the user. An old install takes its list from activities.txt and the
+    // "Other" block from blocks.txt.
     private static func migrated(_ d: AppSettings) -> AppSettings {
         var s = d
+        if Setup.isPending {
+            s.dailyFreeMinutes = 0
+            s.nightEnabled = false
+        }
         if let text = try? String(contentsOf: modesDir.appendingPathComponent("activities.txt"), encoding: .utf8) {
             let names = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
             if !names.isEmpty { s.activities = names.map { ActivitySetting(name: $0) } }
