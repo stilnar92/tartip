@@ -13,7 +13,7 @@ protocol Blocker: AnyObject {
 let blockRulesFile = modesDir.appendingPathComponent("blocks.json")
 let blockedPage = modesDir.appendingPathComponent("blocked.html")
 
-private let chromeID = "com.google.Chrome"
+let chromeID = "com.google.Chrome"
 // Browsers whose tabs we can't see: quit while a block with sites is on.
 private let otherBrowsers: Set<String> = [
     "com.apple.Safari", "org.mozilla.firefox", "company.thebrowser.Browser", "company.thebrowser.dia",

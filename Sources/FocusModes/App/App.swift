@@ -38,7 +38,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.appearance = NSAppearance(named: .aqua)   // Craft-like light look everywhere
         if Bundle.main.bundleIdentifier != nil { UNUserNotificationCenter.current().delegate = self }
-        requestNotificationPermission()
+        // A new install asks on Get started, where it's explained, not at launch.
+        if !Setup.isPending { requestNotificationPermission() }
         AppRoot.shared.windows.start()
     }
 
