@@ -40,7 +40,7 @@ struct ContentView: View {
                     .font(.system(size: 12)).foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            toolbar
+            if !Setup.isPending { toolbar }
         }
         .padding(16)
         .frame(width: 360)

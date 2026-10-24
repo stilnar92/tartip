@@ -34,6 +34,7 @@ final class WindowCoordinator {
     func openMain(_ tab: MainTab) {
         hideMenuPanel()
         model.reloadRecords()
+        let tab = MainTab.shown.contains(tab) ? tab : MainTab.shown[0]
         main.show(MainView(model: model, tab: tab, close: { [weak self] in self?.main.close() }))
     }
 

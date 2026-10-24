@@ -3,8 +3,9 @@ import SwiftUI
 enum MainTab: String, CaseIterable {
     case setup = "Get started", stats = "Stats", activities = "Activities", rules = "Rules"
 
-    // Get started is only listed until first-run setup is done.
-    @MainActor static var shown: [MainTab] { allCases.filter { $0 != .setup || Setup.isPending } }
+    // Until first-run setup is done Get started is the only page: there's nothing to see
+    // in Stats yet, and Activities and Rules would compete with it. Afterwards it's gone.
+    @MainActor static var shown: [MainTab] { Setup.isPending ? [.setup] : allCases.filter { $0 != .setup } }
 
     var icon: String {
         switch self {
