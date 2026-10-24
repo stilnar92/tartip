@@ -92,6 +92,23 @@ final class Model: ObservableObject {
 
     func reloadRecords() { records = loadRecords() }
 
+    // MARK: first-run setup
+
+    // "Start" on Get started: the picked apps and sites go into every block that has nothing
+    // yet (activities, night, "Other"); blocks imported before (e.g. from Cold Turkey) are kept.
+    // From the next tick on, "What's next?" and the night lock work as usual.
+    func finishSetup(base: BlockRule) {
+        let rules = NativeBlocker.shared
+        rules.load()   // blocks.json may have been imported while setup was open
+        let s = Settings.current
+        let names = Set(s.activities.map { s.block(for: $0.name) } + [s.nightBlock, s.otherBlock])
+        for name in names.sorted() where rules.rule(name) == BlockRule() {
+            rules.update(name) { $0 = base }
+        }
+        Setup.markDone()
+        log("setup blocks: \(base.apps.count) apps, \(base.web.count) sites → \(names.sorted().joined(separator: ", "))")
+    }
+
     // MARK: what each activity opens
 
     func updateOpens(_ activity: UUID, _ change: (inout ModeConfig) -> Void) {
@@ -233,7 +250,8 @@ final class Model: ObservableObject {
     private func tick() {
         clock.now = Date()
         let night = Settings.current.isNight(at: now)
-        if night { enterNightIfNeeded() }
+        // Until first-run setup is done nothing is pushed: no night lock, no "What's next?".
+        if night && !Setup.isPending { enterNightIfNeeded() }
         blocker.tick(now)
 
         switch phase {
@@ -262,7 +280,7 @@ final class Model: ObservableObject {
         case .idle:
             // Nothing running and it's not night: you always decide what's next, right away.
             // The picker can't be closed; nothing is blocked until you pick.
-            guard !night, userPresent() else { return }
+            guard !night, !Setup.isPending, !activities.isEmpty, userPresent() else { return }
             // Day done: every limit reached and no free time to offer, so there's nothing to choose.
             let limits = limits
             guard activities.contains(where: limits.canStart) || canRest else { return }

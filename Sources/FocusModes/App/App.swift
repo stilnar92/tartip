@@ -13,6 +13,7 @@ final class AppRoot {
     let windows: WindowCoordinator
 
     private init() {
+        Setup.resolve()          // first: everything after this writes files that would hide a new install
         enforceSingleInstance()
         model = Model()
         windows = WindowCoordinator(model: model)
@@ -39,6 +40,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if Bundle.main.bundleIdentifier != nil { UNUserNotificationCenter.current().delegate = self }
         requestNotificationPermission()
         AppRoot.shared.windows.start()
+    }
+
+    // Opening the app again (Finder, Spotlight) while setup isn't done brings Get started back:
+    // with no Dock icon this is the way to find a window that went behind others.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if Setup.isPending { AppRoot.shared.windows.openMain(.setup) }
+        return true
     }
 
     // Show banners even while the panel makes this app the active one.

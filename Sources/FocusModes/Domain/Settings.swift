@@ -22,6 +22,12 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
         self.toMinute = toMinute
     }
 
+    init(template t: ActivityTemplate) {
+        self.init(name: t.name)
+        icon = t.icon
+        color = t.color
+    }
+
     // Settings saved before a field existed still load.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -83,8 +89,8 @@ struct AppSettings: Codable, Equatable {
     // Workspace
     var otherBlock = "Focus_Mode"         // block for "Other"
 
-    var activities: [ActivitySetting] = ["Work", "Arabic", "AI education", "Project", "English", "Interview", "Rest"]
-        .map { ActivitySetting(name: $0) }
+    // Empty for a new install: first-run setup has the user build the list.
+    var activities: [ActivitySetting] = []
 }
 
 extension AppSettings {

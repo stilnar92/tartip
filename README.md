@@ -4,6 +4,7 @@ A small macOS menu bar app that helps you **start** working and keeps you from d
 
 ## How a day works
 
+0. **First launch.** The **Get started** page opens. It explains the idea, has you build your activity list (from templates with icons, or your own), tick the apps and sites to block, and set the night. Nothing is asked or blocked until you press **Start**; until then the menu bar panel only leads back to Get started (so does opening the app again from Finder or Spotlight).
 1. **Start.** Click ◎ in the menu bar: the **Today** list shows every activity with the time left today. Pick a length at the top (default 30 min, or 🍅 Pomodoro) and click an activity to start it. Right-click a row to start it with a specific length.
 2. **Blocking.** The activity's block is locked for the session: by default the one **with the same name**, and it stays linked if you rename the activity (Activities → ⌄ → Block it locks). Its apps are quit as soon as they start, and its sites are replaced with a "Not now" page in Chrome. Stopping the timer early doesn't lift the block before its time. **Rest** is an activity too: a short break between tasks with its own block, so a break doesn't turn into a movie.
 3. **Workspace.** The app opens the activity's apps and links (set them up in Activities → ⌄). For a one-off site, use **Open a site** before pressing Start.
@@ -31,6 +32,8 @@ Blocks live in `~/modes/blocks.json`, by name; each activity locks the one named
 - `exceptions`: always allowed, even under `"*"` (`youtube.com/watch*`, `file://*.*`).
 
 While a block is locked it can only get stricter: you can add apps and sites and remove exceptions, but not the other way round.
+
+On first launch, **Start** on Get started fills every block that's still empty with the apps and sites you ticked; blocks that already exist are kept.
 
 Coming from Cold Turkey? `swift scripts/import-cold-turkey.swift` copies the blocks named like your activities (and `Focus_Mode`) into `blocks.json` once (`--force` replaces an existing file). Then turn those blocks off in Cold Turkey so they don't double up.
 

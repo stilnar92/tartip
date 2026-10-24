@@ -8,6 +8,7 @@ final class WindowCoordinator {
     private let model: Model
     private let prompt = PromptWindow()
     private let main = MainWindowController()
+    private var setupReminder: Task<Void, Never>?
 
     init(model: Model) { self.model = model }
 
@@ -15,13 +16,25 @@ final class WindowCoordinator {
     func start() {
         model.onPhaseChange = { [weak self] in self?.show(for: $0) }
         show(for: model.phase)
+        if Setup.isPending {
+            openMain(.setup)
+            // A closed Get started comes back every 30 min while you're at the computer,
+            // so a new install doesn't sit there doing nothing.
+            setupReminder = Task { [weak self] in
+                while !Task.isCancelled && Setup.isPending {
+                    try? await Task.sleep(for: .seconds(30 * 60))
+                    guard let self, Setup.isPending, !self.main.isVisible, userPresent() else { continue }
+                    self.openMain(.setup)
+                }
+            }
+        }
     }
 
     // Stats, Activities and Rules live in one window with a sidebar.
     func openMain(_ tab: MainTab) {
         hideMenuPanel()
         model.reloadRecords()
-        main.show(MainView(model: model, tab: tab))
+        main.show(MainView(model: model, tab: tab, close: { [weak self] in self?.main.close() }))
     }
 
     private func show(for phase: AppPhase) {
@@ -38,6 +51,9 @@ final class WindowCoordinator {
 final class MainWindowController {
     private var window: NSWindow?
     private let title = "Focus"
+
+    var isVisible: Bool { window?.isVisible == true }
+    func close() { window?.close() }
 
     func show<V: View>(_ view: V) {
         if window == nil {

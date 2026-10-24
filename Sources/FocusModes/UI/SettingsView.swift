@@ -16,7 +16,7 @@ struct SettingsView: View {
         switch page {
         case .activities: activitiesPage
         case .rules: rulesPage
-        case .stats: EmptyView()
+        case .setup, .stats: EmptyView()
         }
     }
 

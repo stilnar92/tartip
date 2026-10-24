@@ -27,6 +27,8 @@ struct ContentView: View {
                 freeTimeCard(end)
             } else if let s = model.session, let cur = s.current(at: model.now) {
                 sessionCard(s, cur)
+            } else if Setup.isPending {
+                setupCard
             } else if Settings.current.isNight(at: model.now) {
                 nightCard
             } else {
@@ -227,6 +229,29 @@ struct ContentView: View {
             .buttonStyle(.plain)
         }
         .padding(16)
+        .card(radius: 16)
+    }
+
+    // MARK: first-run setup
+
+    // Nothing can start before setup: the panel only leads to Get started.
+    private var setupCard: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 30))
+                .foregroundStyle(Theme.accent)
+            Text("Let's set you up").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
+            Text("Pick your activities and what should be blocked. About two minutes.")
+                .font(.system(size: 12)).foregroundStyle(Theme.text2).multilineTextAlignment(.center)
+            Button { openMain(.setup) } label: {
+                Text("Get started").font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                    .padding(.horizontal, 18).padding(.vertical, 8)
+                    .background(Capsule().fill(Theme.accent))
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(20)
         .card(radius: 16)
     }
 

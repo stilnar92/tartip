@@ -1,10 +1,14 @@
 import SwiftUI
 
 enum MainTab: String, CaseIterable {
-    case stats = "Stats", activities = "Activities", rules = "Rules"
+    case setup = "Get started", stats = "Stats", activities = "Activities", rules = "Rules"
+
+    // Get started is only listed until first-run setup is done.
+    @MainActor static var shown: [MainTab] { allCases.filter { $0 != .setup || Setup.isPending } }
 
     var icon: String {
         switch self {
+        case .setup: return "sparkles"
         case .stats: return "chart.bar"
         case .activities: return "list.bullet"
         case .rules: return "slider.horizontal.3"
@@ -17,6 +21,7 @@ enum MainTab: String, CaseIterable {
 struct MainView: View {
     @ObservedObject var model: Model
     @State var tab: MainTab
+    var close: () -> Void = {}
 
     var body: some View {
         HStack(spacing: 0) {
@@ -25,6 +30,7 @@ struct MainView: View {
             ScrollView {
                 Group {
                     switch tab {
+                    case .setup: GetStartedView(model: model, done: close).padding(28)
                     case .stats: StatsView(model: model)
                     case .activities, .rules: SettingsView(model: model, page: tab).padding(28)
                     }
@@ -47,7 +53,7 @@ struct MainView: View {
                 Text("Focus").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.text)
             }
             .padding(.horizontal, 10).padding(.top, 30).padding(.bottom, 14)
-            ForEach(MainTab.allCases, id: \.self) { t in
+            ForEach(MainTab.shown, id: \.self) { t in
                 Button { tab = t } label: {
                     Label(t.rawValue, systemImage: t.icon)
                         .font(.system(size: 13, weight: tab == t ? .semibold : .regular))
