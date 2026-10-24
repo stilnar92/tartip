@@ -9,9 +9,19 @@ struct ActivityStyle {
         ("blue", .blue), ("indigo", .indigo), ("purple", .purple), ("pink", .pink), ("red", .red),
         ("orange", .orange), ("brown", .brown), ("green", .green), ("mint", .mint), ("teal", .teal), ("gray", .gray),
     ]
-    static let icons = ["briefcase.fill", "laptopcomputer", "hammer.fill", "brain", "graduationcap.fill",
-                        "character.book.closed.fill", "textformat.abc", "person.2.wave.2.fill", "cup.and.saucer.fill",
-                        "figure.run", "music.note", "paintbrush.fill", "book.fill", "circle.fill"]
+    // Grouped by kind of activity, so the picker reads like a menu of what you might do.
+    static let iconGroups: [(name: String, icons: [String])] = [
+        ("Work", ["briefcase.fill", "laptopcomputer", "desktopcomputer", "chevron.left.forwardslash.chevron.right",
+                  "terminal.fill", "doc.text.fill", "chart.bar.fill", "envelope.fill", "phone.fill", "tray.full.fill"]),
+        ("Learning", ["graduationcap.fill", "book.fill", "books.vertical.fill", "character.book.closed.fill",
+                      "textformat.abc", "brain", "lightbulb.fill", "globe"]),
+        ("Creating", ["hammer.fill", "pencil", "paintbrush.fill", "camera.fill", "music.note", "guitars.fill",
+                      "film.fill", "mic.fill"]),
+        ("Body & home", ["figure.run", "dumbbell.fill", "heart.fill", "leaf.fill", "fork.knife", "house.fill",
+                         "cart.fill", "person.2.wave.2.fill"]),
+        ("Rest", ["cup.and.saucer.fill", "bed.double.fill", "gamecontroller.fill", "sparkles", "circle.fill"]),
+    ]
+    static let icons = iconGroups.flatMap(\.icons)
 
     // History can name activities that no longer exist; those get the guess.
     @MainActor static func of(_ name: String) -> ActivityStyle {

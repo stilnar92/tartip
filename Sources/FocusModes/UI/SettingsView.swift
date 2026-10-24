@@ -262,7 +262,7 @@ struct SettingsView: View {
         }
     }
 
-    // Color swatches and an icon menu; the first swatch goes back to the guess from the name.
+    // Color swatches and an icon grid; "From the name" goes back to the guess.
     private func lookPicker(_ a: Binding<ActivitySetting>, _ st: ActivityStyle) -> some View {
         HStack(spacing: 6) {
             ForEach(ActivityStyle.colors, id: \.name) { name, color in
@@ -274,16 +274,11 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
             }
             Spacer()
-            Menu {
+            if a.wrappedValue.icon != nil || a.wrappedValue.color != nil {
                 Button("From the name") { a.wrappedValue.icon = nil; a.wrappedValue.color = nil }
-                Divider()
-                ForEach(ActivityStyle.icons, id: \.self) { icon in
-                    Button { a.wrappedValue.icon = icon } label: { Label(icon, systemImage: icon) }
-                }
-            } label: {
-                Image(systemName: st.icon).foregroundStyle(st.color)
+                    .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.text2)
             }
-            .menuStyle(.borderlessButton).fixedSize()
+            IconPicker(icon: st.icon, color: st.color) { a.wrappedValue.icon = $0 }
         }
     }
 
