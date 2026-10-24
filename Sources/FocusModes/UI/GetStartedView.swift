@@ -35,7 +35,10 @@ struct GetStartedView: View {
             section("2", "What gets blocked", "While an activity runs, these apps are closed and these sites don't open.") {
                 blocking
             }
-            section("3", "Night", "From this hour until morning nothing is asked, and the same apps and sites stay blocked.") {
+            section("3", "Free time", "The one way out of the loop: nothing is blocked and nothing is asked. It comes from a daily budget and is only taken on purpose.") {
+                freeTime
+            }
+            section("4", "Night", "From this hour until morning nothing is asked, and the same apps and sites stay blocked.") {
                 night
             }
             footer
@@ -72,7 +75,10 @@ struct GetStartedView: View {
                 step("lock.fill", "It holds you to it",
                      "Distracting apps close and sites don't open until the timer ends. Stopping early doesn't lift the block.")
             }
-            Text("Afterwards you say what you actually did. The only break from it is free time: \(minutesLabel(s.dailyFreeMinutes)) a day, taken on purpose. At night it leaves you alone and keeps distractions blocked.")
+            Text("Afterwards you say what you actually did. "
+                 + (s.dailyFreeMinutes > 0 ? "The only break from it is free time: \(minutesLabel(s.dailyFreeMinutes)) a day, taken on purpose. "
+                                           : "There's no free time, so there's no break from it. ")
+                 + "At night it leaves you alone and keeps distractions blocked.")
                 .font(.system(size: 12)).foregroundStyle(Theme.text2)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -200,7 +206,34 @@ struct GetStartedView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: 3. night
+    // MARK: 3. free time
+
+    private var freeTime: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            choice("Per day", [0, 30, 60, 90, 120], $settings.value.dailyFreeMinutes) { $0 == 0 ? "None" : minutesLabel($0) }
+            if settings.value.dailyFreeMinutes > 0 {
+                choice("One stretch at most", [15, 30, 60, 120], $settings.value.maxRestMinutes) { minutesLabel($0) }
+            }
+        }
+    }
+
+    // A row of pills; a value set elsewhere (Rules) that isn't among them is shown as well.
+    private func choice(_ label: String, _ options: [Int], _ value: Binding<Int>, _ title: @escaping (Int) -> String) -> some View {
+        let all = options.contains(value.wrappedValue) ? options : (options + [value.wrappedValue]).sorted()
+        return HStack(spacing: 6) {
+            Text(label).font(.system(size: 13)).foregroundStyle(Theme.text2).frame(width: 130, alignment: .leading)
+            ForEach(all, id: \.self) { v in
+                Button { value.wrappedValue = v } label: {
+                    Text(title(v)).font(.system(size: 12, weight: value.wrappedValue == v ? .semibold : .regular))
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .pill(selected: value.wrappedValue == v)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: 4. night
 
     private var night: some View {
         VStack(alignment: .leading, spacing: 8) {
