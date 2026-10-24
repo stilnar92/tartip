@@ -10,7 +10,7 @@ struct GetStartedView: View {
     let done: () -> Void
 
     @State private var apps: Set<String> = Set(Self.installed.filter { $0.app.suggested }.map(\.id))
-    @State private var sites: Set<String> = Self.hasChrome ? Set(siteGroups.filter(\.suggested).map(\.name)) : []
+    @State private var sites: Set<String> = Self.hasChrome ? Set(siteGroups.filter(\.suggested).flatMap(\.sites)) : []
     @State private var newName = ""
     @State private var newIcon = "circle.fill"
 
@@ -175,15 +175,31 @@ struct GetStartedView: View {
                 }
             }
             Text("Sites").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.text2)
-            FlowLayout {
-                ForEach(siteGroups, id: \.name) { g in
-                    toggleChip(sites.contains(g.name), action: { sites.formSymmetricDifference([g.name]) }) {
-                        Image(systemName: g.icon)
-                        Text(g.name)
+            // Each site on its own, so it's clear what "Social" means; the group name ticks them all.
+            ForEach(siteGroups, id: \.name) { g in
+                let on = g.sites.filter(sites.contains).count
+                VStack(alignment: .leading, spacing: 6) {
+                    Button {
+                        if on == g.sites.count { sites.subtract(g.sites) } else { sites.formUnion(g.sites) }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: g.icon).foregroundStyle(Theme.accent)
+                            Text(g.name).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.text)
+                            Text(on == g.sites.count ? "all" : on == 0 ? "none" : "\(on) of \(g.sites.count)")
+                                .font(.system(size: 11)).foregroundStyle(Theme.text2)
+                        }
                     }
-                    .help(g.sites.joined(separator: ", "))
-                    .disabled(!Self.hasChrome)
+                    .buttonStyle(.plain)
+                    .help(on == g.sites.count ? "Untick all" : "Tick all")
+                    FlowLayout {
+                        ForEach(g.sites, id: \.self) { site in
+                            toggleChip(sites.contains(site), action: { sites.formSymmetricDifference([site]) }) {
+                                Text(site)
+                            }
+                        }
+                    }
                 }
+                .disabled(!Self.hasChrome)
             }
             Text(Self.hasChrome
                  ? "Sites are blocked in Google Chrome: a blocked tab shows a \"Not now\" page. Other browsers are closed while sites are blocked, and macOS will ask to let Focus control Chrome."
@@ -262,11 +278,12 @@ struct GetStartedView: View {
 
     private var summary: String {
         let appNames = Self.installed.filter { apps.contains($0.id) }.map(\.app.name)
-        let siteNames = siteGroups.filter { sites.contains($0.name) }.map { $0.name.lowercased() }
+        let chosen = siteGroups.flatMap(\.sites).filter(sites.contains)
         // "a, b and c" in English: the UI isn't localized, so the system language mustn't leak in.
         let and = { (l: [String]) in l.count < 2 ? l.joined() : l.dropLast().joined(separator: ", ") + " and " + l.last! }
         let what = [appNames.isEmpty ? nil : "closes " + and(appNames),
-                    siteNames.isEmpty ? nil : "blocks " + and(siteNames) + " sites"]
+                    chosen.isEmpty ? nil : "blocks " + (chosen.count <= 3 ? and(chosen)
+                                                        : chosen.prefix(3).joined(separator: ", ") + " and \(chosen.count - 3) more sites")]
             .compactMap { $0 }
         return what.isEmpty ? "Nothing is blocked yet: add apps or sites above, or later in Activities."
                             : "During a session Focus " + what.joined(separator: " and ") + "."
@@ -304,7 +321,7 @@ struct GetStartedView: View {
 
     private func start() {
         guard canStart else { return }
-        let web = siteGroups.filter { sites.contains($0.name) }.flatMap(\.sites)
+        let web = siteGroups.flatMap(\.sites).filter(sites.contains)
         model.finishSetup(base: BlockRule(apps: Self.installed.filter { apps.contains($0.id) }.map(\.id), web: web))
         done()
     }
