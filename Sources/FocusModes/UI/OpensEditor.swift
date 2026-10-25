@@ -13,6 +13,8 @@ struct OpensEditor: View {
         let tint = ActivityStyle.of(activity).color
         return VStack(alignment: .leading, spacing: 8) {
             SectionLabel(text: "Opens")
+            Text("Apps and links to open when it starts, so you land straight in the work.")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
             HStack(spacing: 8) {
                 ForEach(c.apps, id: \.self) { path in
                     Image(nsImage: NSWorkspace.shared.icon(forFile: path))
@@ -52,11 +54,18 @@ struct OpensEditor: View {
             }
             .padding(.horizontal, 10).padding(.vertical, 7)
             .card(radius: 9)
-            Toggle(isOn: Binding(get: { activity.opens.maximize },
-                                 set: { v in model.updateOpens(id) { $0.maximize = v } })) {
-                Text("Stretch windows to fill the screen").font(.system(size: 12))
+            // Only means something once there's an app or link to open.
+            if !activity.opens.isEmpty {
+                Toggle(isOn: Binding(get: { activity.opens.maximize },
+                                     set: { v in model.updateOpens(id) { $0.maximize = v } })) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Open them full size").font(.system(size: 12))
+                        Text("Each window fills the screen, so only the work is in front of you. Needs Accessibility.")
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.switch).controlSize(.mini).tint(tint)
             }
-            .toggleStyle(.switch).controlSize(.mini).tint(tint)
         }
     }
 
