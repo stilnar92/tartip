@@ -1,8 +1,45 @@
-# Tartip
+<p align="center">
+  <img src="docs/icon.png" width="128" height="128" alt="Tartip icon: a tulip that is also a person">
+</p>
 
-*Tartip* is Tatar for "order, discipline" (тәртип).
+<h1 align="center">Tartip</h1>
+
+<p align="center"><b>Use it. Don't get used.</b></p>
+
+<p align="center"><i>Tartip</i> is Tatar for "order, discipline" (тәртип).</p>
 
 A small macOS menu bar app that **makes** you focus instead of waiting for you to decide to: deciding to start is the hard part, so the app does the pushing. It helps you **start** working and keeps you from drifting off. You pick what you'll work on; for a set time the app blocks the apps and sites that activity doesn't need, opens the ones it does, and afterwards asks what you actually did. Whenever nothing is running, it asks what's next, so the decision is always yours and always made.
+
+## Install
+
+You need macOS 13 or later (Apple silicon or Intel).
+
+**From the DMG:** open `Tartip.dmg`, drag Tartip into Applications, and open it from there. The app isn't signed by an identified developer, so the first time macOS refuses to open it. Go to System Settings → Privacy & Security, click **Open Anyway** next to Tartip, and confirm.
+
+**From source** (needs the Xcode Command Line Tools; the installer offers them if they're missing):
+
+```sh
+git clone <repo-url> tartip
+cd tartip
+./install.sh
+```
+
+Either way, Tartip starts at login and, if it's quit, comes back within seconds. macOS shows a "Background item added" notice for this; leave it on in System Settings → General → Login Items. Look for ◎ in the menu bar. macOS hides menu bar icons that don't fit, so ⌘-drag ◎ next to the clock to keep it visible.
+
+Then allow two things once:
+
+- **Accessibility** (System Settings → Privacy & Security → Accessibility → Tartip): needed to stretch opened windows to fill the screen.
+- **Chrome automation:** allow "Tartip" to control Google Chrome when asked. It's how links open (in a separate window that's closed when you switch activities) and how blocked sites are caught. If it's turned off, Chrome is quit while a block with sites is on.
+
+**Update:** drag the new version from the DMG over the old one, or run `git pull && ./install.sh`. Your settings and history are kept.
+
+**Uninstall:** `./install.sh --uninstall`. This removes the app and its auto-start. Without the source, run this in Terminal:
+
+```sh
+launchctl bootout gui/$UID/com.user.tartip; rm ~/Library/LaunchAgents/com.user.tartip.plist; rm -rf /Applications/Tartip.app
+```
+
+Your data in `~/modes` is kept either way.
 
 ## How a day works
 
@@ -17,14 +54,11 @@ A small macOS menu bar app that **makes** you focus instead of waiting for you t
    **Days.** An activity can be planned for certain weekdays only (e.g. Arabic on Mon, Wed, Fri; set in Activities → ⌄ → Days). On other days it isn't offered, can't be auto-started, and doesn't count toward "What's next?". With no days set it's every day; a day with nothing planned is a day off. A planned day can also have its own limit (Activities → ⌄ → "Different limit on some days", e.g. Work 4h but Sat 1h). "Your day" at the bottom of Activities shows any weekday's plan. The plan is only edited in Activities, never from "What's next?", so it can't become a way out.
    **Hours.** An activity can also have hours (e.g. Work 12:00–20:00). Outside them it's greyed out in the picker with "from 12:00".
 8. **Night.** From 00:00 to 08:00 the night block (`Focus_Mode`) is locked until morning. No prompts, no timers, and nothing can be started.
-
 9. **Settings lock** (Rules → Changing settings; off by default). So a plan made calmly can't be undone in a weak moment: **Lock after a change** keeps settings locked for 2 h … 1 week, starting 10 minutes after your first change; **Only at set hours** allows loosening only in a daily window (e.g. 21:00–21:30). While locked, anything stricter still works (more days, more apps or sites, less free time); anything looser is undone with a note saying why (removing an activity or a blocked site, fewer days, shorter hours, more free time, turning night or auto-start off, weakening the lock itself).
 
 All the numbers above are defaults. **Stats**, **Activities** (list, daily limits, hours, what each opens) and **Rules** (night, free time, session length) live in one window with a sidebar, opened from the panel's toolbar.
 
-## Setup
-
-### 1. Blocks
+## Blocks
 
 Blocks live in `~/modes/blocks.json`, by name; each activity locks the one named in Activities → ⌄ → Block it locks. `Focus_Mode` is the night block and the one "Other" uses. Edit them in **Activities → ⌄ → Blocks** (and **Rules → Night**), or in the file:
 
@@ -42,27 +76,9 @@ On first launch, **Start** on Get started fills every block that's still empty w
 
 Coming from Cold Turkey? `swift scripts/import-cold-turkey.swift` copies the blocks named like your activities (and `Focus_Mode`) into `blocks.json` once (`--force` replaces an existing file). Then turn those blocks off in Cold Turkey so they don't double up.
 
-### 2. Build and install
+## Your data
 
-```sh
-scripts/build.sh            # builds /Applications/Tartip.app and starts it
-NO_START=1 scripts/build.sh # build only
-```
-
-The build needs Xcode or its command-line tools (Swift 6). It:
-- builds the release binary with SwiftPM and wraps it into `/Applications/Tartip.app`
-- draws the icon (`scripts/make-icon.swift`)
-- signs the app with a local self-signed certificate "Tartip Local", created once in your login keychain, so macOS remembers permissions across rebuilds
-- installs the launch agent (`launchd/com.user.tartip.plist`): the app starts at login and comes back within seconds if it's quit
-
-### 3. Permissions (once)
-
-- **Accessibility** (System Settings → Privacy & Security → Accessibility → Tartip): needed to stretch opened windows to fill the screen.
-- **Chrome automation:** allow "Tartip" to control Google Chrome when asked. It's how links open (in a separate window that's closed when you switch activities) and how blocked sites are caught. If it's turned off, Chrome is quit while a block with sites is on.
-
-## Data
-
-Everything personal lives in `~/modes`, outside the repo:
+Everything personal lives in `~/modes`, outside the app:
 
 | File | What |
 |---|---|
@@ -72,22 +88,11 @@ Everything personal lives in `~/modes`, outside the repo:
 | `logs/sessions.jsonl` | one line per session: start, end, planned, actual, note |
 | `logs/modes.log` | event log: launches, blocks, quit apps, blocked sites, prompts, reviews |
 
-## Code
-
-`swift build` and `swift test` work from the repo root (Swift 6, macOS 13+); `scripts/build.sh` wraps the release build into the app.
-
-| Path | What |
-|---|---|
-| `Sources/Tartip/App/` | entry point and single-instance check, `Model` (state, timer, sessions, free time, night), `Clock`, `WindowCoordinator` (prompt and main windows) |
-| `Sources/Tartip/Domain/` | pure logic: `Session` and `AppPhase`, session records, daily `Limits`, `AppSettings` and night hours, `BlockRule` and its URL matching |
-| `Sources/Tartip/Services/` | `Blocker` (locks, quitting blocked apps, checking Chrome's tabs), workspace (apps and a Chrome window), saved state, settings file, history, log, notifications |
-| `Sources/Tartip/UI/` | Today list, panel, "What's next?"/review, main window (stats, activities, rules), theme |
-| `Tests/TartipTests/` | tests for the domain logic, URL matching and the saved-state migration |
-
 ## Known limits
 
 - Sites are blocked in **Google Chrome** only. Chrome's tabs are checked every 1.5 s, so a blocked page can show for a moment. Other browsers (Safari, Firefox, Arc, Edge, Brave, …) are quit while a block with sites is on.
 - Blocked apps are asked to quit, then force-quit after 3 s if they're still running.
 - A lock can be extended but never shortened.
-- macOS hides menu bar icons that don't fit. ⌘-drag ◎ next to the clock to keep it visible.
 - This is self-control, not security: anyone with admin rights can unload the launch agent or change the settings.
+
+Working on the code? See [DEVELOPMENT.md](DEVELOPMENT.md).
