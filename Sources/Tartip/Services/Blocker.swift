@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import ScriptingBridge
 
 // Locks blocks. A protocol, so the model doesn't depend on the real one.
 @MainActor
@@ -151,8 +152,8 @@ final class NativeBlocker: ObservableObject, Blocker {
     private func sweepWeb() {
         let act = active.filter { !$0.rule.web.isEmpty }
         guard !act.isEmpty, !webBusy,
-              let chrome = NSRunningApplication.runningApplications(withBundleIdentifier: chromeID).first,
-              chrome.isFinishedLaunching else { return }
+              NSRunningApplication.runningApplications(withBundleIdentifier: chromeID).contains(where: \.isFinishedLaunching)
+        else { return }
         webBusy = true
         scriptQueue.async { [weak self] in
             let denied = Self.redirectBlockedTabs(act)
@@ -160,43 +161,40 @@ final class NativeBlocker: ObservableObject, Blocker {
                 guard let self else { return }
                 self.webBusy = false
                 // Automation for Chrome is off, so its tabs can't be checked: Chrome goes instead.
-                if denied, let b = act.first,
-                   let chrome = NSRunningApplication.runningApplications(withBundleIdentifier: chromeID).first {
+                guard denied, let b = act.first else { return }
+                for chrome in NSRunningApplication.runningApplications(withBundleIdentifier: chromeID) {
                     self.quit(chrome, because: b, what: "Google Chrome (allow Tartip to control Chrome in Privacy & Security → Automation)")
                 }
             }
         }
     }
 
-    // Reads every tab's URL in one script and sends the blocked ones to the "Not now" page.
-    // Runs on scriptQueue. Returns true when macOS refused to let us control Chrome.
+    // Reads the tabs of every running Chrome and sends the blocked ones to the "Not now" page.
+    // Each Chrome is reached by its process: with more than one running (a test browser, say),
+    // `tell application id` talks to just one of them and the others go unchecked.
+    // One request per window for its URLs. Runs on scriptQueue.
+    // Returns true when macOS refused to let us control Chrome.
     private nonisolated static func redirectBlockedTabs(_ act: [ActiveBlock]) -> Bool {
-        var err: NSDictionary?
-        let res = NSAppleScript(source: """
-            tell application id "\(chromeID)" to return {id of every window, URL of every tab of every window}
-            """)?.executeAndReturnError(&err)
-        guard let res, err == nil else {
-            let code = err?[NSAppleScript.errorNumber] as? Int ?? 0
-            return code == -1743 || code == -10004    // not allowed / privilege violation
-        }
-        guard res.numberOfItems == 2, let ids = res.atIndex(1), let urls = res.atIndex(2) else { return false }
         let page = blockedPage.absoluteString
-        var fixes: [String] = []
-        for w in 0..<min(ids.numberOfItems, urls.numberOfItems) {
-            guard let winID = ids.atIndex(w + 1)?.stringValue, let tabs = urls.atIndex(w + 1) else { continue }
-            for t in 0..<tabs.numberOfItems {
-                guard let url = tabs.atIndex(t + 1)?.stringValue, !url.hasPrefix(page),
-                      let hit = act.first(where: { $0.rule.blocks(url: url) }) else { continue }
-                let target = blockedPageURL(url, block: hit.name, until: hit.until)
-                fixes.append("set URL of tab \(t + 1) of (first window whose id is \(appleString(winID))) to \(appleString(target))")
-                log("site  \(url.prefix(120)) (\(hit.name))")
+        var denied = false
+        for app in NSRunningApplication.runningApplications(withBundleIdentifier: chromeID) where app.isFinishedLaunching {
+            guard let chrome = SBApplication(processIdentifier: app.processIdentifier) else { continue }
+            let errors = ScriptErrors()
+            chrome.delegate = errors
+            for case let window as SBObject in (chrome.value(forKey: "windows") as? SBElementArray) ?? [] {
+                guard let tabs = window.value(forKey: "tabs") as? SBElementArray,
+                      let urls = tabs.value(forKey: "URL") as? [Any] else { continue }
+                for (i, u) in urls.enumerated() {
+                    guard let url = u as? String, !url.hasPrefix(page), i < tabs.count,
+                          let hit = act.first(where: { $0.rule.blocks(url: url) }) else { continue }
+                    (tabs.object(at: i) as? SBObject)?.setValue(blockedPageURL(url, block: hit.name, until: hit.until), forKey: "URL")
+                    log("site  \(url.prefix(120)) (\(hit.name))")
+                }
+                if errors.notAllowed { break }
             }
+            denied = denied || errors.notAllowed
         }
-        if !fixes.isEmpty {
-            NSAppleScript(source: "tell application id \"\(chromeID)\"\n" + fixes.joined(separator: "\n") + "\nend tell")?
-                .executeAndReturnError(nil)
-        }
-        return false
+        return denied
     }
 
     // blocked.html?block=Work&until=<unix time>&url=<the blocked URL>
@@ -239,4 +237,15 @@ private struct ActiveBlock: Sendable {
     let name: String
     let rule: BlockRule
     let until: Date
+}
+
+// Scripting Bridge reports failed Apple events here instead of throwing.
+private final class ScriptErrors: NSObject, SBApplicationDelegate {
+    var notAllowed = false
+
+    func eventDidFail(_ event: UnsafePointer<AppleEvent>, withError error: any Error) -> Any? {
+        let code = (error as NSError).code
+        if code == -1743 || code == -10004 { notAllowed = true }   // not allowed / privilege violation
+        return nil
+    }
 }
