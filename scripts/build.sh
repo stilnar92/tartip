@@ -1,21 +1,37 @@
 #!/bin/zsh
 # Builds /Applications/Tartip.app from Sources/ and (re)starts it under launchd.
 # NO_START=1 builds without starting it.
+# APP=path/Tartip.app builds there instead and leaves the installed copy alone (make-dmg.sh).
+# UNIVERSAL=1 builds for both Apple silicon and Intel.
 set -e
 cd "${0:A:h}/.."
 mkdir -p build
-APP="/Applications/Tartip.app"
+INSTALLED="/Applications/Tartip.app"
+APP="${APP:-$INSTALLED}"
+[ "$APP" = "$INSTALLED" ] || NO_START=1
 
 AGENT="$HOME/Library/LaunchAgents/com.user.tartip.plist"
 [ -f "$AGENT" ] || [ -n "$NO_START" ] || cp launchd/com.user.tartip.plist "$AGENT"
 
 # Compile first, so a failed build leaves the running copy alone.
-swift build -c release --product Tartip
-BIN="$(swift build -c release --show-bin-path)/Tartip"
+if [ -n "$UNIVERSAL" ]; then
+  for arch in arm64 x86_64; do
+    swift build -c release --product Tartip --triple $arch-apple-macosx13.0
+  done
+  BIN=build/Tartip-universal
+  lipo -create -output "$BIN" \
+    "$(swift build -c release --triple arm64-apple-macosx13.0 --show-bin-path)/Tartip" \
+    "$(swift build -c release --triple x86_64-apple-macosx13.0 --show-bin-path)/Tartip"
+else
+  swift build -c release --product Tartip
+  BIN="$(swift build -c release --show-bin-path)/Tartip"
+fi
 
-# Stop the running copy (and its auto-restart) while rebuilding.
-launchctl bootout "gui/$UID/com.user.tartip" 2>/dev/null || true
-pkill -x Tartip 2>/dev/null || true
+# Stop the running copy (and its auto-restart) while rebuilding it.
+if [ "$APP" = "$INSTALLED" ]; then
+  launchctl bootout "gui/$UID/com.user.tartip" 2>/dev/null || true
+  pkill -x Tartip 2>/dev/null || true
+fi
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
@@ -77,7 +93,9 @@ fi
 echo "Built: $APP"
 
 # Start it again under launchd: runs at login and restarts if quit.
-if [ -n "$NO_START" ]; then
+if [ "$APP" != "$INSTALLED" ]; then
+  :
+elif [ -n "$NO_START" ]; then
   echo "NO_START set, so the app was not started."
 elif [ -f "$AGENT" ]; then
   launchctl bootstrap "gui/$UID" "$AGENT"

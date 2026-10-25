@@ -16,6 +16,7 @@ final class AppRoot {
         Rename.carryOverState()  // before Setup: the old app's state says this isn't a new install
         Setup.resolve()          // first: everything after this writes files that would hide a new install
         enforceSingleInstance()
+        AutoStart.ensure()       // a copy opened by hand hands over to launchd, which closes it
         model = Model()
         windows = WindowCoordinator(model: model)
     }
