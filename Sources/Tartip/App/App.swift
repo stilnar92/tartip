@@ -71,6 +71,7 @@ struct TartipApp: App {
     var body: some Scene {
         MenuBarExtra {
             ContentView(model: model, clock: clock, openMain: AppRoot.shared.windows.openMain)
+                .noFocusRings()
         } label: {
             if model.session == nil && model.freeTimeEnd == nil && Settings.current.isNight(at: clock.now) {
                 Image(systemName: "moon.stars.fill")

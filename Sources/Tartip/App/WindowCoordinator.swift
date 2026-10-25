@@ -68,7 +68,7 @@ final class MainWindowController {
             window = w
         }
         guard let window else { return }
-        let host = NSHostingView(rootView: view.background(Theme.bg).environment(\.colorScheme, .light))
+        let host = NSHostingView(rootView: view.background(Theme.bg).environment(\.colorScheme, .light).noFocusRings())
         window.contentView = host
         window.setContentSize(host.fittingSize)
         window.center()
@@ -117,7 +117,7 @@ final class PromptWindow {
         guard let panel else { return }
         // Close the menu bar panel so it doesn't sit on top of the question.
         hideMenuPanel(except: panel)
-        let host = NSHostingView(rootView: view.background(Theme.bg).environment(\.colorScheme, .light))
+        let host = NSHostingView(rootView: view.background(Theme.bg).environment(\.colorScheme, .light).noFocusRings())
         panel.contentView = host
         panel.setContentSize(host.fittingSize)
         panel.center()
