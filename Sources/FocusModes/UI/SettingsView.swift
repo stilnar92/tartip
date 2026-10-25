@@ -32,6 +32,17 @@ struct SettingsView: View {
             lockBanner
             activitiesSection
         }
+        // On the page, not on the list: a modifier on ForEach is applied to every row.
+        .alert("Delete \(askDelete?.name ?? "")?", isPresented: Binding(get: { askDelete != nil }, set: { if !$0 { askDelete = nil } }),
+               presenting: askDelete) { a in
+            Button("Delete", role: .destructive) {
+                settings.value.activities.removeAll { $0.id == a.id }
+                log("ui    deleted activity \(a.name)")
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { a in
+            Text("Are you sure? \(a.name) leaves your list and today's plan. Past sessions stay in Stats, and its block stays in blocks.json.")
+        }
     }
 
     private var rulesPage: some View {
@@ -53,13 +64,6 @@ struct SettingsView: View {
         group("Your list", "Set a daily limit with the stepper; Edit for days, hours, what it blocks and opens.") {
             ForEach($settings.value.activities) { $a in
                 activityRow($a)
-            }
-            .alert("Delete \(askDelete?.name ?? "")?", isPresented: Binding(get: { askDelete != nil }, set: { if !$0 { askDelete = nil } }),
-                   presenting: askDelete) { a in
-                Button("Delete", role: .destructive) { settings.value.activities.removeAll { $0.id == a.id } }
-                Button("Cancel", role: .cancel) {}
-            } message: { a in
-                Text("It leaves your list and today's plan. Past sessions stay in Stats; its block stays in blocks.json.")
             }
             HStack(spacing: 6) {
                 TextField("New activity (locks the block with its name)", text: $newActivity)

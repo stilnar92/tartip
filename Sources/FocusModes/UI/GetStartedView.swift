@@ -18,6 +18,7 @@ struct GetStartedView: View {
     @State private var ownSites: [String] = []
     @State private var newSite = ""
     @State private var askStart = false     // the last look at what Start switches on
+    @State private var askRemove: ActivitySetting?
     @State private var newName = ""
     @State private var newIcon = "circle.fill"
 
@@ -38,6 +39,13 @@ struct GetStartedView: View {
             howItWorks
             section("1", "Your activities", "What do you want to spend focused time on? Add your own, or start from a template.") {
                 activities
+                    .alert("Remove \(askRemove?.name ?? "")?", isPresented: Binding(get: { askRemove != nil }, set: { if !$0 { askRemove = nil } }),
+                           presenting: askRemove) { a in
+                        Button("Remove", role: .destructive) { settings.value.activities.removeAll { $0.id == a.id } }
+                        Button("Cancel", role: .cancel) {}
+                    } message: { a in
+                        Text(removeAlertText(a))
+                    }
             }
             section("2", "What gets blocked", "While an activity runs, these apps are closed and these sites don't open.") {
                 blocking
@@ -118,7 +126,7 @@ struct GetStartedView: View {
                                 settings.updateActivity(a.id) { $0.icon = icon }
                             }
                             Text(a.name).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text)
-                            Button { settings.value.activities.removeAll { $0.id == a.id } } label: {
+                            Button { askRemove = a } label: {
                                 Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
                             }
                             .buttonStyle(.plain).foregroundStyle(Theme.text2)
@@ -155,6 +163,8 @@ struct GetStartedView: View {
             }
         }
     }
+
+    private func removeAlertText(_ a: ActivitySetting) -> String { "Are you sure? \(a.name) leaves your list; you can add it again." }
 
     private func addOwn() {
         let name = newName.trimmingCharacters(in: .whitespaces)
