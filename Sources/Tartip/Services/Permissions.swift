@@ -16,6 +16,7 @@ final class Permissions: ObservableObject {
     @Published private(set) var notifications: Access = .notAsked
     @Published private(set) var accessibility: Access = .notAsked
     @Published private(set) var askingChrome = false
+    private var checkingChrome = false   // one check at a time, so a slow one can't pile up threads
 
     private var activeSub: NSObjectProtocol?
 
@@ -30,9 +31,13 @@ final class Permissions: ObservableObject {
 
     func refresh() {
         accessibility = AXIsProcessTrusted() ? .granted : .notAsked
-        Task { [weak self] in
-            let status = await Task.detached { chromeAutomation(ask: false) }.value
-            self?.chrome = status
+        if !checkingChrome && !askingChrome {
+            checkingChrome = true
+            Task { [weak self] in
+                let status = await Task.detached { chromeAutomation(ask: false) }.value
+                self?.chrome = status
+                self?.checkingChrome = false
+            }
         }
         guard Bundle.main.bundleIdentifier != nil else { return }
         UNUserNotificationCenter.current().getNotificationSettings { settings in
@@ -94,10 +99,13 @@ final class Permissions: ObservableObject {
 
 // Whether this app may send Apple events to Chrome. With ask, macOS shows its prompt the first
 // time and the call waits for the answer, so never call it on the main thread.
+// Aimed at one Chrome process, not the bundle id: with more than one Chrome running (a test
+// browser, say) a bundle-id check never returns. The permission is per app, so any one will do.
 nonisolated func chromeAutomation(ask: Bool) -> Access {
+    guard var pid = NSRunningApplication.runningApplications(withBundleIdentifier: chromeID).first?.processIdentifier
+    else { return .chromeNotRunning }
     var target = AEAddressDesc()
-    let created = chromeID.withCString { AECreateDesc(typeApplicationBundleID, $0, strlen($0), &target) }
-    guard created == noErr else { return .notAsked }
+    guard AECreateDesc(typeKernelProcessID, &pid, MemoryLayout<pid_t>.size, &target) == noErr else { return .notAsked }
     defer { AEDisposeDesc(&target) }
     switch AEDeterminePermissionToAutomateTarget(&target, typeWildCard, typeWildCard, ask) {
     case noErr: return .granted
