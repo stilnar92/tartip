@@ -27,6 +27,25 @@ func limitLabel(_ minutes: Int) -> String { minutes == 0 ? "No limit" : minutesL
 
 func formatDuration(_ secs: Int) -> String { minutesLabel(secs / 60) }
 
+// Weekdays in the order they're shown (Monday first), with Calendar's numbers (1 = Sunday).
+let weekOrder = [2, 3, 4, 5, 6, 7, 1]
+let weekdayShort = [1: "Sun", 2: "Mon", 3: "Tue", 4: "Wed", 5: "Thu", 6: "Fri", 7: "Sat"]
+
+// "Every day", "Weekdays", "Weekends", "Mon–Thu", "Mon, Wed, Fri".
+func daysLabel(_ days: [Int]) -> String {
+    let set = Set(days)
+    if set.isEmpty || set.count == 7 { return "Every day" }
+    if set == [2, 3, 4, 5, 6] { return "Weekdays" }
+    if set == [1, 7] { return "Weekends" }
+    let ordered = weekOrder.filter(set.contains)
+    // A run of 3+ days in a row reads better as a range.
+    if ordered.count >= 3, let first = weekOrder.firstIndex(of: ordered[0]),
+       weekOrder[first..<min(first + ordered.count, 7)].elementsEqual(ordered) {
+        return "\(weekdayShort[ordered.first!]!)–\(weekdayShort[ordered.last!]!)"
+    }
+    return ordered.compactMap { weekdayShort[$0] }.joined(separator: ", ")
+}
+
 // "4:05" until `end`.
 func countdown(to end: Date, from now: Date) -> String {
     let sec = max(0, Int(end.timeIntervalSince(now)))

@@ -41,7 +41,10 @@ struct Limits {
         return "from \(clockLabel(from))"
     }
 
-    func canStart(_ activity: String) -> Bool { isOpen(activity) && hasTimeLeft(activity) }
+    // Planned for today's weekday (activities without days are planned every day).
+    func isToday(_ activity: String) -> Bool { setting(activity)?.isPlanned(on: now, calendar: calendar) ?? true }
+
+    func canStart(_ activity: String) -> Bool { isToday(activity) && isOpen(activity) && hasTimeLeft(activity) }
 
     // What auto-start picks when "What's next?" goes unanswered: of the activities that can
     // start now, the one furthest behind its daily limit (most time left), then ones without

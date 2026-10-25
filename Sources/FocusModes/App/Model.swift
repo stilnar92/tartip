@@ -57,6 +57,8 @@ final class Model: ObservableObject {
     var freeTimeEnd: Date? { phase.freeTimeEnd }
     var restTaken: Bool { state.restTaken }
     var activities: [String] { Settings.current.activities.map(\.name).filter { !$0.isEmpty } }
+    // The ones planned for today's weekday: what the Today list and "What's next?" offer.
+    var todayActivities: [String] { activities.filter(limits.isToday) }
 
     // Length for the next start, kept across restarts.
     var minutes: Int {
@@ -147,7 +149,7 @@ final class Model: ObservableObject {
         guard phase == .picking, Settings.current.autoStartAfterMinutes > 0, let since = state.pickingSince else { return nil }
         return since.addingTimeInterval(Double(Settings.current.autoStartAfterMinutes * 60))
     }
-    var autoStartActivity: String? { limits.autoPick(from: activities) }
+    var autoStartActivity: String? { limits.autoPick(from: todayActivities) }
 
     // "What's next?" went unanswered: start an activity for the auto-start length.
     // The length chosen in the panel isn't changed.
@@ -277,7 +279,8 @@ final class Model: ObservableObject {
         case .idle:
             // Nothing running and it's not night: you always decide what's next, right away.
             // The picker can't be closed; nothing is blocked until you pick.
-            guard !night, !Setup.isPending, !activities.isEmpty, userPresent() else { return }
+            // A day with nothing planned is a day off: nothing is pushed.
+            guard !night, !Setup.isPending, !todayActivities.isEmpty, userPresent() else { return }
             // Day done: every limit reached and no free time to offer, so there's nothing to choose.
             let limits = limits
             guard activities.contains(where: limits.canStart) || canRest else { return }

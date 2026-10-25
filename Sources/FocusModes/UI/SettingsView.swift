@@ -42,7 +42,7 @@ struct SettingsView: View {
     // MARK: sections
 
     private var activitiesSection: some View {
-        group("Your list", "Set a daily limit with the stepper; tap ⌄ for hours and what it opens.") {
+        group("Your list", "Set a daily limit with the stepper; tap ⌄ for days, hours and what it opens.") {
             ForEach($settings.value.activities) { $a in
                 activityRow($a)
             }
@@ -67,6 +67,9 @@ struct SettingsView: View {
             HStack(spacing: 8) {
                 Image(systemName: st.icon).foregroundStyle(st.color).frame(width: 18)
                 TextField("Name", text: a.name).textFieldStyle(.plain).font(.system(size: 13))
+                if !item.days.isEmpty {
+                    Text(daysLabel(item.days)).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
                 if let from = item.fromMinute, let to = item.toMinute {
                     Text("\(clockLabel(from))–\(clockLabel(to))")
                         .font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
@@ -83,7 +86,7 @@ struct SettingsView: View {
                     Image(systemName: open ? "chevron.up" : "chevron.down").font(.system(size: 11, weight: .semibold))
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
-                .help("Hours, block, look and what it opens")
+                .help("Days, hours, block, look and what it opens")
                 Button { settings.value.activities.removeAll { $0.id == item.id } } label: {
                     Image(systemName: "trash").font(.system(size: 11))
                 }
@@ -91,6 +94,9 @@ struct SettingsView: View {
             }
             if open {
                 VStack(alignment: .leading, spacing: 8) {
+                    SectionLabel(text: "Days")
+                    dayPicker(a.days)
+                    Divider()
                     SectionLabel(text: "Hours")
                     Toggle("Any time", isOn: Binding(
                         get: { a.wrappedValue.fromMinute == nil || a.wrappedValue.toMinute == nil },
@@ -259,6 +265,28 @@ struct SettingsView: View {
             Text(clockLabel(value.wrappedValue)).monospacedDigit()
             Stepper("", onIncrement: { value.wrappedValue = (value.wrappedValue + 30) % 1440 },
                         onDecrement: { value.wrappedValue = (value.wrappedValue + 1410) % 1440 }).labelsHidden()
+        }
+    }
+
+    // Mon…Sun toggles. No days set means every day, shown as all seven on; switching
+    // one off plans it for the rest. At least one day stays on.
+    private func dayPicker(_ days: Binding<[Int]>) -> some View {
+        let on = days.wrappedValue.isEmpty ? Set(weekOrder) : Set(days.wrappedValue)
+        return HStack(spacing: 4) {
+            ForEach(weekOrder, id: \.self) { d in
+                Button {
+                    var next = on
+                    if next.contains(d) { if next.count > 1 { next.remove(d) } } else { next.insert(d) }
+                    days.wrappedValue = next.count == 7 ? [] : weekOrder.filter(next.contains)
+                } label: {
+                    Text(weekdayShort[d] ?? "").font(.system(size: 11, weight: on.contains(d) ? .semibold : .regular))
+                        .frame(width: 34).padding(.vertical, 4)
+                        .pill(selected: on.contains(d))
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+            Text(daysLabel(days.wrappedValue)).font(.system(size: 11)).foregroundStyle(.secondary)
         }
     }
 

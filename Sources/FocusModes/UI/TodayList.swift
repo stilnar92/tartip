@@ -11,17 +11,23 @@ struct TodayList: View {
         let limits = model.limits
         return VStack(alignment: .leading, spacing: 12) {
             lengthBar
-            VStack(spacing: 0) {
-                let names = model.activities
-                ForEach(Array(names.enumerated()), id: \.element) { i, a in
-                    row(a, limits)
-                    if i < names.count - 1 { Divider().opacity(0.4).padding(.leading, 44) }
-                }
+            let names = model.todayActivities
+            if names.isEmpty && !model.activities.isEmpty {
+                Label("Nothing planned for today", systemImage: "calendar")
+                    .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text2)
             }
-            .padding(.vertical, 4)
-            .card(radius: 14)
+            if !names.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(Array(names.enumerated()), id: \.element) { i, a in
+                        row(a, limits)
+                        if i < names.count - 1 { Divider().opacity(0.4).padding(.leading, 44) }
+                    }
+                }
+                .padding(.vertical, 4)
+                .card(radius: 14)
+            }
 
-            if !model.activities.contains(where: limits.hasTimeLeft) {
+            if !names.isEmpty && !names.contains(where: limits.hasTimeLeft) {
                 Label("All daily goals done 🎉", systemImage: "checkmark.seal.fill")
                     .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.accent)
             }
