@@ -65,8 +65,16 @@ final class NativeBlocker: ObservableObject, Blocker {
         let old = rule(name)
         var r = old
         change(&r)
-        if isLocked(name) { r = old.stricter(r) }
+        if isLocked(name) || Settings.shared.lockedUntil != nil {
+            let wanted = r
+            r = old.stricter(r)
+            if r != wanted, let until = Settings.shared.lockedUntil ?? locks[name] {
+                Settings.shared.refuse("Locked until \(Fmt.weekdayClock.string(from: until)): \(name) can only get stricter.")
+            }
+        }
+        guard r != old else { return }
         rules[name] = r
+        Settings.shared.noteChange()
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         do { try enc.encode(rules).write(to: blockRulesFile) } catch { log("error: couldn't save \(blockRulesFile.path): \(error)") }

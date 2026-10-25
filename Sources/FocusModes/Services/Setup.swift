@@ -15,7 +15,7 @@ enum Setup {
         let existing = evidence.contains { FileManager.default.fileExists(atPath: $0.path) }
             || d.object(forKey: "state") != nil || d.object(forKey: "session") != nil
         d.set(existing ? "done" : "pending", forKey: key)
-        log("setup \(existing ? "not needed (existing install)" : "pending (new install)")")
+        if d === UserDefaults.standard { log("setup \(existing ? "not needed (existing install)" : "pending (new install)")") }
     }
 
     static func isPending(_ d: UserDefaults) -> Bool { d.string(forKey: key) == "pending" }
@@ -23,6 +23,6 @@ enum Setup {
 
     static func markDone(_ d: UserDefaults = .standard) {
         d.set("done", forKey: key)
-        log("setup done")
+        if d === UserDefaults.standard { log("setup done") }   // tests use their own defaults; keep them out of the log
     }
 }

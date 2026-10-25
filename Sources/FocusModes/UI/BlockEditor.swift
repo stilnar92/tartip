@@ -11,7 +11,8 @@ struct BlockEditor: View {
 
     var body: some View {
         let r = blocker.rule(block)
-        let locked = blocker.isLocked(block)
+        // A running block, or the settings lock: either way it can only get stricter.
+        let locked = blocker.isLocked(block) || Settings.shared.lockedUntil != nil
         let tint = ActivityStyle.of(block).color
         return VStack(alignment: .leading, spacing: 8) {
             HStack {

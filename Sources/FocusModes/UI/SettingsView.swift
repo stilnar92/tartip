@@ -26,16 +26,19 @@ struct SettingsView: View {
     private var activitiesPage: some View {
         VStack(alignment: .leading, spacing: 18) {
             PageTitle(title: "Activities", subtitle: "Each one locks a block while it runs: the one with its name, unless you pick another.")
+            lockBanner
             activitiesSection
         }
     }
 
     private var rulesPage: some View {
         VStack(alignment: .leading, spacing: 22) {
-            PageTitle(title: "Rules", subtitle: "Night, free time and session length.")
+            PageTitle(title: "Rules", subtitle: "Night, free time, session length, and when settings may change.")
+            lockBanner
             nightSection
             freeTimeSection
             durationSection
+            lockSection
             Text("Saved automatically to ~/modes/settings.json")
                 .font(.system(size: 11)).foregroundStyle(.tertiary)
         }
@@ -182,6 +185,61 @@ struct SettingsView: View {
                     Text("\(settings.value.pomodoroRounds)").monospacedDigit()
                     Stepper("", value: $settings.value.pomodoroRounds, in: 1...8).labelsHidden()
                 }
+            }
+        }
+    }
+
+    // MARK: settings lock
+
+    // Where the lock stands, and why the last change was undone. Re-checked every 30 s,
+    // since the lock starts and ends with the clock, not with an edit.
+    private var lockBanner: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { _ in
+            VStack(alignment: .leading, spacing: 6) {
+                if let until = settings.lockedUntil {
+                    Label("Locked until \(Fmt.weekdayClock.string(from: until)). You can make things stricter, not looser.",
+                          systemImage: "lock.fill")
+                        .foregroundStyle(Theme.text)
+                } else if let at = settings.locksAt {
+                    Label("Settings lock at \(Fmt.clock.string(from: at)): finish your changes before then.", systemImage: "lock.open.fill")
+                        .foregroundStyle(Theme.text)
+                }
+                if let why = settings.refused {
+                    Label(why, systemImage: "hand.raised.fill").foregroundStyle(.orange)
+                }
+            }
+            .font(.system(size: 12))
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var lockSection: some View {
+        let lock = $settings.value.lock
+        return group("Changing settings",
+                     "So a plan made calmly can't be undone in a weak moment. While locked, anything that makes things stricter still works.") {
+            HStack(spacing: 6) {
+                choicePill("Any time", lock.wrappedValue.mode == .off) { lock.wrappedValue.mode = .off }
+                choicePill("Lock after a change", lock.wrappedValue.mode == .afterChange) { lock.wrappedValue.mode = .afterChange }
+                choicePill("Only at set hours", lock.wrappedValue.mode == .hours) { lock.wrappedValue.mode = .hours }
+            }
+            switch lock.wrappedValue.mode {
+            case .off:
+                EmptyView()
+            case .afterChange:
+                HStack(spacing: 6) {
+                    Text("Locked for").font(.system(size: 13))
+                    ForEach([2, 6, 12, 24, 48, 168], id: \.self) { h in
+                        choicePill(h < 24 ? "\(h)h" : h == 24 ? "1 day" : h == 168 ? "1 week" : "\(h / 24) days",
+                                   lock.wrappedValue.hours == h) { lock.wrappedValue.hours = h }
+                    }
+                }
+                Text("Starts 10 minutes after your first change, so you can finish what you're doing.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+            case .hours:
+                row("Settings can be loosened from") { clockStepper(lock.from) }
+                row("Until") { clockStepper(lock.to) }
+                Text("Outside these hours you can only make things stricter.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
             }
         }
     }

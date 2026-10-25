@@ -104,6 +104,9 @@ struct AppSettings: Codable, Equatable {
     // Workspace
     var otherBlock = "Focus_Mode"         // block for "Other"
 
+    // Settings lock (off by default): when settings may be loosened.
+    var lock = LockSettings()
+
     // Empty for a new install: first-run setup has the user build the list.
     var activities: [ActivitySetting] = []
 }

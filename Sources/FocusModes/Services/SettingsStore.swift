@@ -5,7 +5,50 @@ import Combine
 final class Settings: ObservableObject {
     static let shared = Settings()
 
-    @Published var value: AppSettings { didSet { if value != oldValue { save() } } }
+    @Published var value: AppSettings {
+        didSet {
+            guard value != oldValue else { return }
+            // Locked: a looser change is undone right here, so no screen has to know the rules.
+            if let until = lockedUntil, case let why = loosenings(from: oldValue, to: value), !why.isEmpty {
+                value = oldValue
+                refuse("Locked until \(Fmt.weekdayClock.string(from: until)): no " + why.joined(separator: ", ") + ".")
+                return
+            }
+            if value.lock.mode != oldValue.lock.mode { changedAt = Date() } else { noteChange() }
+            save()
+        }
+    }
+
+    // Why the last change was undone, shown for a few seconds.
+    @Published private(set) var refused: String?
+
+    // Start of the current round of changes, for the "after a change" lock.
+    private var changedAt: Date? {
+        get { UserDefaults.standard.object(forKey: "settingsChangedAt") as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: "settingsChangedAt") }
+    }
+
+    // Until when looser changes are refused; nil = not locked (never during first-run setup).
+    var lockedUntil: Date? {
+        Setup.isPending ? nil : value.lock.lockedUntil(now: Date(), changedAt: changedAt)
+    }
+
+    // "Settings lock at 14:32": the grace after a change, while it's still open.
+    var locksAt: Date? { value.lock.locksAt(changedAt: changedAt, now: Date()) }
+
+    // Any change, here or to blocks.json, can start the "after a change" lock.
+    func noteChange() {
+        if value.lock.newRound(now: Date(), changedAt: changedAt) { changedAt = Date() }
+    }
+
+    func refuse(_ message: String) {
+        refused = message
+        log("lock  refused: \(message)")
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(8))
+            if self?.refused == message { self?.refused = nil }
+        }
+    }
 
     // The current settings.
     static var current: AppSettings { shared.value }
