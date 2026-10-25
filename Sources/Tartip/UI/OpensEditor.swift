@@ -13,7 +13,7 @@ struct OpensEditor: View {
         let tint = ActivityStyle.of(activity).color
         return VStack(alignment: .leading, spacing: 8) {
             SectionLabel(text: "Opens")
-            Text("Apps and links to open when it starts, so you land straight in the work.")
+            Text("Apps, links, files and folders to open when it starts, so you land straight in the work.")
                 .font(.system(size: 11)).foregroundStyle(.secondary)
             HStack(spacing: 8) {
                 ForEach(c.apps, id: \.self) { path in
@@ -46,6 +46,24 @@ struct OpensEditor: View {
                 }
                 .font(.system(size: 12))
             }
+            ForEach(c.files, id: \.self) { path in
+                HStack(spacing: 8) {
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: path))
+                        .resizable().frame(width: 16, height: 16)
+                    Text(URL(fileURLWithPath: path).lastPathComponent)
+                        .lineLimit(1).truncationMode(.middle)
+                        .help(path)
+                    if !FileManager.default.fileExists(atPath: path) {
+                        Text("missing").foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button { model.updateOpens(id) { $0.files.removeAll { $0 == path } } } label: {
+                        Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                    }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                }
+                .font(.system(size: 12))
+            }
             HStack(spacing: 6) {
                 Image(systemName: "link").foregroundStyle(.secondary)
                 TextField("Paste a link and press Enter", text: $newLink)
@@ -54,6 +72,10 @@ struct OpensEditor: View {
             }
             .padding(.horizontal, 10).padding(.vertical, 7)
             .card(radius: 9)
+            Button { model.chooseFiles(for: id) } label: {
+                Label("Add a file or folder", systemImage: "folder.badge.plus").font(.system(size: 12))
+            }
+            .buttonStyle(.plain).foregroundStyle(.secondary)
             // Only means something once there's an app or link to open.
             if !activity.opens.isEmpty {
                 Toggle(isOn: Binding(get: { activity.opens.maximize },

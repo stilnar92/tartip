@@ -190,6 +190,12 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(s.activities.first?.dailyMinutes == 60)
     }
 
+    @Test func opensWithoutFilesLoadsWithNone() throws {
+        let json = #"{"activities": [{"id": "6F9619FF-8B86-D011-B42D-00CF4FC964FF", "name": "Work", "opens": {"apps": ["/Applications/Xcode.app"], "urls": [], "maximize": false}}]}"#
+        let s = try #require(AppSettings.merged(over: Data(json.utf8)))
+        #expect(s.activities.first?.opens == ModeConfig(apps: ["/Applications/Xcode.app"], maximize: false))
+    }
+
     @Test func renamingKeepsTheBlock() {
         var s = AppSettings()
         s.activities = [ActivitySetting(name: "Arabic")]

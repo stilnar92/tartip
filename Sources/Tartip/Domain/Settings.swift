@@ -62,20 +62,22 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
 struct ModeConfig: Codable, Hashable, Sendable {
     var apps: [String] = []        // .app paths
     var urls: [String] = []
+    var files: [String] = []       // files and folders, opened in their default app (folders in Finder)
     var maximize: Bool = true      // stretch windows to fill the screen
 
-    init(apps: [String] = [], urls: [String] = [], maximize: Bool = true) {
-        self.apps = apps; self.urls = urls; self.maximize = maximize
+    init(apps: [String] = [], urls: [String] = [], files: [String] = [], maximize: Bool = true) {
+        self.apps = apps; self.urls = urls; self.files = files; self.maximize = maximize
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         apps = try c.decodeIfPresent([String].self, forKey: .apps) ?? []
         urls = try c.decodeIfPresent([String].self, forKey: .urls) ?? []
+        files = try c.decodeIfPresent([String].self, forKey: .files) ?? []
         maximize = try c.decodeIfPresent(Bool.self, forKey: .maximize) ?? true
     }
 
-    var isEmpty: Bool { apps.isEmpty && urls.isEmpty }
+    var isEmpty: Bool { apps.isEmpty && urls.isEmpty && files.isEmpty }
 }
 
 struct AppSettings: Codable, Equatable {

@@ -114,6 +114,12 @@ func openWorkspace(mode: String, _ c: ModeConfig, extraURLs: [String],
             }
         }
 
+        // Left open on the next start: the app they open in may be holding other work.
+        for path in c.files {
+            guard FileManager.default.fileExists(atPath: path) else { log("open  missing \(path)"); continue }
+            NSWorkspace.shared.open(URL(fileURLWithPath: path))
+        }
+
         let links = (c.urls + extraURLs).map { $0.contains("://") ? $0 : "https://" + $0 }
         var chromeWindow: Int?
         if !links.isEmpty {

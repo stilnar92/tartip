@@ -97,7 +97,7 @@ final class Model: ObservableObject {
     // MARK: first-run setup
 
     // "Start" on Get started: the picked apps and sites go into every block that has nothing
-    // yet (activities, night, "Other"); blocks imported before (e.g. from Cold Turkey) are kept.
+    // yet (activities, night, "Other"); blocks that already have rules are kept.
     // From the next tick on, "What's next?" and the night lock work as usual.
     func finishSetup(base: BlockRule) {
         let rules = NativeBlocker.shared
@@ -129,6 +129,22 @@ final class Model: ObservableObject {
             let paths = panel.urls.map(\.path)
             self?.updateOpens(activity) { c in
                 for p in paths where !c.apps.contains(p) { c.apps.append(p) }
+            }
+        }
+    }
+
+    func chooseFiles(for activity: UUID) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Add"
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { [weak self] response in
+            guard response == .OK else { return }
+            let paths = panel.urls.map(\.path)
+            self?.updateOpens(activity) { c in
+                for p in paths where !c.files.contains(p) { c.files.append(p) }
             }
         }
     }
@@ -300,7 +316,7 @@ final class Model: ObservableObject {
         blocker.lock(Settings.current.nightBlock, until: end)
         state.nightUntil = end
         log("night \(Settings.current.nightBlock) until \(clockLabel(Settings.current.nightTo))")
-        notify("Night mode", "\(Settings.current.nightBlock) is on until \(clockLabel(Settings.current.nightTo)). Time to sleep 🌙")
+        notify("Night mode", "It's on until \(clockLabel(Settings.current.nightTo)). Time to sleep 🌙")
     }
 
     // MARK: display
