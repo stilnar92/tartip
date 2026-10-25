@@ -1,11 +1,11 @@
 import Foundation
 import Testing
-@testable import FocusModes
+@testable import Tartip
 
 @Suite struct SetupTests {
     // A fresh defaults domain and an empty folder, both removed afterwards.
     private func sandbox(_ body: (UserDefaults, URL) throws -> Void) throws {
-        let name = "FocusModesTests.\(UUID().uuidString)"
+        let name = "TartipTests.\(UUID().uuidString)"
         let d = try #require(UserDefaults(suiteName: name))
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(name)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

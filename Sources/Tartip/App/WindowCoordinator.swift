@@ -51,7 +51,7 @@ final class WindowCoordinator {
 @MainActor
 final class MainWindowController {
     private var window: NSWindow?
-    private let title = "Focus"
+    private let title = "Tartip"
 
     var isVisible: Bool { window?.isVisible == true }
     func close() { window?.close() }

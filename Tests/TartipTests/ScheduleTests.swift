@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import FocusModes
+@testable import Tartip
 
 // 2026-03-02 is a Monday; UTC so the weekday doesn't depend on the machine.
 private let cal: Calendar = {

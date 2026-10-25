@@ -47,7 +47,7 @@ final class Permissions: ObservableObject {
         }
     }
 
-    // Shows macOS's own "allow Focus Modes to control Google Chrome?" prompt, opening Chrome
+    // Shows macOS's own "allow Tartip to control Google Chrome?" prompt, opening Chrome
     // first if needed (the button says so). Runs off the main thread: the call waits for the answer.
     func askChrome() {
         guard !askingChrome else { return }

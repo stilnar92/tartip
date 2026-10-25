@@ -51,7 +51,7 @@ struct MainView: View {
                 Image(systemName: "scope").font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
                     .frame(width: 24, height: 24)
                     .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Theme.accent))
-                Text("Focus").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.text)
+                Text("Tartip").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.text)
             }
             .padding(.horizontal, 10).padding(.top, 30).padding(.bottom, 14)
             ForEach(MainTab.shown, id: \.self) { t in

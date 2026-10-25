@@ -1,4 +1,6 @@
-# Focus Modes
+# Tartip
+
+*Tartip* is Tatar for "order, discipline" (тәртип).
 
 A small macOS menu bar app that **makes** you focus instead of waiting for you to decide to: deciding to start is the hard part, so the app does the pushing. It helps you **start** working and keeps you from drifting off. You pick what you'll work on; for a set time the app blocks the apps and sites that activity doesn't need, opens the ones it does, and afterwards asks what you actually did. Whenever nothing is running, it asks what's next, so the decision is always yours and always made.
 
@@ -43,20 +45,20 @@ Coming from Cold Turkey? `swift scripts/import-cold-turkey.swift` copies the blo
 ### 2. Build and install
 
 ```sh
-scripts/build.sh            # builds /Applications/Focus Modes.app and starts it
+scripts/build.sh            # builds /Applications/Tartip.app and starts it
 NO_START=1 scripts/build.sh # build only
 ```
 
 The build needs Xcode or its command-line tools (Swift 6). It:
-- builds the release binary with SwiftPM and wraps it into `/Applications/Focus Modes.app`
+- builds the release binary with SwiftPM and wraps it into `/Applications/Tartip.app`
 - draws the icon (`scripts/make-icon.swift`)
-- signs the app with a local self-signed certificate "FocusModes Local", created once in your login keychain, so macOS remembers permissions across rebuilds
-- installs the launch agent (`launchd/com.user.focusmodes.plist`): the app starts at login and comes back within seconds if it's quit
+- signs the app with a local self-signed certificate "Tartip Local", created once in your login keychain, so macOS remembers permissions across rebuilds
+- installs the launch agent (`launchd/com.user.tartip.plist`): the app starts at login and comes back within seconds if it's quit
 
 ### 3. Permissions (once)
 
-- **Accessibility** (System Settings → Privacy & Security → Accessibility → Focus Modes): needed to stretch opened windows to fill the screen.
-- **Chrome automation:** allow "Focus Modes" to control Google Chrome when asked. It's how links open (in a separate window that's closed when you switch activities) and how blocked sites are caught. If it's turned off, Chrome is quit while a block with sites is on.
+- **Accessibility** (System Settings → Privacy & Security → Accessibility → Tartip): needed to stretch opened windows to fill the screen.
+- **Chrome automation:** allow "Tartip" to control Google Chrome when asked. It's how links open (in a separate window that's closed when you switch activities) and how blocked sites are caught. If it's turned off, Chrome is quit while a block with sites is on.
 
 ## Data
 
@@ -76,11 +78,11 @@ Everything personal lives in `~/modes`, outside the repo:
 
 | Path | What |
 |---|---|
-| `Sources/FocusModes/App/` | entry point and single-instance check, `Model` (state, timer, sessions, free time, night), `Clock`, `WindowCoordinator` (prompt and main windows) |
-| `Sources/FocusModes/Domain/` | pure logic: `Session` and `AppPhase`, session records, daily `Limits`, `AppSettings` and night hours, `BlockRule` and its URL matching |
-| `Sources/FocusModes/Services/` | `Blocker` (locks, quitting blocked apps, checking Chrome's tabs), workspace (apps and a Chrome window), saved state, settings file, history, log, notifications |
-| `Sources/FocusModes/UI/` | Today list, panel, "What's next?"/review, main window (stats, activities, rules), theme |
-| `Tests/FocusModesTests/` | tests for the domain logic, URL matching and the saved-state migration |
+| `Sources/Tartip/App/` | entry point and single-instance check, `Model` (state, timer, sessions, free time, night), `Clock`, `WindowCoordinator` (prompt and main windows) |
+| `Sources/Tartip/Domain/` | pure logic: `Session` and `AppPhase`, session records, daily `Limits`, `AppSettings` and night hours, `BlockRule` and its URL matching |
+| `Sources/Tartip/Services/` | `Blocker` (locks, quitting blocked apps, checking Chrome's tabs), workspace (apps and a Chrome window), saved state, settings file, history, log, notifications |
+| `Sources/Tartip/UI/` | Today list, panel, "What's next?"/review, main window (stats, activities, rules), theme |
+| `Tests/TartipTests/` | tests for the domain logic, URL matching and the saved-state migration |
 
 ## Known limits
 

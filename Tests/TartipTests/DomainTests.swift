@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import FocusModes
+@testable import Tartip
 
 // Dates in a fixed calendar, so the tests don't depend on the machine's time zone.
 private let cal: Calendar = {
@@ -162,7 +162,7 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
     }
 
     @Test func migratesTheOldKeys() throws {
-        let name = "FocusModesTests.\(UUID().uuidString)"
+        let name = "TartipTests.\(UUID().uuidString)"
         let d = try #require(UserDefaults(suiteName: name))
         defer { d.removePersistentDomain(forName: name) }
         let session = Session(block: "Work", phases: [Phase(isBreak: false, minutes: 30)], start: at(10), planned: "Work")

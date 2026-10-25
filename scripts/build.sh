@@ -1,40 +1,40 @@
 #!/bin/zsh
-# Builds /Applications/Focus Modes.app from Sources/ and (re)starts it under launchd.
+# Builds /Applications/Tartip.app from Sources/ and (re)starts it under launchd.
 # NO_START=1 builds without starting it.
 set -e
 cd "${0:A:h}/.."
 mkdir -p build
-APP="/Applications/Focus Modes.app"
+APP="/Applications/Tartip.app"
 
-AGENT="$HOME/Library/LaunchAgents/com.user.focusmodes.plist"
-[ -f "$AGENT" ] || [ -n "$NO_START" ] || cp launchd/com.user.focusmodes.plist "$AGENT"
+AGENT="$HOME/Library/LaunchAgents/com.user.tartip.plist"
+[ -f "$AGENT" ] || [ -n "$NO_START" ] || cp launchd/com.user.tartip.plist "$AGENT"
 
 # Compile first, so a failed build leaves the running copy alone.
-swift build -c release --product FocusModes
-BIN="$(swift build -c release --show-bin-path)/FocusModes"
+swift build -c release --product Tartip
+BIN="$(swift build -c release --show-bin-path)/Tartip"
 
 # Stop the running copy (and its auto-restart) while rebuilding.
-launchctl bootout "gui/$UID/com.user.focusmodes" 2>/dev/null || true
-pkill -x FocusModes 2>/dev/null || true
+launchctl bootout "gui/$UID/com.user.tartip" 2>/dev/null || true
+pkill -x Tartip 2>/dev/null || true
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
-cp "$BIN" "$APP/Contents/MacOS/FocusModes"
+cp "$BIN" "$APP/Contents/MacOS/Tartip"
 
 cat > "$APP/Contents/Info.plist" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>Focus Modes</string>
-  <key>CFBundleIdentifier</key><string>com.user.focusmodes</string>
-  <key>CFBundleExecutable</key><string>FocusModes</string>
+  <key>CFBundleName</key><string>Tartip</string>
+  <key>CFBundleIdentifier</key><string>com.user.tartip</string>
+  <key>CFBundleExecutable</key><string>Tartip</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
   <key>CFBundleIconFile</key><string>AppIcon</string>
-  <key>NSAppleEventsUsageDescription</key><string>Focus Modes opens your links in Chrome and sends blocked tabs to a "Not now" page.</string>
+  <key>NSAppleEventsUsageDescription</key><string>Tartip opens your links in Chrome and sends blocked tabs to a "Not now" page.</string>
 </dict>
 </plist>
 EOF
@@ -53,7 +53,7 @@ rm -rf "${ICONSET:h}"
 
 # Sign with a stable local certificate so macOS keeps the Accessibility
 # permission across rebuilds (ad-hoc signatures change every build).
-CERT="FocusModes Local"
+CERT="Tartip Local"
 if ! security find-certificate -c "$CERT" >/dev/null 2>&1; then
   TMP=$(mktemp -d)
   openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=$CERT" \

@@ -33,7 +33,7 @@ struct GetStartedView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 26) {
-            PageTitle(title: "Welcome to Focus",
+            PageTitle(title: "Welcome to Tartip",
                       subtitle: "Set it up once, and from then on it does the pushing. Nothing happens until you press Start.")
             idea
             howItWorks
@@ -70,7 +70,7 @@ struct GetStartedView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("You don't have to make yourself start.")
                 .font(.system(size: 19, weight: .bold)).foregroundStyle(Theme.text)
-            Text("Most focus apps wait until you decide to focus, and deciding is the hard part. Focus doesn't wait: it asks, it starts, and it holds you to it. You only choose what to work on.")
+            Text("Most focus apps wait until you decide to focus, and deciding is the hard part. Tartip doesn't wait: it asks, it starts, and it holds you to it. You only choose what to work on.")
                 .font(.system(size: 13)).foregroundStyle(Theme.text)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -88,7 +88,7 @@ struct GetStartedView: View {
                 step("questionmark.bubble.fill", "It asks",
                      "Whenever nothing is running, \"What's next?\" comes up over everything and can't be closed.")
                 step("hand.point.up.left.fill", wait > 0 ? "You pick, or it picks" : "You pick",
-                     wait > 0 ? "Choose an activity and a length. Leave it unanswered for \(wait) min and Focus starts one for you."
+                     wait > 0 ? "Choose an activity and a length. Leave it unanswered for \(wait) min and Tartip starts one for you."
                               : "Choose an activity and a length.")
                 step("lock.fill", "It holds you to it",
                      "Distracting apps close and sites don't open until the timer ends. Stopping early doesn't lift the block.")
@@ -255,7 +255,7 @@ struct GetStartedView: View {
             }
             .disabled(!Self.hasChrome)
             Text(Self.hasChrome
-                 ? "Sites are blocked in Google Chrome: a blocked tab shows a \"Not now\" page. Other browsers are closed while sites are blocked, and macOS will ask to let Focus control Chrome."
+                 ? "Sites are blocked in Google Chrome: a blocked tab shows a \"Not now\" page. Other browsers are closed while sites are blocked, and macOS will ask to let Tartip control Chrome."
                  : "Site blocking needs Google Chrome; without it, only apps are blocked. You can add sites later.")
                 .font(.system(size: 11)).foregroundStyle(Theme.text2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -372,7 +372,7 @@ struct GetStartedView: View {
             if Self.hasChrome {
                 permissionRow("globe", "Control Google Chrome",
                               sites.isEmpty ? "Not needed while no sites are ticked above."
-                                            : "Lets Focus see your Chrome tabs and send a blocked site to the \"Not now\" page. Without it Chrome is closed while sites are blocked.",
+                                            : "Lets Tartip see your Chrome tabs and send a blocked site to the \"Not now\" page. Without it Chrome is closed while sites are blocked.",
                               status: perms.chrome, optional: sites.isEmpty) {
                     switch perms.chrome {
                     case .granted: EmptyView()
@@ -438,7 +438,7 @@ struct GetStartedView: View {
                     chosen.isEmpty ? nil : "blocks " + andList(chosen, atMost: 3, more: "sites")]
             .compactMap { $0 }
         return what.isEmpty ? "Nothing is blocked yet: add apps or sites above, or later in Activities."
-                            : "During a session Focus " + what.joined(separator: " and ") + "."
+                            : "During a session Tartip " + what.joined(separator: " and ") + "."
     }
 
     private var footer: some View {
@@ -451,7 +451,7 @@ struct GetStartedView: View {
                     .font(.system(size: 12)).foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text("After Start, Focus takes over: \"What's next?\" comes up right away.")
+            Text("After Start, Tartip takes over: \"What's next?\" comes up right away.")
                 .font(.system(size: 12)).foregroundStyle(Theme.text2)
             HStack(spacing: 12) {
                 Button { askStart = true } label: {
@@ -468,7 +468,7 @@ struct GetStartedView: View {
         }
         .padding(16)
         .card(radius: 14)
-        .alert("Ready to let Focus take over?", isPresented: $askStart) {
+        .alert("Ready to let Tartip take over?", isPresented: $askStart) {
             Button("Start") { start() }
             Button("Not yet", role: .cancel) {}
         } message: {
@@ -479,7 +479,7 @@ struct GetStartedView: View {
     // Everything Start switches on, in one place, before it does.
     private var startWarning: String {
         let s = settings.value
-        var out = ["From now on Focus decides when you start: whenever nothing is running, \"What's next?\" comes up over everything and can't be closed"
+        var out = ["From now on Tartip decides when you start: whenever nothing is running, \"What's next?\" comes up over everything and can't be closed"
                    + (s.autoStartAfterMinutes > 0 ? ", and if you don't answer within \(s.autoStartAfterMinutes) min it starts an activity for you." : ".")]
         out.append(summary + " Stopping a session early ends the timer, not the block.")
         out.append(s.dailyFreeMinutes > 0 ? "Free time: \(minutesLabel(s.dailyFreeMinutes)) a day, the only break from it."

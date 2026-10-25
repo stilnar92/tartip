@@ -1,5 +1,5 @@
 import Testing
-@testable import FocusModes
+@testable import Tartip
 
 // Real blocks, imported from Cold Turkey.
 @Suite struct BlockRulesTests {

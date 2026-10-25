@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import FocusModes
+@testable import Tartip
 
 private let cal: Calendar = {
     var c = Calendar(identifier: .gregorian)

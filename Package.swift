@@ -1,21 +1,21 @@
 // swift-tools-version: 6.0
 // `swift build` / `swift test` for development; scripts/build.sh wraps the release
-// binary into /Applications/Focus Modes.app.
+// binary into /Applications/Tartip.app.
 import PackageDescription
 
 let package = Package(
-    name: "FocusModes",
+    name: "Tartip",
     platforms: [.macOS(.v13)],
     targets: [
         .executableTarget(
-            name: "FocusModes",
-            path: "Sources/FocusModes",
+            name: "Tartip",
+            path: "Sources/Tartip",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
-            name: "FocusModesTests",
-            dependencies: ["FocusModes"],
-            path: "Tests/FocusModesTests"
+            name: "TartipTests",
+            dependencies: ["Tartip"],
+            path: "Tests/TartipTests"
         ),
     ]
 )

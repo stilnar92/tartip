@@ -21,7 +21,7 @@ private let otherBrowsers: Set<String> = [
     "com.google.Chrome.beta", "com.google.Chrome.dev", "com.google.Chrome.canary", "org.chromium.Chromium",
     "ru.yandex.desktop.yandex-browser", "app.zen-browser.zen", "com.kagi.kagimacOS",
 ]
-private let neverQuit: Set<String> = ["com.user.focusmodes", "com.apple.finder"]
+private let neverQuit: Set<String> = ["com.user.tartip", "com.apple.finder"]
 
 // Blocking apps and sites while a block is locked (what Cold Turkey used to do).
 // Apps from an active block are quit. Chrome's tabs are checked every 1.5 s and blocked
@@ -162,7 +162,7 @@ final class NativeBlocker: ObservableObject, Blocker {
                 // Automation for Chrome is off, so its tabs can't be checked: Chrome goes instead.
                 if denied, let b = act.first,
                    let chrome = NSRunningApplication.runningApplications(withBundleIdentifier: chromeID).first {
-                    self.quit(chrome, because: b, what: "Google Chrome (allow Focus Modes to control Chrome in Privacy & Security → Automation)")
+                    self.quit(chrome, because: b, what: "Google Chrome (allow Tartip to control Chrome in Privacy & Security → Automation)")
                 }
             }
         }
@@ -223,7 +223,7 @@ final class NativeBlocker: ObservableObject, Blocker {
         </div><script>
         const q = new URLSearchParams(location.search);
         const until = new Date(Number(q.get("until")) * 1000);
-        document.getElementById("b").textContent = (q.get("block") || "Focus") + " is on until " +
+        document.getElementById("b").textContent = (q.get("block") || "Tartip") + " is on until " +
           until.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) + ".";
         document.getElementById("u").textContent = q.get("url") || "";
         </script></body></html>

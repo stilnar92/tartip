@@ -76,11 +76,11 @@ final class Model: ObservableObject {
         if let s = session, let planned = s.planned {
             recs.append(SessionRecord(start: s.start, end: min(now, s.end), mode: s.block, planned: planned))
         }
-        return FocusModes.records(recs, since: from)
+        return Tartip.records(recs, since: from)
     }
 
     func secondsByActivity(since from: Date) -> [String: Int] {
-        FocusModes.secondsByActivity(recordsSince(from))
+        Tartip.secondsByActivity(recordsSince(from))
     }
 
     var limits: Limits {
@@ -172,7 +172,7 @@ final class Model: ObservableObject {
         let c = s.planned.flatMap { Settings.current.activity(named: $0)?.opens } ?? ModeConfig()
         let opensSomething = !c.isEmpty || !extraURLs.isEmpty
         if opensSomething && c.maximize && !axTrusted(prompt: true) {
-            message = "Allow Focus Modes in Privacy & Security → Accessibility to resize windows."
+            message = "Allow Tartip in Privacy & Security → Accessibility to resize windows."
         }
         openWorkspace(mode: s.block, c, extraURLs: extraURLs, prev: state.opened) { [weak self] opened in
             self?.state.opened = opened

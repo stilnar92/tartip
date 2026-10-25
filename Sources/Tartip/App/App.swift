@@ -1,4 +1,4 @@
-// Focus Modes: a menu bar app that blocks apps and sites for a timed session and keeps you honest.
+// Tartip (Tatar тәртип, "order"): a menu bar app that blocks apps and sites for a timed session and keeps you honest.
 
 import SwiftUI
 import AppKit
@@ -13,6 +13,7 @@ final class AppRoot {
     let windows: WindowCoordinator
 
     private init() {
+        Rename.carryOverState()  // before Setup: the old app's state says this isn't a new install
         Setup.resolve()          // first: everything after this writes files that would hide a new install
         enforceSingleInstance()
         model = Model()
@@ -24,9 +25,9 @@ final class AppRoot {
 // so if it were the one to quit it would loop.
 private func enforceSingleInstance() {
     let mine = ProcessInfo.processInfo.processIdentifier
-    let others = NSRunningApplication.runningApplications(withBundleIdentifier: "com.user.focusmodes")
+    let others = NSRunningApplication.runningApplications(withBundleIdentifier: "com.user.tartip")
         .filter { $0.processIdentifier != mine }
-    let fromLaunchd = ProcessInfo.processInfo.environment["FOCUSMODES_LAUNCHD"] == "1"
+    let fromLaunchd = ProcessInfo.processInfo.environment["TARTIP_LAUNCHD"] == "1"
     if !others.isEmpty {
         if fromLaunchd { others.forEach { $0.forceTerminate() } }
         else { exit(0) }
@@ -62,7 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 }
 
 @main
-struct FocusModesApp: App {
+struct TartipApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @ObservedObject private var model = AppRoot.shared.model
     @ObservedObject private var clock = AppRoot.shared.model.clock
