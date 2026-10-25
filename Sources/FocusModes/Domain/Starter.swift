@@ -59,11 +59,11 @@ struct SiteGroup: Hashable, Sendable {
 
 let siteGroups: [SiteGroup] = [
     .init(name: "Social", icon: "person.2.fill",
-          sites: ["instagram.com", "facebook.com", "x.com", "twitter.com", "tiktok.com", "vk.com", "reddit.com"], suggested: true),
+          sites: ["instagram.com", "facebook.com", "x.com", "twitter.com", "tiktok.com", "reddit.com"], suggested: true),
     .init(name: "Video", icon: "play.rectangle.fill",
-          sites: ["youtube.com", "twitch.tv", "netflix.com", "rutube.ru", "vkvideo.ru"], suggested: true),
+          sites: ["youtube.com", "twitch.tv", "netflix.com", "vimeo.com"], suggested: true),
     .init(name: "News", icon: "newspaper.fill",
-          sites: ["news.google.com", "lenta.ru", "ria.ru", "bbc.com", "cnn.com"], suggested: false),
+          sites: ["news.google.com", "bbc.com", "cnn.com", "nytimes.com", "theguardian.com"], suggested: false),
     .init(name: "Shopping", icon: "cart.fill",
-          sites: ["amazon.com", "ozon.ru", "wildberries.ru", "aliexpress.com", "ebay.com"], suggested: false),
+          sites: ["amazon.com", "aliexpress.com", "ebay.com", "etsy.com", "temu.com"], suggested: false),
 ]

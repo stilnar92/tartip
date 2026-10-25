@@ -13,6 +13,10 @@ struct GetStartedView: View {
     // Nothing is ticked for the user: every choice on this page is theirs.
     @State private var apps: Set<String> = []
     @State private var sites: Set<String> = []
+    // Added by hand on this page; ticked when added.
+    @State private var ownApps: [PickedApp] = []
+    @State private var ownSites: [String] = []
+    @State private var newSite = ""
     @State private var newName = ""
     @State private var newIcon = "circle.fill"
 
@@ -175,18 +179,21 @@ struct GetStartedView: View {
                 }
                 .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.accent)
             }
-            if Self.installed.isEmpty {
-                Text("None of the usual distractions are installed. You can add any app later in Activities → ⌄ → Blocks.")
-                    .font(.system(size: 12)).foregroundStyle(Theme.text2)
-            } else {
-                FlowLayout {
-                    ForEach(Self.installed, id: \.id) { item in
-                        toggleChip(apps.contains(item.id), action: { apps.formSymmetricDifference([item.id]) }) {
-                            Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path)).resizable().frame(width: 16, height: 16)
-                            Text(item.app.name)
-                        }
+            FlowLayout {
+                ForEach(allApps) { item in
+                    toggleChip(apps.contains(item.id), action: { apps.formSymmetricDifference([item.id]) }) {
+                        Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path)).resizable().frame(width: 16, height: 16)
+                        Text(item.name)
                     }
                 }
+                Button(action: chooseApps) {
+                    Label("Other app…", systemImage: "plus")
+                        .font(.system(size: 12))
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .overlay(Capsule().strokeBorder(Theme.text2.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [3])))
+                        .foregroundStyle(Theme.text2)
+                }
+                .buttonStyle(.plain)
             }
             Text("Sites").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.text2)
             // Each site on its own, so it's clear what "Social" means; the group name ticks them all.
@@ -215,12 +222,72 @@ struct GetStartedView: View {
                 }
                 .disabled(!Self.hasChrome)
             }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 5) {
+                    Image(systemName: "globe").foregroundStyle(Theme.accent)
+                    Text("Your own").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.text)
+                }
+                FlowLayout {
+                    ForEach(ownSites, id: \.self) { site in
+                        toggleChip(sites.contains(site), action: { sites.formSymmetricDifference([site]) }) { Text(site) }
+                    }
+                    HStack(spacing: 6) {
+                        TextField("e.g. news.ycombinator.com", text: $newSite)
+                            .textFieldStyle(.plain).font(.system(size: 12)).frame(width: 190)
+                            .onSubmit(addSite)
+                        Button("Add", action: addSite).controlSize(.small)
+                            .disabled(newSite.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .card(radius: 9)
+                }
+            }
+            .disabled(!Self.hasChrome)
             Text(Self.hasChrome
                  ? "Sites are blocked in Google Chrome: a blocked tab shows a \"Not now\" page. Other browsers are closed while sites are blocked, and macOS will ask to let Focus control Chrome."
                  : "Site blocking needs Google Chrome; without it, only apps are blocked. You can add sites later.")
                 .font(.system(size: 11)).foregroundStyle(Theme.text2)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    // The catalog apps that are installed, then the ones added by hand.
+    private var allApps: [PickedApp] {
+        Self.installed.map { PickedApp(id: $0.id, name: $0.app.name, url: $0.url) }
+            + ownApps.filter { own in !Self.installed.contains { $0.id == own.id } }
+    }
+
+    private var allSites: [String] { siteGroups.flatMap(\.sites) + ownSites }
+
+    // Any app from /Applications. A sheet-less panel: runModal would stall the 1 s tick.
+    private func chooseApps() {
+        let panel = NSOpenPanel()
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.allowedContentTypes = [.application]
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Block"
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { response in
+            guard response == .OK else { return }
+            for url in panel.urls {
+                guard let id = bundleID(url.path), id != Bundle.main.bundleIdentifier else { continue }
+                if !allApps.contains(where: { $0.id == id }) {
+                    ownApps.append(PickedApp(id: id, name: url.deletingPathExtension().lastPathComponent, url: url))
+                }
+                apps.insert(id)
+            }
+        }
+    }
+
+    // "https://www.Example.com/path/" → "example.com/path".
+    private func addSite() {
+        var s = newSite.trimmingCharacters(in: .whitespaces).lowercased()
+        newSite = ""
+        for prefix in ["https://", "http://", "www."] where s.hasPrefix(prefix) { s.removeFirst(prefix.count) }
+        while s.hasSuffix("/") { s.removeLast() }
+        guard !s.isEmpty, s.contains(".") || s == "*" else { return }
+        if !allSites.contains(s) { ownSites.append(s) }
+        sites.insert(s)
     }
 
     private func toggleChip<Content: View>(_ on: Bool, action: @escaping () -> Void, @ViewBuilder _ content: () -> Content) -> some View {
@@ -353,8 +420,8 @@ struct GetStartedView: View {
     private var canStart: Bool { settings.value.activities.contains { $0.name.lowercased() != "rest" } }
 
     private var summary: String {
-        let appNames = Self.installed.filter { apps.contains($0.id) }.map(\.app.name)
-        let chosen = siteGroups.flatMap(\.sites).filter(sites.contains)
+        let appNames = allApps.filter { apps.contains($0.id) }.map(\.name)
+        let chosen = allSites.filter(sites.contains)
         // "a, b and c" in English: the UI isn't localized, so the system language mustn't leak in.
         let and = { (l: [String]) in l.count < 2 ? l.joined() : l.dropLast().joined(separator: ", ") + " and " + l.last! }
         let what = [appNames.isEmpty ? nil : "closes " + and(appNames),
@@ -396,8 +463,7 @@ struct GetStartedView: View {
 
     private func start() {
         guard canStart else { return }
-        let web = siteGroups.flatMap(\.sites).filter(sites.contains)
-        model.finishSetup(base: BlockRule(apps: Self.installed.filter { apps.contains($0.id) }.map(\.id), web: web))
+        model.finishSetup(base: BlockRule(apps: allApps.map(\.id).filter(apps.contains), web: allSites.filter(sites.contains)))
         done()
     }
 
@@ -416,4 +482,10 @@ struct GetStartedView: View {
             content()
         }
     }
+}
+
+struct PickedApp: Identifiable, Hashable {
+    let id: String      // bundle id
+    let name: String
+    let url: URL
 }
