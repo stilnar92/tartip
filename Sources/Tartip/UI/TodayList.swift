@@ -5,6 +5,9 @@ import SwiftUI
 struct TodayList: View {
     @ObservedObject var model: Model
     @ObservedObject var clock: Clock     // hours and limits change as time passes
+    // "What's next?" is itself the deliberate choice, so it starts without a warning;
+    // the menu bar panel shows one on a block's first start.
+    var warnOnStart = true
     @State private var hovered: String?
     @State private var request: StartRequest?    // waiting for "Start" in the warning
 
@@ -48,7 +51,7 @@ struct TodayList: View {
 
     // A first start (or one after its block changed) asks first; otherwise it starts right away.
     private func tryStart(_ a: String, minutes: Int? = nil, pomodoro: Bool? = nil) {
-        if Warnings.needsStartConfirm(block: Settings.current.block(for: a)) {
+        if warnOnStart && Warnings.needsStartConfirm(block: Settings.current.block(for: a)) {
             request = StartRequest(activity: a, minutes: minutes, pomodoro: pomodoro)
         } else {
             model.startActivity(a, minutes: minutes, pomodoro: pomodoro)

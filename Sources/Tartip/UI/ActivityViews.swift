@@ -23,7 +23,7 @@ struct ActivityPickerView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.accentTint))
             }
-            TodayList(model: model, clock: clock)
+            TodayList(model: model, clock: clock, warnOnStart: false)
         }
         .padding(24)
         .frame(width: 420)
