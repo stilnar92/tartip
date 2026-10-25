@@ -28,12 +28,12 @@ A small macOS menu bar app that **makes** you focus instead of waiting for you t
 
 You need macOS 13 or later (Apple silicon or Intel).
 
-**From the DMG:** open `Tartip.dmg`, drag Tartip into Applications, and open it from there. The app isn't signed by an identified developer, so the first time macOS refuses to open it. Go to System Settings → Privacy & Security, click **Open Anyway** next to Tartip, and confirm.
+**From the DMG:** download `Tartip.dmg` from the [latest release](https://github.com/stilnar92/tartip/releases/latest), open it, drag Tartip into Applications, and open it from there. The app isn't signed by an identified developer, so the first time macOS refuses to open it. Go to System Settings → Privacy & Security, click **Open Anyway** next to Tartip, and confirm.
 
 **From source** (needs the Xcode Command Line Tools; the installer offers them if they're missing):
 
 ```sh
-git clone <repo-url> tartip
+git clone https://github.com/stilnar92/tartip.git
 cd tartip
 ./install.sh
 ```
