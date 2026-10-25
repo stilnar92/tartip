@@ -6,7 +6,9 @@ struct SettingsView: View {
     @ObservedObject var settings = Settings.shared
     var model: Model? = nil                      // for "what it opens"
     let page: MainTab
-    @State private var expanded: Set<UUID> = []
+    @State var expanded: Set<UUID> = []                 // rows opened with ⌄
+    @State private var limitsByDay: Set<UUID> = []      // "different limit on some days" opened
+    @State private var planDay = Calendar.current.component(.weekday, from: Date())
     @State private var newActivity = ""
     @State private var optionsText = Settings.shared.value.durationOptions.map(String.init).joined(separator: ", ")
 
@@ -75,11 +77,17 @@ struct SettingsView: View {
                         .font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
                 }
                 Spacer()
+                if !item.dayMinutes.isEmpty {
+                    Image(systemName: "calendar.badge.clock").font(.system(size: 11)).foregroundStyle(.secondary)
+                        .help("Different on " + weekOrder.compactMap { d in
+                            item.dayMinutes[d].map { "\(weekdayShort[d] ?? ""): \(limitLabel($0))" } }.joined(separator: ", "))
+                }
                 Text(limitLabel(item.dailyMinutes))
                     .font(.system(size: 12, weight: .medium)).monospacedDigit()
                     .foregroundStyle(item.dailyMinutes == 0 ? .secondary : .primary)
                     .frame(width: 60, alignment: .trailing)
                 Stepper("", value: a.dailyMinutes, in: 0...720, step: 15).labelsHidden().controlSize(.small)
+                    .help(item.dayMinutes.isEmpty ? "Daily limit" : "Usual daily limit; some days have their own (⌄)")
                 Button {
                     if open { expanded.remove(item.id) } else { expanded.insert(item.id) }
                 } label: {
@@ -95,7 +103,8 @@ struct SettingsView: View {
             if open {
                 VStack(alignment: .leading, spacing: 8) {
                     SectionLabel(text: "Days")
-                    dayPicker(a.days)
+                    dayPicker(a)
+                    dayLimits(a)
                     Divider()
                     SectionLabel(text: "Hours")
                     Toggle("Any time", isOn: Binding(
@@ -179,19 +188,21 @@ struct SettingsView: View {
 
     // MARK: day plan
 
-    // How the daily limits add up: active work, Rest (with blocking), free time,
-    // and what's left of the waking day (24 h minus night).
+    // How one weekday's limits add up: active work, Rest (with blocking), free time,
+    // and what's left of the waking day (24 h minus night). Only what's planned that day counts.
     private var dayPlan: some View {
         let s = settings.value
+        let day = s.activities.filter { $0.isPlanned(onWeekday: planDay) }
+        let limit = { (a: ActivitySetting) in a.limit(onWeekday: planDay) }
         let isRest = { (a: ActivitySetting) in a.name.lowercased() == "rest" }
-        let active = s.activities.filter { !isRest($0) }.reduce(0) { $0 + $1.dailyMinutes }
-        let rest = s.activities.filter(isRest).reduce(0) { $0 + $1.dailyMinutes }
+        let active = day.filter { !isRest($0) }.reduce(0) { $0 + limit($1) }
+        let rest = day.filter(isRest).reduce(0) { $0 + limit($1) }
         let free = s.dailyFreeMinutes
         let nightLen = s.nightEnabled ? (s.nightTo - s.nightFrom + 1440) % 1440 : 0
         let awake = 1440 - nightLen
         let planned = active + rest + free
         let unplanned = max(0, awake - planned)
-        let noLimit = s.activities.filter { $0.dailyMinutes == 0 }.map(\.name)
+        let noLimit = day.filter { limit($0) == 0 }.map(\.name)
         let parts: [(String, Int, Color)] = [("Active", active, .indigo), ("Rest", rest, .brown),
                                              ("Free time", free, .orange), ("Unplanned", unplanned, .gray)]
 
@@ -201,6 +212,15 @@ struct SettingsView: View {
                 Spacer()
                 Text("\(minutesLabel(planned)) planned of \(minutesLabel(awake)) awake")
                     .font(.system(size: 11)).foregroundStyle(planned > awake ? .red : .secondary)
+            }
+            HStack(spacing: 4) {
+                ForEach(weekOrder, id: \.self) { d in
+                    choicePill(weekdayShort[d] ?? "", planDay == d) { planDay = d }
+                }
+            }
+            if day.isEmpty && !s.activities.isEmpty {
+                Text("Nothing planned: a day off, \"What's next?\" won't ask.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
             }
             // One bar for the whole waking day.
             GeometryReader { g in
@@ -270,7 +290,8 @@ struct SettingsView: View {
 
     // Mon…Sun toggles. No days set means every day, shown as all seven on; switching
     // one off plans it for the rest. At least one day stays on.
-    private func dayPicker(_ days: Binding<[Int]>) -> some View {
+    private func dayPicker(_ a: Binding<ActivitySetting>) -> some View {
+        let days = a.days
         let on = days.wrappedValue.isEmpty ? Set(weekOrder) : Set(days.wrappedValue)
         return HStack(spacing: 4) {
             ForEach(weekOrder, id: \.self) { d in
@@ -278,6 +299,7 @@ struct SettingsView: View {
                     var next = on
                     if next.contains(d) { if next.count > 1 { next.remove(d) } } else { next.insert(d) }
                     days.wrappedValue = next.count == 7 ? [] : weekOrder.filter(next.contains)
+                    a.wrappedValue.dayMinutes = a.wrappedValue.dayMinutes.filter { next.contains($0.key) }
                 } label: {
                     Text(weekdayShort[d] ?? "").font(.system(size: 11, weight: on.contains(d) ? .semibold : .regular))
                         .frame(width: 34).padding(.vertical, 4)
@@ -288,6 +310,48 @@ struct SettingsView: View {
             Spacer()
             Text(daysLabel(days.wrappedValue)).font(.system(size: 11)).foregroundStyle(.secondary)
         }
+    }
+
+    // Per weekday: the usual limit, or its own (0 = no limit). Only planned days are listed:
+    // "off" is the day toggle above, never a limit.
+    private func dayLimits(_ a: Binding<ActivitySetting>) -> some View {
+        let item = a.wrappedValue
+        let open = !item.dayMinutes.isEmpty || limitsByDay.contains(item.id)
+        return VStack(alignment: .leading, spacing: 6) {
+            Toggle("Different limit on some days", isOn: Binding(
+                get: { open },
+                set: { on in
+                    if on { limitsByDay.insert(item.id) } else { limitsByDay.remove(item.id); a.wrappedValue.dayMinutes = [:] }
+                }))
+                .toggleStyle(.switch).controlSize(.small).font(.system(size: 12))
+            if open {
+                ForEach(weekOrder.filter(item.isPlanned(onWeekday:)), id: \.self) { d in
+                    let own = item.dayMinutes[d]
+                    HStack(spacing: 6) {
+                        Text(weekdayShort[d] ?? "").font(.system(size: 12, weight: .medium)).frame(width: 34, alignment: .leading)
+                        choicePill("Usual · \(limitLabel(item.dailyMinutes))", own == nil) { a.wrappedValue.dayMinutes[d] = nil }
+                        choicePill("Own", own != nil) {
+                            if own == nil { a.wrappedValue.dayMinutes[d] = item.dailyMinutes }
+                        }
+                        if let own {
+                            Text(limitLabel(own)).font(.system(size: 12)).monospacedDigit().frame(width: 60, alignment: .trailing)
+                            Stepper("", value: Binding(get: { own }, set: { a.wrappedValue.dayMinutes[d] = $0 }),
+                                    in: 0...720, step: 15).labelsHidden().controlSize(.small)
+                        }
+                        Spacer()
+                    }
+                }
+            }
+        }
+    }
+
+    private func choicePill(_ title: String, _ selected: Bool, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title).font(.system(size: 11, weight: selected ? .semibold : .regular))
+                .padding(.horizontal, 9).padding(.vertical, 4)
+                .pill(selected: selected)
+        }
+        .buttonStyle(.plain)
     }
 
     // Color swatches and an icon grid; "From the name" goes back to the guess.

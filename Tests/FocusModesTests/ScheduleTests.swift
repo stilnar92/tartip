@@ -50,4 +50,23 @@ private let monday = day(2), saturday = day(7)
         let a = try JSONDecoder().decode(ActivitySetting.self, from: Data(json.utf8))
         #expect(a.days.isEmpty)
     }
+
+    @Test func ownLimitOnSomeDays() {
+        var s = AppSettings()
+        var work = ActivitySetting(name: "Work", dailyMinutes: 240)
+        work.dayMinutes = [7: 60, 1: 0]              // Sat 1h, Sun no limit
+        s.activities = [work]
+        #expect(Limits(settings: s, today: [], now: monday, calendar: cal).limitMinutes("Work") == 240)
+        #expect(Limits(settings: s, today: [], now: saturday, calendar: cal).limitMinutes("Work") == 60)
+        let sunday = Limits(settings: s, today: [], now: day(8), calendar: cal)
+        #expect(sunday.limitMinutes("Work") == 0 && sunday.secondsLeftToday("Work") == nil)
+    }
+
+    @Test func dayLimitsSurviveSaving() throws {
+        var a = ActivitySetting(name: "Work", dailyMinutes: 120)
+        a.days = [2, 3, 7]
+        a.dayMinutes = [7: 45]
+        let back = try JSONDecoder().decode(ActivitySetting.self, from: JSONEncoder().encode(a))
+        #expect(back.dayMinutes == [7: 45] && back.limit(onWeekday: 7) == 45 && back.limit(onWeekday: 2) == 120)
+    }
 }

@@ -11,6 +11,8 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
     var fromMinute: Int? = nil     // hours it can be picked, minutes since midnight;
     var toMinute: Int? = nil       // nil = any time. May cross midnight.
     var days: [Int] = []           // weekdays it's planned for (Calendar: 1 = Sunday … 7 = Saturday); empty = every day
+    var dayMinutes: [Int: Int] = [:]   // a different daily limit on some weekdays (0 = no limit); absent = dailyMinutes.
+                                       // "Off on a day" is only ever `days`, never a limit.
     var opens = ModeConfig()       // apps and links opened when it starts
     var icon: String? = nil        // SF Symbol; nil = picked from the name
     var color: String? = nil       // one of ActivityStyle.colors; nil = picked from the name
@@ -29,9 +31,14 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
         color = t.color
     }
 
+    // The daily limit on a weekday (Calendar numbering), in minutes; 0 = no limit.
+    func limit(onWeekday d: Int) -> Int { dayMinutes[d] ?? dailyMinutes }
+
+    func isPlanned(onWeekday d: Int) -> Bool { days.isEmpty || days.contains(d) }
+
     // Planned for the day `d` falls on: any day when no days are set.
     func isPlanned(on d: Date, calendar: Calendar = .current) -> Bool {
-        days.isEmpty || days.contains(calendar.component(.weekday, from: d))
+        isPlanned(onWeekday: calendar.component(.weekday, from: d))
     }
 
     // Settings saved before a field existed still load.
@@ -44,6 +51,7 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
         fromMinute = try c.decodeIfPresent(Int.self, forKey: .fromMinute)
         toMinute = try c.decodeIfPresent(Int.self, forKey: .toMinute)
         days = try c.decodeIfPresent([Int].self, forKey: .days) ?? []
+        dayMinutes = try c.decodeIfPresent([Int: Int].self, forKey: .dayMinutes) ?? [:]
         opens = try c.decodeIfPresent(ModeConfig.self, forKey: .opens) ?? ModeConfig()
         icon = try c.decodeIfPresent(String.self, forKey: .icon)
         color = try c.decodeIfPresent(String.self, forKey: .color)

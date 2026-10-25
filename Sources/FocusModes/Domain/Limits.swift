@@ -17,8 +17,10 @@ struct Limits {
 
     func usedToday(_ activity: String) -> Int { used[activity] ?? 0 }
 
-    // Daily limit in minutes (0 = none).
-    func limitMinutes(_ activity: String) -> Int { setting(activity)?.dailyMinutes ?? 0 }
+    // Today's limit in minutes (0 = none): the one for today's weekday if it has its own.
+    func limitMinutes(_ activity: String) -> Int {
+        setting(activity)?.limit(onWeekday: calendar.component(.weekday, from: now)) ?? 0
+    }
 
     // Seconds left today, or nil when the activity has no limit.
     func secondsLeftToday(_ activity: String) -> Int? {
