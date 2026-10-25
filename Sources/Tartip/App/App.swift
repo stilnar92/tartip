@@ -75,7 +75,7 @@ struct TartipApp: App {
             if model.session == nil && model.freeTimeEnd == nil && Settings.current.isNight(at: clock.now) {
                 Image(systemName: "moon.stars.fill")
             } else if model.session == nil && model.freeTimeEnd == nil {
-                Image(systemName: "scope")
+                Image(nsImage: Logo.menuBar)
             } else {
                 Text(model.menuTitle).monospacedDigit()
             }

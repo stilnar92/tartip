@@ -39,8 +39,12 @@ cat > "$APP/Contents/Info.plist" <<'EOF'
 </plist>
 EOF
 
-# App icon: draw it once (make-icon.swift), then pack all sizes into AppIcon.icns.
-[ -f build/icon.png ] || swift scripts/make-icon.swift build/icon.png
+# App icon: the mark from Sources/Tartip/UI/Logo.swift, drawn by make-icon.swift (top-level code
+# has to be main.swift when compiled with another file), then all sizes packed into AppIcon.icns.
+mkdir -p build/icon-tool
+cp scripts/make-icon.swift build/icon-tool/main.swift
+swiftc -O Sources/Tartip/UI/Logo.swift build/icon-tool/main.swift -o build/icon-tool/make-icon
+build/icon-tool/make-icon build/icon.png
 ICONSET=$(mktemp -d)/AppIcon.iconset
 mkdir -p "$ICONSET"
 for sz in 16 32 128 256 512; do

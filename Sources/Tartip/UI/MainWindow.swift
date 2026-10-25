@@ -48,7 +48,7 @@ struct MainView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                Image(systemName: "scope").font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
+                Image(nsImage: Logo.image(size: 16, color: .white))
                     .frame(width: 24, height: 24)
                     .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Theme.accent))
                 Text("Tartip").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.text)
