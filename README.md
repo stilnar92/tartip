@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="docs/icon.png" width="128" height="128" alt="Tartip icon: a tulip that is also a person">
+  <img src="docs/icon.png" width="128" height="128" alt="Tärtip icon: a tulip that is also a person">
 </p>
 
-<h1 align="center">Tartip</h1>
+<h1 align="center">Tärtip</h1>
 
 <p align="center"><b>Use it. Don't get used.</b></p>
 
-<p align="center"><i>Tartip</i> is Tatar for "order, discipline" (тәртип).</p>
+<p align="center"><i>Tärtip</i> (тәртип) is Tatar for "order, discipline".</p>
 
 A small macOS menu bar app that **makes** you focus instead of waiting for you to decide to: deciding to start is the hard part, so the app does the pushing. It helps you **start** working and keeps you from drifting off. You pick what you'll work on; for a set time the app blocks the apps and sites that activity doesn't need, opens the ones it does, and afterwards asks what you actually did. Whenever nothing is running, it asks what's next, so the decision is always yours and always made.
 
@@ -24,7 +24,7 @@ cd tartip
 ./install.sh
 ```
 
-Either way, Tartip starts at login and, if it's quit, comes back within seconds. macOS shows a "Background item added" notice for this; leave it on in System Settings → General → Login Items. Look for ◎ in the menu bar. macOS hides menu bar icons that don't fit, so ⌘-drag ◎ next to the clock to keep it visible.
+Either way, Tärtip starts at login and, if it's quit, comes back within seconds. macOS shows a "Background item added" notice for this; leave it on in System Settings → General → Login Items. Look for ◎ in the menu bar. macOS hides menu bar icons that don't fit, so ⌘-drag ◎ next to the clock to keep it visible.
 
 Then allow two things once:
 
