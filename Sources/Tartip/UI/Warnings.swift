@@ -52,7 +52,7 @@ enum Warnings {
     }
 
     static func night(_ s: AppSettings) -> String {
-        "Every night from \(clockLabel(s.nightFrom)) to \(clockLabel(s.nightTo)) nothing is asked and \(s.nightBlock) stays locked. "
+        "Every night from \(clockLabel(s.nightFrom)) to \(clockLabel(s.nightTo)) nothing is asked and the night block stays on. "
             + blocks(NativeBlocker.shared.rule(s.nightBlock))
             + " Once a night has started it can't be lifted until \(clockLabel(s.nightTo))."
     }

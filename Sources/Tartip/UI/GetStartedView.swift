@@ -29,7 +29,7 @@ struct GetStartedView: View {
         }
         return nil
     }
-    private static let hasChrome = NSWorkspace.shared.urlForApplication(withBundleIdentifier: chromeID) != nil
+    private static let hasChrome = PermissionsList.hasChrome
 
     var body: some View {
         VStack(alignment: .leading, spacing: 26) {
@@ -57,7 +57,7 @@ struct GetStartedView: View {
                 night
             }
             section("5", "Permissions", "macOS asks you to allow a few things. Here's what each one is for; nothing else is needed.") {
-                permissions
+                PermissionsList(perms: perms, blocksSites: !sites.isEmpty)
             }
             footer
         }
@@ -363,68 +363,6 @@ struct GetStartedView: View {
             Stepper("", onIncrement: { value.wrappedValue = (value.wrappedValue + 30) % 1440 },
                         onDecrement: { value.wrappedValue = (value.wrappedValue + 1410) % 1440 }).labelsHidden()
         }
-    }
-
-    // MARK: 5. permissions
-
-    private var permissions: some View {
-        VStack(spacing: 8) {
-            if Self.hasChrome {
-                permissionRow("globe", "Control Google Chrome",
-                              sites.isEmpty ? "Not needed while no sites are ticked above."
-                                            : "Lets Tartip see your Chrome tabs and send a blocked site to the \"Not now\" page. Without it Chrome is closed while sites are blocked.",
-                              status: perms.chrome, optional: sites.isEmpty) {
-                    switch perms.chrome {
-                    case .granted: EmptyView()
-                    case .denied: actionButton("Open System Settings") { perms.openSettings("Privacy_Automation") }
-                    case .chromeNotRunning: actionButton(perms.askingChrome ? "Waiting for Chrome…" : "Open Chrome and allow") { perms.askChrome() }
-                    case .notAsked: actionButton(perms.askingChrome ? "Waiting…" : "Allow") { perms.askChrome() }
-                    }
-                }
-            }
-            permissionRow("bell.badge.fill", "Notifications",
-                          "Tells you when a round ends, a session is done, or an app was closed.",
-                          status: perms.notifications, optional: false) {
-                switch perms.notifications {
-                case .granted: EmptyView()
-                case .denied: actionButton("Open System Settings") { perms.openNotificationSettings() }
-                default: actionButton("Allow") { perms.askNotifications() }
-                }
-            }
-            permissionRow("macwindow", "Accessibility",
-                          "Only to stretch the apps an activity opens to fill the screen. Blocking works without it.",
-                          status: perms.accessibility, optional: true) {
-                if perms.accessibility != .granted {
-                    actionButton("Open System Settings") { perms.openSettings("Privacy_Accessibility") }
-                }
-            }
-        }
-    }
-
-    private func permissionRow<Action: View>(_ icon: String, _ title: String, _ why: String, status: Access, optional: Bool,
-                                             @ViewBuilder action: () -> Action) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon).font(.system(size: 16)).foregroundStyle(Theme.accent).frame(width: 22)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text)
-                    switch status {
-                    case .granted: Tag(text: "✓ Allowed", color: .green, fill: .green.opacity(0.12))
-                    case .denied: Tag(text: "Not allowed", color: Theme.red, fill: Theme.redTint)
-                    default: Tag(text: optional ? "Optional" : "Not yet")
-                    }
-                }
-                Text(why).font(.system(size: 12)).foregroundStyle(Theme.text2).fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 8)
-            action()
-        }
-        .padding(12)
-        .card(radius: 12)
-    }
-
-    private func actionButton(_ title: String, _ action: @escaping () -> Void) -> some View {
-        Button(title, action: action).controlSize(.small)
     }
 
     // MARK: start

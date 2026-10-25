@@ -1,4 +1,4 @@
-// What a block blocks, and the URL matching rule (the same one Cold Turkey's extension uses).
+// What a block blocks, and the URL matching rule.
 
 import Foundation
 

@@ -23,7 +23,7 @@ private let otherBrowsers: Set<String> = [
 ]
 private let neverQuit: Set<String> = ["com.user.tartip", "com.apple.finder"]
 
-// Blocking apps and sites while a block is locked (what Cold Turkey used to do).
+// Blocking apps and sites while a block is locked.
 // Apps from an active block are quit. Chrome's tabs are checked every 1.5 s and blocked
 // ones are sent to a "Not now" page; browsers whose tabs we can't see are quit.
 @MainActor

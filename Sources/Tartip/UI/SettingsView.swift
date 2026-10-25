@@ -4,6 +4,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settings = Settings.shared
+    @StateObject private var perms = Permissions()
     var model: Model? = nil                      // for "what it opens"
     let page: MainTab
     @State var expanded: Set<UUID> = []                 // rows opened with ⌄
@@ -29,7 +30,7 @@ struct SettingsView: View {
     // Pages of the main window's sidebar.
     private var activitiesPage: some View {
         VStack(alignment: .leading, spacing: 18) {
-            PageTitle(title: "Activities", subtitle: "Each one locks a block while it runs: the one with its name, unless you pick another.")
+            PageTitle(title: "Activities", subtitle: "Each one blocks what you list under Blocks while it runs.")
             lockBanner
             activitiesSection
         }
@@ -48,13 +49,16 @@ struct SettingsView: View {
 
     private var rulesPage: some View {
         VStack(alignment: .leading, spacing: 22) {
-            PageTitle(title: "Rules", subtitle: "Night, free time, session length, and when settings may change.")
+            PageTitle(title: "Rules", subtitle: "Night, free time, session length, when settings may change, and permissions.")
             lockBanner
             pickerSection
             nightSection
             freeTimeSection
             durationSection
             lockSection
+            group("Permissions", "What macOS lets Tartip do. Rechecked when you come back from System Settings.") {
+                PermissionsList(perms: perms, blocksSites: NativeBlocker.shared.rules.values.contains { !$0.web.isEmpty })
+            }
             Text("Saved automatically to ~/modes/settings.json")
                 .font(.system(size: 11)).foregroundStyle(.tertiary)
         }
@@ -68,7 +72,7 @@ struct SettingsView: View {
                 activityRow($a)
             }
             HStack(spacing: 6) {
-                TextField("New activity (locks the block with its name)", text: $newActivity)
+                TextField("New activity", text: $newActivity)
                     .textFieldStyle(.plain).font(.system(size: 12))
                     .padding(.horizontal, 10).padding(.vertical, 7)
                     .card(radius: 9)
@@ -144,7 +148,6 @@ struct SettingsView: View {
                         row("Until") { clockStepper(Binding(get: { a.wrappedValue.toMinute ?? 1200 }, set: { a.wrappedValue.toMinute = $0 })) }
                     }
                     Divider()
-                    row("Block it locks") { textField(a.block) }
                     BlockEditor(block: item.block.isEmpty ? item.name : item.block)
                     Divider()
                     SectionLabel(text: "Look")
@@ -200,9 +203,6 @@ struct SettingsView: View {
             if settings.value.nightEnabled {
                 row("From") { clockStepper($settings.value.nightFrom) }
                 row("To") { clockStepper($settings.value.nightTo) }
-                row("Block") { textField($settings.value.nightBlock) }
-                Text("The night block is also what \"Other\" sessions lock.")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
                 BlockEditor(block: settings.value.nightBlock)
                     .padding(10).card(radius: 9)
             }
@@ -504,10 +504,6 @@ struct SettingsView: View {
             }
             IconPicker(icon: st.icon, color: st.color) { a.wrappedValue.icon = $0 }
         }
-    }
-
-    private func textField(_ value: Binding<String>) -> some View {
-        TextField("", text: value).textFieldStyle(.roundedBorder).frame(width: 160)
     }
 
     private func addActivity() {

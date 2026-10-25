@@ -263,7 +263,7 @@ struct ContentView: View {
                 .font(.system(size: 34))
                 .foregroundStyle(.purple)
             Text("Time to sleep").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
-            Text("\(Settings.current.nightBlock) is on until \(clockLabel(Settings.current.nightTo)). Nothing to do until morning.")
+            Text("Night mode is on until \(clockLabel(Settings.current.nightTo)). Nothing to do until morning.")
                 .font(.system(size: 12)).foregroundStyle(Theme.text2).multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)

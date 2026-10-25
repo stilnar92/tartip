@@ -25,7 +25,7 @@ let activityTemplates: [ActivityTemplate] = [
 ]
 
 // The blocks Start on Get started fills: every block an activity, the night or "Other" locks,
-// unless it already has rules (e.g. imported from Cold Turkey before the first launch).
+// unless it already has rules (blocks.json written before the first launch).
 func blocksToFill(_ s: AppSettings, existing: [String: BlockRule]) -> [String] {
     let names = Set(s.activities.map { s.block(for: $0.name) } + [s.nightBlock, s.otherBlock])
     return names.filter { (existing[$0] ?? BlockRule()) == BlockRule() }.sorted()

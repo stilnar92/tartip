@@ -1,7 +1,7 @@
 import Testing
 @testable import Tartip
 
-// Real blocks, imported from Cold Turkey.
+// Real blocks.
 @Suite struct BlockRulesTests {
     let work = BlockRule(apps: ["com.tdesktop.telegram"], web: ["google.com"],
                          exceptions: ["accounts.google.com", "github.com", "localhost:3000", "mail.google.com",

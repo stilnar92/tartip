@@ -64,7 +64,7 @@ A dev build uses the same `~/modes` as the installed app, so back up the folder 
 | `Sources/Tartip/Services/` | `Blocker` (locks, quitting blocked apps, checking Chrome's tabs), `Workspace` (apps and a Chrome window), `AutoStart` (the launch agent), `StateStore` (saved state), `SettingsStore`, `Setup` (first launch), `History`, `Log`, `Notifications`, `Permissions`, `Paths` |
 | `Sources/Tartip/UI/` | Today list, panel, "What's next?"/review, Get started, main window (stats, activities, rules), theme, logo |
 | `Tests/TartipTests/` | tests for the domain logic, URL matching, schedules, the settings lock, setup and the saved-state migration |
-| `scripts/` | `build.sh`, `make-dmg.sh`, `make-icon.swift`, `import-cold-turkey.swift` |
+| `scripts/` | `build.sh`, `make-dmg.sh`, `make-icon.swift` |
 | `launchd/` | the launch agent |
 
 Rules of thumb:
