@@ -94,6 +94,7 @@ struct AppSettings: Codable, Equatable {
     // Auto-start: if "What's next?" stays unanswered this long, start an activity by itself.
     var autoStartAfterMinutes = 15   // 0 = never
     var autoStartMinutes = 30        // length of that session
+    var pickerFullScreen = false     // "What's next?" covers the whole screen and can't be moved aside
 
     // Night: block stays on, nothing is asked. Minutes since midnight.
     var nightEnabled = true

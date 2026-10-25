@@ -68,4 +68,11 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 2) -> Date {
         n.activities[0].icon = "brain"                    // looks don't matter
         #expect(loosenings(from: o, to: n).isEmpty)
     }
+
+    @Test func fullScreenPickerCanOnlyBeTurnedOn() {
+        var o = AppSettings(); o.pickerFullScreen = true
+        var n = o; n.pickerFullScreen = false
+        #expect(loosenings(from: o, to: n) == ["a smaller \"What's next?\""])
+        #expect(loosenings(from: n, to: o).isEmpty)
+    }
 }

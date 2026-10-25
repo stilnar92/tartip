@@ -57,6 +57,9 @@ enum Warnings {
             + " Once a night has started it can't be lifted until \(clockLabel(s.nightTo))."
     }
 
+    static let fullScreenPicker =
+        "Whenever nothing is running, \"What's next?\" will cover the whole screen, menu bar included, and every other screen goes dark. It can't be moved or hidden: the only way on is to pick an activity or free time."
+
     static func lock(_ l: LockSettings) -> String {
         let looser = "you won't be able to remove activities or blocked apps and sites, cut days or hours, add free time, or turn night, auto-start or this lock off."
         switch l.mode {

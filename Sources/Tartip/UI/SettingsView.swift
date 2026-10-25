@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var limitsByDay: Set<UUID> = []      // "different limit on some days" opened
     @State private var planDay = Calendar.current.component(.weekday, from: Date())
     @State private var askNight = false                  // warning before night is switched on
+    @State private var askFullScreen = false             // warning before "What's next?" goes full screen
     @State private var askDelete: ActivitySetting?       // "Delete activity?" waiting for an answer
     @State private var askLock: LockSettings?            // warning before the settings lock gets on or stronger
     @State private var newActivity = ""
@@ -49,6 +50,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 22) {
             PageTitle(title: "Rules", subtitle: "Night, free time, session length, and when settings may change.")
             lockBanner
+            pickerSection
             nightSection
             freeTimeSection
             durationSection
@@ -164,6 +166,24 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
         .card(open ? st.color : nil, radius: 9)
+    }
+
+    private var pickerSection: some View {
+        group("What's next?", "The window that asks what you'll do whenever nothing is running.") {
+            Toggle("Full screen", isOn: Binding(get: { settings.value.pickerFullScreen },
+                                                set: { on in if on { askFullScreen = true } else { settings.value.pickerFullScreen = false } }))
+                .toggleStyle(.switch).controlSize(.small)
+                .alert("Show \"What's next?\" full screen?", isPresented: $askFullScreen) {
+                    Button("Full screen") { settings.value.pickerFullScreen = true }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text(Warnings.fullScreenPicker)
+                }
+            Text(settings.value.pickerFullScreen
+                 ? "Covers the whole screen and can't be moved; other screens go dark."
+                 : "A window in the middle of the screen that can be dragged aside but not closed.")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+        }
     }
 
     private var nightSection: some View {
