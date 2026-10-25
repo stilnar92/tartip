@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var limitsByDay: Set<UUID> = []      // "different limit on some days" opened
     @State private var planDay = Calendar.current.component(.weekday, from: Date())
     @State private var askNight = false                  // warning before night is switched on
+    @State private var askDelete: ActivitySetting?       // "Delete activity?" waiting for an answer
     @State private var askLock: LockSettings?            // warning before the settings lock gets on or stronger
     @State private var newActivity = ""
     @State private var optionsText = Settings.shared.value.durationOptions.map(String.init).joined(separator: ", ")
@@ -49,9 +50,16 @@ struct SettingsView: View {
     // MARK: sections
 
     private var activitiesSection: some View {
-        group("Your list", "Set a daily limit with the stepper; tap ⌄ for days, hours and what it opens.") {
+        group("Your list", "Set a daily limit with the stepper; Edit for days, hours, what it blocks and opens.") {
             ForEach($settings.value.activities) { $a in
                 activityRow($a)
+            }
+            .alert("Delete \(askDelete?.name ?? "")?", isPresented: Binding(get: { askDelete != nil }, set: { if !$0 { askDelete = nil } }),
+                   presenting: askDelete) { a in
+                Button("Delete", role: .destructive) { settings.value.activities.removeAll { $0.id == a.id } }
+                Button("Cancel", role: .cancel) {}
+            } message: { a in
+                Text("It leaves your list and today's plan. Past sessions stay in Stats; its block stays in blocks.json.")
             }
             HStack(spacing: 6) {
                 TextField("New activity (locks the block with its name)", text: $newActivity)
@@ -98,18 +106,15 @@ struct SettingsView: View {
                     .frame(width: 60, alignment: .trailing)
                 Stepper("", value: a.dailyMinutes, in: 0...720, step: 15).labelsHidden().controlSize(.small)
                     .help(item.dayMinutes.isEmpty ? "Daily limit" : "Usual daily limit; some days have their own (⌄)")
-                // A plain button only answers on its glyph's pixels; give both a normal-sized target.
+                // A labelled button: a bare chevron was hard to see, hit and understand.
                 Button { toggle(item) } label: {
-                    Image(systemName: open ? "chevron.up" : "chevron.down").font(.system(size: 11, weight: .semibold))
-                        .frame(width: 28, height: 28).contentShape(Rectangle())
+                    Label(open ? "Done" : "Edit", systemImage: open ? "chevron.up" : "slider.horizontal.3")
+                        .font(.system(size: 12, weight: .medium))
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .pill(selected: open)
                 }
-                .buttonStyle(.plain).foregroundStyle(.secondary)
-                .help("Days, hours, block, look and what it opens")
-                Button { settings.value.activities.removeAll { $0.id == item.id } } label: {
-                    Image(systemName: "trash").font(.system(size: 11))
-                        .frame(width: 28, height: 28).contentShape(Rectangle())
-                }
-                .buttonStyle(.plain).foregroundStyle(.secondary)
+                .buttonStyle(.plain)
+                .help("Days, limits, hours, what it blocks, what it opens, look")
             }
             // The rest of the row (not the name or the stepper) opens and closes it too.
             .contentShape(Rectangle())
@@ -142,6 +147,13 @@ struct SettingsView: View {
                         Divider()
                         OpensEditor(model: model, activity: item)
                     }
+                    // Deleting lives here, away from Edit, and asks first.
+                    Divider()
+                    Button(role: .destructive) { askDelete = item } label: {
+                        Label("Delete \(item.name.isEmpty ? "activity" : item.name)", systemImage: "trash")
+                            .font(.system(size: 12))
+                    }
+                    .buttonStyle(.plain).foregroundStyle(Theme.red)
                 }
                 .padding(.leading, 26)
             }
