@@ -66,6 +66,11 @@ struct SettingsView: View {
         }
     }
 
+    private func toggle(_ item: ActivitySetting) {
+        if expanded.contains(item.id) { expanded.remove(item.id) } else { expanded.insert(item.id) }
+        log("ui    \(item.name) \(expanded.contains(item.id) ? "opened" : "closed")")
+    }
+
     private func activityRow(_ a: Binding<ActivitySetting>) -> some View {
         let item = a.wrappedValue
         let st = ActivityStyle.of(item)
@@ -93,18 +98,22 @@ struct SettingsView: View {
                     .frame(width: 60, alignment: .trailing)
                 Stepper("", value: a.dailyMinutes, in: 0...720, step: 15).labelsHidden().controlSize(.small)
                     .help(item.dayMinutes.isEmpty ? "Daily limit" : "Usual daily limit; some days have their own (⌄)")
-                Button {
-                    if open { expanded.remove(item.id) } else { expanded.insert(item.id) }
-                } label: {
+                // A plain button only answers on its glyph's pixels; give both a normal-sized target.
+                Button { toggle(item) } label: {
                     Image(systemName: open ? "chevron.up" : "chevron.down").font(.system(size: 11, weight: .semibold))
+                        .frame(width: 28, height: 28).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
                 .help("Days, hours, block, look and what it opens")
                 Button { settings.value.activities.removeAll { $0.id == item.id } } label: {
                     Image(systemName: "trash").font(.system(size: 11))
+                        .frame(width: 28, height: 28).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
             }
+            // The rest of the row (not the name or the stepper) opens and closes it too.
+            .contentShape(Rectangle())
+            .onTapGesture { toggle(item) }
             if open {
                 VStack(alignment: .leading, spacing: 8) {
                     SectionLabel(text: "Days")
