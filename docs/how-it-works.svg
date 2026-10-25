@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 430" width="900" height="430" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>How Tärtip works: it asks what's next, opens your workspace, keeps you focused, asks what you did, and asks again.</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f3f8f4"/>
+      <stop offset="1" stop-color="#e6f0e9"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0" stop-color="#5a9a72"/>
+      <stop offset="1" stop-color="#2a5e47"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3f7a5b"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#1f3d2e" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <rect width="900" height="430" rx="22" fill="url(#bg)"/>
+
+  <!-- Step cards -->
+  <g filter="url(#shadow)">
+    <rect x="24" y="40" width="192" height="236" rx="16" fill="#ffffff"/>
+    <rect x="248" y="40" width="192" height="236" rx="16" fill="#ffffff"/>
+    <rect x="472" y="40" width="192" height="236" rx="16" fill="#ffffff"/>
+    <rect x="696" y="40" width="180" height="236" rx="16" fill="#ffffff"/>
+  </g>
+
+  <!-- 1. What's next? -->
+  <circle cx="60" cy="80" r="20" fill="url(#mark)"/>
+  <text x="60" y="87" text-anchor="middle" font-size="21" font-weight="700" fill="#ffffff">?</text>
+  <text x="40" y="128" font-size="17" font-weight="700" fill="#1d3328">What's next?</text>
+  <text font-size="13" fill="#4b5d53">
+    <tspan x="40" y="154">Free? Tärtip asks right</tspan>
+    <tspan x="40" y="172">away, over everything.</tspan>
+    <tspan x="40" y="190">The window can't be</tspan>
+    <tspan x="40" y="208">closed: you just choose.</tspan>
+  </text>
+  <rect x="40" y="226" width="160" height="34" rx="9" fill="#eef5f0"/>
+  <text font-size="11.5" fill="#2f6b4d">
+    <tspan x="50" y="240">No answer in 15 min?</tspan>
+    <tspan x="50" y="254" font-weight="600">It starts one for you.</tspan>
+  </text>
+
+  <!-- 2. Workspace -->
+  <g transform="translate(264 60)">
+    <rect width="18" height="18" rx="4.5" fill="#5a9a72"/>
+    <rect x="22" width="18" height="18" rx="4.5" fill="#3f7a5b"/>
+    <rect y="22" width="18" height="18" rx="4.5" fill="#3f7a5b"/>
+    <rect x="22" y="22" width="18" height="18" rx="4.5" fill="#2a5e47"/>
+  </g>
+  <text x="264" y="128" font-size="17" font-weight="700" fill="#1d3328">You're in the work</text>
+  <text font-size="13" fill="#4b5d53">
+    <tspan x="264" y="154">The activity's apps,</tspan>
+    <tspan x="264" y="172">links, files and folders</tspan>
+    <tspan x="264" y="190">open by themselves.</tspan>
+    <tspan x="264" y="208">No hunting for where</tspan>
+    <tspan x="264" y="226">you left off.</tspan>
+  </text>
+
+  <!-- 3. Focus -->
+  <g transform="translate(508 80)">
+    <circle r="19" fill="none" stroke="#dbe9e0" stroke-width="5"/>
+    <path d="M0,-19 A19,19 0 1 1 -16.5,9.5" fill="none" stroke="url(#mark)" stroke-width="5" stroke-linecap="round"/>
+    <path d="M0,-8 L0,0 L6,4" fill="none" stroke="#2a5e47" stroke-width="2.4" stroke-linecap="round"/>
+  </g>
+  <text x="488" y="128" font-size="17" font-weight="700" fill="#1d3328">Focus</text>
+  <text font-size="13" fill="#4b5d53">
+    <tspan x="488" y="154">Distracting apps quit,</tspan>
+    <tspan x="488" y="172">blocked sites show</tspan>
+    <tspan x="488" y="190">"Not now". Stopping</tspan>
+    <tspan x="488" y="208">early doesn't lift the</tspan>
+    <tspan x="488" y="226">block.</tspan>
+  </text>
+
+  <!-- 4. Review -->
+  <circle cx="732" cy="80" r="20" fill="url(#mark)"/>
+  <path d="M722,80 L729,87 L742,73" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="712" y="128" font-size="17" font-weight="700" fill="#1d3328">Review</text>
+  <text font-size="13" fill="#4b5d53">
+    <tspan x="712" y="154">Time's up: one click</tspan>
+    <tspan x="712" y="172">says what you really</tspan>
+    <tspan x="712" y="190">did. It goes into</tspan>
+    <tspan x="712" y="208">honest stats.</tspan>
+  </text>
+
+  <!-- Arrows between steps -->
+  <path d="M220,158 L244,158" stroke="#3f7a5b" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <path d="M444,158 L468,158" stroke="#3f7a5b" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <path d="M668,158 L692,158" stroke="#3f7a5b" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- And again -->
+  <path d="M786,280 C786,330 760,338 700,338 L200,338 C140,338 120,330 120,284" fill="none" stroke="#3f7a5b" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#arrow)"/>
+  <rect x="330" y="322" width="240" height="32" rx="16" fill="#2f6b4d"/>
+  <text x="450" y="343" text-anchor="middle" font-size="13" font-weight="600" fill="#ffffff">…and again: always decided</text>
+
+  <!-- Night -->
+  <g transform="translate(24 374)">
+    <rect width="852" height="38" rx="12" fill="#2a3350"/>
+    <path d="M27,9 A10,10 0 1 0 37,26 A8,8 0 1 1 27,9 z" fill="#f3e9b5"/>
+    <text x="52" y="24" font-size="13" fill="#e8ebf5"><tspan font-weight="700">Night</tspan> (00:00–08:00 by default): nothing is asked, nothing can be started, the night block stays on. Go to sleep.</text>
+  </g>
+</svg>

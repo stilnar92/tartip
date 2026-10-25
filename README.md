@@ -10,6 +10,20 @@
 
 A small macOS menu bar app that **makes** you focus instead of waiting for you to decide to: deciding to start is the hard part, so the app does the pushing. It helps you **start** working and keeps you from drifting off. You pick what you'll work on; for a set time the app blocks the apps and sites that activity doesn't need, opens the ones it does, and afterwards asks what you actually did. Whenever nothing is running, it asks what's next, so the decision is always yours and always made.
 
+<p align="center">
+  <img src="docs/how-it-works.svg" width="900" alt="How Tärtip works: What's next? → your workspace opens → focus with distractions blocked → review → and again. At night nothing is asked and the night block stays on.">
+</p>
+
+## Why it works
+
+- **It starts for you.** Most focus apps wait until you find the willpower to sit down and choose, and that's exactly where people get stuck: starting takes effort. Tärtip doesn't wait. The moment you're free it asks what's next, the window stays until you answer, and if you don't answer in 15 minutes it picks the activity that's furthest behind and starts it.
+- **You land straight in the work.** Starting an activity opens its apps, links, files and folders. No hunting, no "where was I", no thinking about what to open: you're in context within seconds.
+- **Distractions are gone, not just discouraged.** Blocked apps quit as soon as they start, and blocked sites turn into a "Not now" page. Stopping the timer early doesn't lift the block.
+- **Breaks stay breaks.** Rest has its own block, so a break doesn't turn into a movie. Free time for movies or YouTube comes from a daily budget and can't be taken twice in a row.
+- **A plan made calmly holds.** Daily limits, weekdays and hours shape the day. The settings lock makes sure you can only loosen them after a delay or in a set window, not in a weak moment.
+- **Honest stats.** After each session one click says what you actually did, and that's what Stats shows.
+- **It sends you to bed.** At night nothing can be started and the night block stays on until morning.
+
 ## Install
 
 You need macOS 13 or later (Apple silicon or Intel).
