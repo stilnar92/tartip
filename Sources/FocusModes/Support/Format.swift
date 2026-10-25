@@ -46,6 +46,16 @@ func daysLabel(_ days: [Int]) -> String {
     return ordered.compactMap { weekdayShort[$0] }.joined(separator: ", ")
 }
 
+// "a, b and c" in English: the UI isn't localized, so the system language mustn't leak in.
+func andList(_ l: [String]) -> String {
+    l.count < 2 ? l.joined() : l.dropLast().joined(separator: ", ") + " and " + l.last!
+}
+
+// "a, b, c and 4 more": long lists cut short.
+func andList(_ l: [String], atMost n: Int, more noun: String = "") -> String {
+    l.count <= n ? andList(l) : l.prefix(n).joined(separator: ", ") + " and \(l.count - n) more" + (noun.isEmpty ? "" : " \(noun)")
+}
+
 // "4:05" until `end`.
 func countdown(to end: Date, from now: Date) -> String {
     let sec = max(0, Int(end.timeIntervalSince(now)))

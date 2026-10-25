@@ -6,6 +6,7 @@ struct TodayList: View {
     @ObservedObject var model: Model
     @ObservedObject var clock: Clock     // hours and limits change as time passes
     @State private var hovered: String?
+    @State private var request: StartRequest?    // waiting for "Start" in the warning
 
     var body: some View {
         let limits = model.limits
@@ -33,6 +34,30 @@ struct TodayList: View {
             }
             freeTime
         }
+        .alert("Start \(request?.activity ?? "")?", isPresented: Binding(get: { request != nil }, set: { if !$0 { request = nil } }),
+               presenting: request) { r in
+            Button("Start") {
+                Warnings.acknowledge(block: Settings.current.block(for: r.activity))
+                model.startActivity(r.activity, minutes: r.minutes, pomodoro: r.pomodoro)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { r in
+            Text(Warnings.start(r.activity, minutes: length(r)))
+        }
+    }
+
+    // A first start (or one after its block changed) asks first; otherwise it starts right away.
+    private func tryStart(_ a: String, minutes: Int? = nil, pomodoro: Bool? = nil) {
+        if Warnings.needsStartConfirm(block: Settings.current.block(for: a)) {
+            request = StartRequest(activity: a, minutes: minutes, pomodoro: pomodoro)
+        } else {
+            model.startActivity(a, minutes: minutes, pomodoro: pomodoro)
+        }
+    }
+
+    private func length(_ r: StartRequest) -> Int {
+        let s = Settings.current
+        return r.pomodoro ?? model.pomodoro ? s.pomodoroPhases().reduce(0) { $0 + $1.minutes } : max(s.minMinutes, r.minutes ?? model.minutes)
     }
 
     // Length for the next start: pills, plus 🍅 for Pomodoro.
@@ -66,7 +91,7 @@ struct TodayList: View {
         let closed = limits.opensLabel(a)
         let canStart = !done && closed == nil && model.phase.canStart
         let hover = hovered == a && canStart
-        return Button { model.startActivity(a) } label: {
+        return Button { tryStart(a) } label: {
             HStack(spacing: 10) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
@@ -106,9 +131,9 @@ struct TodayList: View {
         // Right-click: start with a specific length.
         .contextMenu {
             ForEach(Settings.current.sessionLengths, id: \.self) { n in
-                Button("Start for \(minutesLabel(n))") { model.startActivity(a, minutes: n, pomodoro: false) }
+                Button("Start for \(minutesLabel(n))") { tryStart(a, minutes: n, pomodoro: false) }
             }
-            Button("Start Pomodoro") { model.startActivity(a, pomodoro: true) }
+            Button("Start Pomodoro") { tryStart(a, pomodoro: true) }
         }
     }
 
@@ -138,4 +163,11 @@ struct TodayList: View {
         .padding(.horizontal, 12).padding(.vertical, 9)
         .card(radius: 12)
     }
+}
+
+struct StartRequest: Identifiable {
+    let id = UUID()
+    let activity: String
+    let minutes: Int?
+    let pomodoro: Bool?
 }

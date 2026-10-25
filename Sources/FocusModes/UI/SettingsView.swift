@@ -9,6 +9,8 @@ struct SettingsView: View {
     @State var expanded: Set<UUID> = []                 // rows opened with ⌄
     @State private var limitsByDay: Set<UUID> = []      // "different limit on some days" opened
     @State private var planDay = Calendar.current.component(.weekday, from: Date())
+    @State private var askNight = false                  // warning before night is switched on
+    @State private var askLock: LockSettings?            // warning before the settings lock gets on or stronger
     @State private var newActivity = ""
     @State private var optionsText = Settings.shared.value.durationOptions.map(String.init).joined(separator: ", ")
 
@@ -141,7 +143,15 @@ struct SettingsView: View {
 
     private var nightSection: some View {
         group("Night", "Nothing is asked and no timers run; the night block stays on so you go to sleep.") {
-            Toggle("Night mode", isOn: $settings.value.nightEnabled).toggleStyle(.switch).controlSize(.small)
+            Toggle("Night mode", isOn: Binding(get: { settings.value.nightEnabled },
+                                               set: { on in if on { askNight = true } else { settings.value.nightEnabled = false } }))
+                .toggleStyle(.switch).controlSize(.small)
+                .alert("Turn night on?", isPresented: $askNight) {
+                    Button("Turn on") { settings.value.nightEnabled = true }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text(Warnings.night({ var v = settings.value; v.nightEnabled = true; return v }()))
+                }
             if settings.value.nightEnabled {
                 row("From") { clockStepper($settings.value.nightFrom) }
                 row("To") { clockStepper($settings.value.nightTo) }
@@ -157,7 +167,9 @@ struct SettingsView: View {
     private var freeTimeSection: some View {
         group("Free time", "Nothing blocked: movies, YouTube, anything. Only when you take it on purpose; idle time doesn't count.") {
             row("Per day") { minuteStepper($settings.value.dailyFreeMinutes, 0...240, step: 5) }
-            row("One stretch at most") { minuteStepper($settings.value.maxRestMinutes, 5...120, step: 5) }
+            row("Longest break at once") { minuteStepper($settings.value.maxRestMinutes, 5...120, step: 5) }
+            Text("Free time is taken in pieces; this caps one piece. It never goes past what's left for the day.")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
         }
     }
 
@@ -197,7 +209,7 @@ struct SettingsView: View {
         TimelineView(.periodic(from: .now, by: 30)) { _ in
             VStack(alignment: .leading, spacing: 6) {
                 if let until = settings.lockedUntil {
-                    Label("Locked until \(Fmt.weekdayClock.string(from: until)). You can make things stricter, not looser.",
+                    Label("Locked until \(Fmt.weekdayClock.string(from: until)). You can make things stricter, not looser, and anything you add now stays until then.",
                           systemImage: "lock.fill")
                         .foregroundStyle(Theme.text)
                 } else if let at = settings.locksAt {
@@ -213,14 +225,31 @@ struct SettingsView: View {
         }
     }
 
+    // Switching the lock on, or making it last longer, asks first; anything else just applies
+    // (and a weaker lock is refused while locked).
+    private func setLock(_ change: (inout LockSettings) -> Void) {
+        var l = settings.value.lock
+        change(&l)
+        guard l != settings.value.lock else { return }
+        let stronger = l.mode != settings.value.lock.mode || l.hours > settings.value.lock.hours
+        if stronger { askLock = l } else { settings.value.lock = l }
+    }
+
     private var lockSection: some View {
         let lock = $settings.value.lock
         return group("Changing settings",
                      "So a plan made calmly can't be undone in a weak moment. While locked, anything that makes things stricter still works.") {
             HStack(spacing: 6) {
                 choicePill("Any time", lock.wrappedValue.mode == .off) { lock.wrappedValue.mode = .off }
-                choicePill("Lock after a change", lock.wrappedValue.mode == .afterChange) { lock.wrappedValue.mode = .afterChange }
-                choicePill("Only at set hours", lock.wrappedValue.mode == .hours) { lock.wrappedValue.mode = .hours }
+                choicePill("Lock after a change", lock.wrappedValue.mode == .afterChange) { setLock { $0.mode = .afterChange } }
+                choicePill("Only at set hours", lock.wrappedValue.mode == .hours) { setLock { $0.mode = .hours } }
+            }
+            .alert("Lock your settings?", isPresented: Binding(get: { askLock != nil }, set: { if !$0 { askLock = nil } }),
+                   presenting: askLock) { l in
+                Button("Lock") { settings.value.lock = l }
+                Button("Cancel", role: .cancel) {}
+            } message: { l in
+                Text(Warnings.lock(l))
             }
             switch lock.wrappedValue.mode {
             case .off:
@@ -230,7 +259,7 @@ struct SettingsView: View {
                     Text("Locked for").font(.system(size: 13))
                     ForEach([2, 6, 12, 24, 48, 168], id: \.self) { h in
                         choicePill(h < 24 ? "\(h)h" : h == 24 ? "1 day" : h == 168 ? "1 week" : "\(h / 24) days",
-                                   lock.wrappedValue.hours == h) { lock.wrappedValue.hours = h }
+                                   lock.wrappedValue.hours == h) { setLock { $0.hours = h } }
                     }
                 }
                 Text("Starts 10 minutes after your first change, so you can finish what you're doing.")

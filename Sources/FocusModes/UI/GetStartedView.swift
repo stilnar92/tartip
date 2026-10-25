@@ -17,6 +17,7 @@ struct GetStartedView: View {
     @State private var ownApps: [PickedApp] = []
     @State private var ownSites: [String] = []
     @State private var newSite = ""
+    @State private var askStart = false     // the last look at what Start switches on
     @State private var newName = ""
     @State private var newIcon = "circle.fill"
 
@@ -309,7 +310,8 @@ struct GetStartedView: View {
         VStack(alignment: .leading, spacing: 10) {
             choice("Per day", [0, 30, 60, 90, 120], $settings.value.dailyFreeMinutes) { $0 == 0 ? "None" : minutesLabel($0) }
             if settings.value.dailyFreeMinutes > 0 {
-                choice("One stretch at most", [15, 30, 60, 120], $settings.value.maxRestMinutes) { minutesLabel($0) }
+                choice("Longest break at once", [15, 30, 60, 120], $settings.value.maxRestMinutes) { minutesLabel($0) }
+                Text("Free time is taken in pieces; this caps one piece.").font(.system(size: 11)).foregroundStyle(Theme.text2)
             }
         }
     }
@@ -422,11 +424,8 @@ struct GetStartedView: View {
     private var summary: String {
         let appNames = allApps.filter { apps.contains($0.id) }.map(\.name)
         let chosen = allSites.filter(sites.contains)
-        // "a, b and c" in English: the UI isn't localized, so the system language mustn't leak in.
-        let and = { (l: [String]) in l.count < 2 ? l.joined() : l.dropLast().joined(separator: ", ") + " and " + l.last! }
-        let what = [appNames.isEmpty ? nil : "closes " + and(appNames),
-                    chosen.isEmpty ? nil : "blocks " + (chosen.count <= 3 ? and(chosen)
-                                                        : chosen.prefix(3).joined(separator: ", ") + " and \(chosen.count - 3) more sites")]
+        let what = [appNames.isEmpty ? nil : "closes " + andList(appNames),
+                    chosen.isEmpty ? nil : "blocks " + andList(chosen, atMost: 3, more: "sites")]
             .compactMap { $0 }
         return what.isEmpty ? "Nothing is blocked yet: add apps or sites above, or later in Activities."
                             : "During a session Focus " + what.joined(separator: " and ") + "."
@@ -445,7 +444,7 @@ struct GetStartedView: View {
             Text("After Start, Focus takes over: \"What's next?\" comes up right away.")
                 .font(.system(size: 12)).foregroundStyle(Theme.text2)
             HStack(spacing: 12) {
-                Button { start() } label: {
+                Button { askStart = true } label: {
                     Text("Start").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
                         .padding(.horizontal, 22).padding(.vertical, 9)
                         .background(Capsule().fill(canStart ? Theme.accent : Theme.text2.opacity(0.4)))
@@ -459,6 +458,26 @@ struct GetStartedView: View {
         }
         .padding(16)
         .card(radius: 14)
+        .alert("Ready to let Focus take over?", isPresented: $askStart) {
+            Button("Start") { start() }
+            Button("Not yet", role: .cancel) {}
+        } message: {
+            Text(startWarning)
+        }
+    }
+
+    // Everything Start switches on, in one place, before it does.
+    private var startWarning: String {
+        let s = settings.value
+        var out = ["From now on Focus decides when you start: whenever nothing is running, \"What's next?\" comes up over everything and can't be closed"
+                   + (s.autoStartAfterMinutes > 0 ? ", and if you don't answer within \(s.autoStartAfterMinutes) min it starts an activity for you." : ".")]
+        out.append(summary + " Stopping a session early ends the timer, not the block.")
+        out.append(s.dailyFreeMinutes > 0 ? "Free time: \(minutesLabel(s.dailyFreeMinutes)) a day, the only break from it."
+                                          : "There's no free time, so there's no break from it.")
+        if s.nightEnabled {
+            out.append("Every night \(clockLabel(s.nightFrom))–\(clockLabel(s.nightTo)) the same apps and sites stay blocked, and that can't be lifted until morning.")
+        }
+        return out.joined(separator: "\n\n")
     }
 
     private func start() {
