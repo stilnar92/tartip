@@ -9,7 +9,6 @@ struct SettingsView: View {
     let page: MainTab
     @State var expanded: Set<UUID> = []                 // rows opened with ⌄
     @State private var limitsByDay: Set<UUID> = []      // "different limit on some days" opened
-    @State private var planDay = Calendar.current.component(.weekday, from: Date())
     @State private var askNight = false                  // warning before night is switched on
     @State private var askFullScreen = false             // warning before "What's next?" goes full screen
     @State private var askDelete: ActivitySetting?       // "Delete activity?" waiting for an answer
@@ -322,10 +321,12 @@ struct SettingsView: View {
 
     // How one weekday's limits add up: active work, Rest (with blocking), free time,
     // and what's left of the waking day (24 h minus night). Only what's planned that day counts.
+    // Below, today as two calendar columns: the plan, and what actually happened.
     private var dayPlan: some View {
         let s = settings.value
-        let day = s.activities.filter { $0.isPlanned(onWeekday: planDay) }
-        let limit = { (a: ActivitySetting) in a.limit(onWeekday: planDay) }
+        let weekday = Calendar.current.component(.weekday, from: Date())
+        let day = s.activities.filter { $0.isPlanned(onWeekday: weekday) }
+        let limit = { (a: ActivitySetting) in a.limit(onWeekday: weekday) }
         let isRest = { (a: ActivitySetting) in a.name.lowercased() == "rest" }
         let active = day.filter { !isRest($0) }.reduce(0) { $0 + limit($1) }
         let rest = day.filter(isRest).reduce(0) { $0 + limit($1) }
@@ -340,15 +341,11 @@ struct SettingsView: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Your day").font(.system(size: 13, weight: .semibold))
+                Text("Today").font(.system(size: 13, weight: .semibold))
+                Text(Fmt.dayTitle.string(from: Date())).font(.system(size: 12)).foregroundStyle(.secondary)
                 Spacer()
                 Text("\(minutesLabel(planned)) planned of \(minutesLabel(awake)) awake")
                     .font(.system(size: 11)).foregroundStyle(planned > awake ? .red : .secondary)
-            }
-            HStack(spacing: 4) {
-                ForEach(weekOrder, id: \.self) { d in
-                    choicePill(weekdayShort[d] ?? "", planDay == d) { planDay = d }
-                }
             }
             if day.isEmpty && !s.activities.isEmpty {
                 Text("Nothing planned: a day off, \"What's next?\" won't ask.")
@@ -381,6 +378,17 @@ struct SettingsView: View {
             if planned > awake {
                 Text("That's more than your waking day.").font(.system(size: 11)).foregroundStyle(.red)
             }
+            Divider().opacity(0.5)
+            let w = wakingHours(s)
+            let plan = DayTimeline.Column(title: "Plan", slots: Tartip.planDay(s, weekday: weekday, from: w.from, to: w.to))
+            if let model {
+                let actual = model.todayActual
+                DayTimeline(from: w.from, to: w.to, columns: [plan, .init(title: "Actual", slots: actual.slots)], now: actual.now)
+            } else {
+                DayTimeline(from: w.from, to: w.to, columns: [plan])
+            }
+            Text("Plan: how today can go with your hours and limits. \"Again\": nothing else is open then, so its limit starts over. Actual: the sessions you ran.")
+                .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
         .card(radius: 12)

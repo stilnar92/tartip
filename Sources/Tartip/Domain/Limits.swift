@@ -48,6 +48,16 @@ struct Limits {
 
     func canStart(_ activity: String) -> Bool { isToday(activity) && isOpen(activity) && hasTimeLeft(activity) }
 
+    // Time for a new round: no work can start now, but some that's planned and open is used up.
+    // Never at night, when nothing is asked anyway.
+    func needsNewRound(_ activities: [String]) -> Bool {
+        guard !settings.isNight(at: now, calendar: calendar) else { return false }
+        let open = activities.filter { isToday($0) && isOpen($0) }.map { a in
+            OpenActivity(name: a, limitSeconds: limitMinutes(a) * 60, usedSeconds: usedToday(a))
+        }
+        return roundIsUsedUp(open)
+    }
+
     // What auto-start picks when "What's next?" goes unanswered: of the activities that can
     // start now, the one furthest behind its daily limit (most time left), then ones without
     // a limit, in list order. Rest only if nothing else can start.

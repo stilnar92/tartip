@@ -84,7 +84,77 @@ final class Model: ObservableObject {
     }
 
     var limits: Limits {
-        Limits(settings: Settings.current, today: recordsSince(Calendar.current.startOfDay(for: now)), now: now)
+        Limits(settings: Settings.current, today: recordsSince(roundStart), now: now)
+    }
+
+    // Today's round: 1 until the limits first start over.
+    var roundNumber: Int { todaysRound?.number ?? 1 }
+    // Where the limits count from: the start of the day, or of today's round.
+    var roundStart: Date { todaysRound?.since ?? Calendar.current.startOfDay(for: now) }
+    private var todaysRound: Round? { state.round.flatMap { $0.day == dayKey(now) ? $0 : nil } }
+
+    // Today's waking hours: what's been done so far, then how the rest can go from now on.
+    struct DayView {
+        var from: Int
+        var to: Int
+        var slots: [PlanSlot]
+        var now: Int?
+    }
+
+    // Today until now: the sessions that ran, and the time with none.
+    var todayActual: DayView {
+        let w = wakingHours(Settings.current)
+        // Minutes in the waking day's frame, which may run past midnight.
+        let inDay = { (m: Int) in m < w.from && m + 1440 <= w.to ? m + 1440 : m }
+        let nowM = inDay(minuteOfDay(now))
+        let done = recordsSince(Calendar.current.startOfDay(for: now)).map { r -> PlanSlot in
+            let start = inDay(minuteOfDay(r.start))
+            return PlanSlot(start: start, end: start + max(1, r.seconds / 60),
+                            activity: r.actual.first ?? r.planned ?? otherActivity, done: true)
+        }
+        return DayView(from: w.from, to: w.to, slots: pastDay(done, from: w.from, until: min(nowM, w.to)),
+                       now: nowM >= w.from && nowM < w.to ? nowM : nil)
+    }
+
+    // Today in one line for the panel: what happened, then how the rest can go from now on.
+    var todayView: DayView {
+        let s = Settings.current
+        let actual = todayActual
+        let w = (from: actual.from, to: actual.to)
+        let nowM = actual.now ?? (minuteOfDay(now) < w.from ? w.from : w.to)
+        var slots = actual.slots
+        // What's running now goes on until it ends; the plan picks up after that.
+        var planFrom = max(nowM, w.from)
+        var used = secondsByActivity(since: roundStart)
+        // Used up in an earlier round today: shown as a repeat from here on.
+        let limits = limits
+        let repeats = secondsByActivity(since: Calendar.current.startOfDay(for: now)).reduce(into: [String: Int]()) { out, e in
+            let limit = limits.limitMinutes(e.key) * 60
+            let earlier = e.value - (used[e.key] ?? 0)
+            if limit > 0, earlier >= limit { out[e.key] = earlier / limit }
+        }
+        if let sess = session, let p = sess.planned {
+            let left = max(0, Int(sess.end.timeIntervalSince(now)))
+            slots.append(PlanSlot(start: nowM, end: nowM + left / 60, activity: p, round: (repeats[p] ?? 0) + 1))
+            used[p, default: 0] += left
+            planFrom = max(planFrom, nowM + left / 60)
+        } else if let end = freeTimeEnd {
+            let left = max(0, Int(end.timeIntervalSince(now))) / 60
+            slots.append(PlanSlot(start: nowM, end: nowM + left, activity: "Free time"))
+            planFrom = max(planFrom, nowM + left)
+        }
+        if planFrom < w.to {
+            slots += planDay(s, weekday: Calendar.current.component(.weekday, from: now), from: planFrom, to: w.to,
+                             used: used, repeats: repeats)
+        }
+        return DayView(from: w.from, to: w.to, slots: slots, now: nowM >= w.from && nowM < w.to ? nowM : nil)
+    }
+
+    // Nothing can start but some work is open and used up: its limits count from zero again.
+    private func startRoundIfStuck() {
+        guard limits.needsNewRound(todayActivities) else { return }
+        state.round = Round(day: dayKey(now), number: roundNumber + 1, since: now)
+        log("round \(roundNumber): limits start over")
     }
 
     // Time in sessions today, by the clock, counting the running one.
@@ -289,6 +359,7 @@ final class Model: ObservableObject {
             notify("Free time is over", "Pick what's next.")
         case .picking:
             if state.pickingSince == nil { state.pickingSince = now }
+            startRoundIfStuck()   // the picker opened, then what was left closed or ran out
             if let at = autoStartAt, now >= at { autoStart() }
         case .reviewing:
             return
@@ -297,6 +368,7 @@ final class Model: ObservableObject {
             // The picker can't be closed; nothing is blocked until you pick.
             // A day with nothing planned is a day off: nothing is pushed.
             guard !night, !Setup.isPending, !todayActivities.isEmpty, userPresent() else { return }
+            startRoundIfStuck()
             // Day done: every limit reached and no free time to offer, so there's nothing to choose.
             let limits = limits
             guard activities.contains(where: limits.canStart) || canRest else { return }

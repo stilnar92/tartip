@@ -161,6 +161,14 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(back == s)
     }
 
+    @Test func roundSurvivesAndOldStateLoadsWithout() throws {
+        var s = StoredState()
+        let old = try JSONDecoder().decode(StoredState.self, from: JSONEncoder().encode(s))   // saved before rounds
+        #expect(old.round == nil)
+        s.round = Round(day: "2026-03-01", number: 2, since: at(11))
+        #expect(try JSONDecoder().decode(StoredState.self, from: JSONEncoder().encode(s)) == s)
+    }
+
     @Test func migratesTheOldKeys() throws {
         let name = "TartipTests.\(UUID().uuidString)"
         let d = try #require(UserDefaults(suiteName: name))

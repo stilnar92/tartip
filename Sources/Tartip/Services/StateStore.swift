@@ -16,6 +16,14 @@ struct StoredState: Codable, Equatable {
     var opened: OpenedWorkspace?       // what the last start opened, to clean up on the next
     var nightUntil: Date?              // the night lock already sent
     var pickingSince: Date?            // when "What's next?" opened, for auto-start
+    var round: Round?                  // today's limits started over (see roundIsUsedUp)
+}
+
+// Limits count sessions from `since` on, on `day` only.
+struct Round: Codable, Equatable {
+    var day: String
+    var number: Int
+    var since: Date
 }
 
 // One UserDefaults key holds the whole StoredState.

@@ -34,6 +34,15 @@ struct TodayList: View {
             if !names.isEmpty && !names.contains(where: limits.hasTimeLeft) {
                 Label("All daily goals done 🎉", systemImage: "checkmark.seal.fill")
                     .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.accent)
+            } else if model.roundNumber > 1 {
+                Label("Round \(model.roundNumber): nothing else was open, so limits started over",
+                      systemImage: "arrow.counterclockwise")
+                    .font(.system(size: 12)).foregroundStyle(Theme.text2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !names.isEmpty {
+                let v = model.todayView
+                DayStrip(from: v.from, to: v.to, slots: v.slots, now: v.now)
             }
             freeTime
         }
