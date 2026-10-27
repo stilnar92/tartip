@@ -42,7 +42,7 @@ final class WindowCoordinator {
         switch phase {
         case .picking: prompt.show(ActivityPickerView(model: model, clock: model.clock), fullScreen: Settings.current.pickerFullScreen)
         case .reviewing: prompt.show(ReviewView(model: model))
-        case .idle, .session, .freeTime: prompt.hide()
+        case .idle, .session, .freeTime, .away: prompt.hide()
         }
     }
 }

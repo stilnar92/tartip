@@ -60,7 +60,7 @@ A dev build uses the same `~/modes` as the installed app, so back up the folder 
 | Path | What |
 |---|---|
 | `Sources/Tartip/App/` | entry point and single-instance check, `Model` (state, timer, sessions, free time, night), `Clock`, `WindowCoordinator` (prompt and main windows) |
-| `Sources/Tartip/Domain/` | pure logic: `Session` and `AppPhase`, session records, daily `Limits` and rounds, `DayPlan` (the day simulated for the timeline), `AppSettings` and night hours, `BlockRule` and its URL matching, `SettingsLock`, `Starter` (Get started's templates and suggested distractions) |
+| `Sources/Tartip/Domain/` | pure logic: `Session` and `AppPhase`, session records, daily `Limits` and rounds, `DayPlan` (the day in periods of what can be picked, and what ran), `AppSettings` and night hours, `BlockRule` and its URL matching, `SettingsLock`, `Starter` (Get started's templates and suggested distractions) |
 | `Sources/Tartip/Services/` | `Blocker` (locks, quitting blocked apps, checking Chrome's tabs), `Workspace` (apps and a Chrome window), `AutoStart` (the launch agent), `StateStore` (saved state), `SettingsStore`, `Setup` (first launch), `History`, `Log`, `Notifications`, `Permissions`, `Paths` |
 | `Sources/Tartip/UI/` | Today list, panel, "What's next?"/review, Get started, main window (stats, activities, rules), theme, logo |
 | `Tests/TartipTests/` | tests for the domain logic, URL matching, schedules, the settings lock, setup and the saved-state migration |

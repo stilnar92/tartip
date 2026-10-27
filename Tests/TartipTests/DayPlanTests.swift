@@ -42,78 +42,65 @@ private func hm(_ h: Int, _ m: Int = 0) -> Int { h * 60 + m }
         #expect(wakingHours(off) == (0, 1440))
     }
 
-    @Test func theExampleRepeatsTask1InTheGap() {
+    @Test func theExampleInPeriods() {
         let w = wakingHours(example)
-        let plan = planDay(example, weekday: monday, from: w.from, to: w.to)
-        #expect(plan.first == PlanSlot(start: hm(9, 30), end: hm(10, 30), activity: "Task 1"))
-        // Nothing else is open before 14:00, so Task 1 starts over until then.
-        let gap = plan.filter { $0.start >= hm(10, 30) && $0.end <= hm(14) }
-        #expect(gap.map(\.minutes).reduce(0, +) == hm(3, 30))
-        #expect(gap.allSatisfy { $0.activity == "Task 1" && $0.round > 1 })
-        // Task 2 and Task 3 still get their whole limit when they open.
-        #expect(plan.contains { $0.activity == "Task 2" && $0.start == hm(14) && $0.minutes == 120 })
-        #expect(plan.contains { $0.activity == "Task 3" && $0.start == hm(16) && $0.minutes == 180 })
-        #expect(!plan.contains { $0.activity == nil })
-        #expect(plan.last?.end == hm(21))
+        #expect(availability(example, weekday: monday, from: w.from, to: w.to) == [
+            Period(start: hm(9, 30), end: hm(14), available: ["Task 1"]),
+            Period(start: hm(14), end: hm(16), available: ["Task 1", "Task 2"]),
+            Period(start: hm(16), end: hm(21), available: ["Task 1", "Task 2", "Task 3"]),
+        ])
     }
 
-    @Test func nothingOpenIsAGap() {
+    @Test func nothingOpenIsAnEmptyPeriod() {
         let s = settings([act("Task 2", 120, 14, 21)])
-        let plan = planDay(s, weekday: monday, from: hm(9, 30), to: hm(21))
-        #expect(plan.first == PlanSlot(start: hm(9, 30), end: hm(14), activity: nil))
-        #expect(plan[1].activity == "Task 2" && plan[1].round == 1 && plan[1].minutes == 120)
+        #expect(availability(s, weekday: monday, from: hm(9, 30), to: hm(21)) == [
+            Period(start: hm(9, 30), end: hm(14), available: []),
+            Period(start: hm(14), end: hm(21), available: ["Task 2"]),
+        ])
     }
 
-    @Test func soonestClosingGoesFirst() {
-        // Both open at 9:30; English closes at 11:00, so it can't wait.
-        let s = settings([act("Work", 60), act("English", 30, 9, 11)])
-        let plan = planDay(s, weekday: monday, from: hm(9, 30), to: hm(11))
-        #expect(plan.first?.activity == "English")
-        #expect(plan[1].activity == "Work")
-    }
-
-    @Test func restOnlyWhenNothingElse() {
-        let s = settings([act("Rest", 30), act("Work", 60, 10, 21)])
-        let plan = planDay(s, weekday: monday, from: hm(9, 30), to: hm(11))
-        #expect(plan.first == PlanSlot(start: hm(9, 30), end: hm(10), activity: "Rest"))
-        #expect(plan[1].activity == "Work" && plan[1].start == hm(10))
-    }
-
-    @Test func noLimitFillsBeforeARound() {
-        let s = settings([act("Work", 60), act("Reading", 0)])
-        let plan = planDay(s, weekday: monday, from: hm(10), to: hm(12))
-        #expect(plan == [PlanSlot(start: hm(10), end: hm(11), activity: "Work"),
-                         PlanSlot(start: hm(11), end: hm(12), activity: "Reading")])
+    @Test func periodsCloseToo() {
+        let s = settings([act("Work", 60), act("English", 30, 13, 20)])
+        #expect(availability(s, weekday: monday, from: hm(9, 30), to: hm(21)) == [
+            Period(start: hm(9, 30), end: hm(13), available: ["Work"]),
+            Period(start: hm(13), end: hm(20), available: ["Work", "English"]),
+            Period(start: hm(20), end: hm(21), available: ["Work"]),
+        ])
     }
 
     @Test func otherWeekdaysAreLeftOut() {
         let s = settings([act("Arabic", 60, days: [4])])   // Wednesdays only
-        #expect(planDay(s, weekday: monday, from: hm(10), to: hm(11)) == [PlanSlot(start: hm(10), end: hm(11), activity: nil)])
-        #expect(planDay(s, weekday: 4, from: hm(10), to: hm(11)).first?.activity == "Arabic")
+        #expect(availability(s, weekday: monday, from: hm(10), to: hm(11)) == [Period(start: hm(10), end: hm(11), available: [])])
+        #expect(availability(s, weekday: 4, from: hm(10), to: hm(11)).first?.available == ["Arabic"])
     }
 
     @Test func hoursCanCrossMidnight() {
-        var s = settings([act("Late", 60, 23, 1)])
-        s.nightEnabled = false
-        let plan = planDay(s, weekday: monday, from: hm(22), to: hm(25))
-        #expect(plan.contains { $0.activity == "Late" && $0.start == hm(23) && $0.minutes == 60 })
-    }
-
-    @Test func usedTimeCarriesIn() {
-        let plan = planDay(example, weekday: monday, from: hm(9, 30), to: hm(10), used: ["Task 1": 45 * 60])
-        #expect(plan.first == PlanSlot(start: hm(9, 30), end: hm(9, 45), activity: "Task 1"))
-        #expect(plan[1].round == 2)
+        let s = settings([act("Late", 60, 23, 1)])
+        #expect(availability(s, weekday: monday, from: hm(22), to: hm(26)) == [
+            Period(start: hm(22), end: hm(23), available: []),
+            Period(start: hm(23), end: hm(25), available: ["Late"]),
+            Period(start: hm(25), end: hm(26), available: []),
+        ])
     }
 
     @Test func pastDayMergesAndMarksNoSession() {
-        let done = [PlanSlot(start: hm(19, 24), end: hm(19, 39), activity: "Work", done: true),
-                    PlanSlot(start: hm(18, 38), end: hm(18, 53), activity: "Project", done: true),
-                    PlanSlot(start: hm(19, 9), end: hm(19, 24), activity: "Work", done: true)]
+        let done = [PlanSlot(start: hm(19, 24), end: hm(19, 39), activity: "Work"),
+                    PlanSlot(start: hm(18, 38), end: hm(18, 53), activity: "Project"),
+                    PlanSlot(start: hm(19, 9), end: hm(19, 24), activity: "Work")]
         #expect(pastDay(done, from: hm(8), until: hm(19, 41)) == [
-            PlanSlot(start: hm(8), end: hm(18, 38), activity: nil, done: true),
-            PlanSlot(start: hm(18, 38), end: hm(18, 53), activity: "Project", done: true),
-            PlanSlot(start: hm(18, 53), end: hm(19, 9), activity: nil, done: true),
-            PlanSlot(start: hm(19, 9), end: hm(19, 39), activity: "Work", done: true),
+            PlanSlot(start: hm(8), end: hm(18, 38), activity: nil),
+            PlanSlot(start: hm(18, 38), end: hm(18, 53), activity: "Project"),
+            PlanSlot(start: hm(18, 53), end: hm(19, 9), activity: nil),
+            PlanSlot(start: hm(19, 9), end: hm(19, 39), activity: "Work"),
+        ])
+    }
+
+    @Test func awayStaysApartAndOverlapsAreTrimmed() {
+        let slots = [PlanSlot(start: hm(10), end: hm(10, 40), activity: nil, away: true),
+                     PlanSlot(start: hm(10, 30), end: hm(11), activity: "Work")]
+        #expect(pastDay(slots, from: hm(10), until: hm(11)) == [
+            PlanSlot(start: hm(10), end: hm(10, 40), activity: nil, away: true),
+            PlanSlot(start: hm(10, 40), end: hm(11), activity: "Work"),
         ])
     }
 

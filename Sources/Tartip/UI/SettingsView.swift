@@ -31,6 +31,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 18) {
             PageTitle(title: "Activities", subtitle: "Each one blocks what you list under Blocks while it runs.")
             lockBanner
+            dayPlan               // the day first, the list that shapes it below
             activitiesSection
         }
         // On the page, not on the list: a modifier on ForEach is applied to every row.
@@ -79,7 +80,6 @@ struct SettingsView: View {
                 Button("Add", action: addActivity)
                     .disabled(newActivity.trimmingCharacters(in: .whitespaces).isEmpty)
             }
-            dayPlan
         }
     }
 
@@ -379,16 +379,11 @@ struct SettingsView: View {
                 Text("That's more than your waking day.").font(.system(size: 11)).foregroundStyle(.red)
             }
             Divider().opacity(0.5)
-            let w = wakingHours(s)
-            let plan = DayTimeline.Column(title: "Plan", slots: Tartip.planDay(s, weekday: weekday, from: w.from, to: w.to))
             if let model {
-                let actual = model.todayActual
-                DayTimeline(from: w.from, to: w.to, columns: [plan, .init(title: "Actual", slots: actual.slots)], now: actual.now)
-            } else {
-                DayTimeline(from: w.from, to: w.to, columns: [plan])
+                DayTimeline(day: model.today)
+                Text("Not a schedule: within a period you pick any of these. Red: nothing can start then.")
+                    .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
-            Text("Plan: how today can go with your hours and limits. \"Again\": nothing else is open then, so its limit starts over. Actual: the sessions you ran.")
-                .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
         .card(radius: 12)

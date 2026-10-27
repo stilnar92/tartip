@@ -24,6 +24,20 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(pomodoro.current(at: at(10, 55)) == nil)
     }
 
+    @Test func timeAwayMovesTheRest() {
+        var s = pomodoro
+        s.paused = 10 * 60
+        #expect(s.end == at(11, 5))
+        #expect(s.current(at: at(10, 30))?.index == 0)     // 20 min in, not 30
+        #expect(s.current(at: at(10, 36))?.index == 1)     // the break moved to 10:35–10:40
+        #expect(s.current(at: at(10, 40))?.end == at(11, 5))
+    }
+
+    @Test func oldSessionLoadsWithoutTimeAway() throws {
+        let json = #"{"block":"Work","phases":[{"isBreak":false,"minutes":30}],"start":0}"#
+        #expect(try JSONDecoder().decode(Session.self, from: Data(json.utf8)).paused == 0)
+    }
+
     @Test func rounds() {
         #expect(pomodoro.workRounds == 2)
         #expect(pomodoro.totalMinutes == 55)

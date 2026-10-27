@@ -41,10 +41,10 @@ struct TodayList: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !names.isEmpty {
-                let v = model.todayView
-                DayStrip(from: v.from, to: v.to, slots: v.slots, now: v.now)
+                DayStrip(day: model.today)
             }
             freeTime
+            away
         }
         .alert("Start \(request?.activity ?? "")?", isPresented: Binding(get: { request != nil }, set: { if !$0 { request = nil } }),
                presenting: request) { r in
@@ -147,6 +147,26 @@ struct TodayList: View {
             }
             Button("Start Pomodoro") { tryStart(a, pomodoro: true) }
         }
+    }
+
+    // Leaving the computer: no length, it lasts until you unlock. Not free time: nothing is
+    // spent from the budget, and the computer can't be used meanwhile.
+    private var away: some View {
+        Button { model.stepAway() } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "figure.walk").font(.system(size: 14)).foregroundStyle(Theme.accent).frame(width: 20)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Step away").font(.system(size: 14)).foregroundStyle(Theme.text)
+                    Text("Locks the screen; your tasks keep running").font(.system(size: 11)).foregroundStyle(Theme.text2)
+                }
+                Spacer()
+                Image(systemName: "lock.fill").font(.system(size: 11)).foregroundStyle(Theme.text2)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 9)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .card(radius: 12)
     }
 
     // 🍿 Free time: nothing blocked, from the daily budget, never twice in a row.

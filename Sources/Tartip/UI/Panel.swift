@@ -29,6 +29,8 @@ struct ContentView: View {
                 sessionCard(s, cur)
             } else if Setup.isPending {
                 setupCard
+            } else if let since = model.phase.awaySince {
+                awayCard(since)
             } else if Settings.current.isNight(at: model.now) {
                 nightCard
             } else {
@@ -166,11 +168,18 @@ struct ContentView: View {
 
             if !p.isBreak { dailyProgress(name, color) }
 
-            Button { model.stop() } label: {
-                Text("Stop session").font(.system(size: 12)).foregroundStyle(Theme.text2).underline()
+            HStack(spacing: 18) {
+                Button { model.stepAway() } label: {
+                    Label("Step away", systemImage: "figure.walk").font(.system(size: 12, weight: .medium))
+                }
+                .buttonStyle(.plain).foregroundStyle(Theme.accent)
+                .help("Locks the screen and pauses the timer; your tasks keep running. Unlock to carry on.")
+                Button { model.stop() } label: {
+                    Text("Stop session").font(.system(size: 12)).foregroundStyle(Theme.text2).underline()
+                }
+                .buttonStyle(.plain)
+                .help("The block stays on until \(f.string(from: s.end))")
             }
-            .buttonStyle(.plain)
-            .help("The block stays on until \(f.string(from: s.end))")
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20).padding(.horizontal, 16)
@@ -205,6 +214,19 @@ struct ContentView: View {
     }
 
     // MARK: free time
+
+    // Only seen if the screen didn't lock: then "I'm back" is right here.
+    private func awayCard(_ since: Date) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: "figure.walk").font(.system(size: 30)).foregroundStyle(Theme.accent)
+            Text("Away since \(Fmt.clock.string(from: since))").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
+            Text("The timer is paused and your tasks keep running.").font(.system(size: 12)).foregroundStyle(Theme.text2)
+            Button("I'm back") { model.comeBack() }.controlSize(.large)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .card(radius: 18)
+    }
 
     private func freeTimeCard(_ until: Date) -> some View {
         VStack(alignment: .leading, spacing: 14) {

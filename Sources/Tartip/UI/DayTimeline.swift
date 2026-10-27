@@ -1,64 +1,54 @@
 import SwiftUI
 
-// Today in calendar columns on one time axis: the plan (how the day can go with your hours
-// and limits) next to what actually happened. Repeats are lighter; red is where nothing can start.
+// Today in two calendar columns on one time axis. Available: the day cut where an activity's
+// hours start or end, each period shaded with the activities you can pick then (any-time ones
+// are listed once above; red where nothing at all can start). Actual: the sessions that ran.
 struct DayTimeline: View {
-    struct Column {
-        var title: String
-        var slots: [PlanSlot]
-    }
-
-    let from: Int
-    let to: Int
-    let columns: [Column]
-    var now: Int? = nil
+    let day: Model.DayView
 
     private let hourHeight: CGFloat = 56   // a 15-minute session still gets its label
     private let labelWidth: CGFloat = 40
 
-    private func y(_ m: Int) -> CGFloat { CGFloat(m - from) / 60 * hourHeight }
+    private func y(_ m: Int) -> CGFloat { CGFloat(m - day.from) / 60 * hourHeight }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            legend
+            if !day.anyTime.isEmpty {
+                (Text("Any time  ").foregroundColor(Theme.text2) + names(day.anyTime))
+                    .font(.system(size: 11, weight: .medium))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             HStack(spacing: 8) {
                 Color.clear.frame(width: labelWidth, height: 1)
-                ForEach(columns, id: \.title) { c in
-                    Text(c.title).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.text)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                title("Available", day.anyTime.isEmpty ? "what you can pick, by period" : "plus the any-time ones")
+                title("Actual", "the sessions you ran")
             }
             HStack(alignment: .top, spacing: 8) {
                 hourLabels
-                ForEach(columns, id: \.title) { c in column(c.slots) }
+                column { w in
+                    ForEach(Array(day.periods.enumerated()), id: \.offset) { i, p in
+                        period(p, shade: i % 2 == 0).frame(width: w, height: max(2, y(p.end) - y(p.start) - 3)).offset(y: y(p.start) + 1.5)
+                    }
+                }
+                column { w in
+                    ForEach(Array(day.actual.enumerated()), id: \.offset) { _, s in
+                        session(s).frame(width: w, height: max(2, y(s.end) - y(s.start) - 2)).offset(y: y(s.start) + 1)
+                    }
+                }
             }
         }
     }
 
-    // What the marks mean; only the ones this day uses.
-    private var legend: some View {
-        let all = columns.flatMap(\.slots)
-        let has = { (f: (PlanSlot) -> Bool) in all.contains(where: f) }
-        let items: [(String, AnyView)] = [
-            has { !$0.done && $0.activity != nil && $0.round == 1 } ? ("Planned", AnyView(swatch(Theme.accent.opacity(0.2), edge: Theme.accent))) : nil,
-            has { !$0.done && $0.round > 1 } ? ("↻ Again: nothing else is open", AnyView(swatch(Theme.accent.opacity(0.08), edge: Theme.accent.opacity(0.4)))) : nil,
-            has { !$0.done && $0.activity == nil } ? ("Nothing can start", AnyView(swatch(Theme.redTint, dashed: Theme.red))) : nil,
-            has { $0.done && $0.activity != nil } ? ("Done", AnyView(swatch(Theme.accent.opacity(0.85)))) : nil,
-            has { $0.done && $0.activity == nil } ? ("No session", AnyView(swatch(Theme.pill))) : nil,
-        ].compactMap { $0 }
-        return FlowLayout(spacing: 12) {
-            ForEach(items, id: \.0) { label, mark in
-                HStack(spacing: 5) { mark; Text(label) }.font(.system(size: 10)).foregroundStyle(Theme.text2)
-            }
+    private func title(_ t: String, _ sub: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(t).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.text)
+            Text(sub).font(.system(size: 10)).foregroundStyle(Theme.text2)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func swatch(_ fill: Color, edge: Color? = nil, dashed: Color? = nil) -> some View {
-        RoundedRectangle(cornerRadius: 3).fill(fill).frame(width: 16, height: 11)
-            .overlay(alignment: .leading) { if let edge { Rectangle().fill(edge).frame(width: 2.5) } }
-            .overlay { if let dashed { RoundedRectangle(cornerRadius: 3).strokeBorder(dashed, style: StrokeStyle(lineWidth: 1, dash: [2, 2])) } }
-            .clipShape(RoundedRectangle(cornerRadius: 3))
-    }
+    // The axis marks where periods start and end: that's when what you can pick changes.
+    private var hourMarks: [Int] { Array(Set(day.periods.flatMap { [$0.start, $0.end] } + [day.from, day.to])).sorted() }
 
     private var hourLabels: some View {
         ZStack(alignment: .topLeading) {
@@ -68,20 +58,17 @@ struct DayTimeline: View {
                     .offset(y: y(m) - 6)
             }
         }
-        .frame(width: labelWidth, height: y(to), alignment: .topLeading)
+        .frame(width: labelWidth, height: y(day.to), alignment: .topLeading)
     }
 
-    private func column(_ slots: [PlanSlot]) -> some View {
+    private func column<Content: View>(@ViewBuilder _ content: @escaping (CGFloat) -> Content) -> some View {
         GeometryReader { g in
             ZStack(alignment: .topLeading) {
                 ForEach(hourMarks, id: \.self) { m in
                     Rectangle().fill(Theme.separator).frame(width: g.size.width, height: 1).offset(y: y(m))
                 }
-                ForEach(Array(slots.enumerated()), id: \.offset) { _, slot in
-                    block(slot).frame(width: g.size.width, height: max(2, y(slot.end) - y(slot.start) - 2))
-                        .offset(y: y(slot.start) + 1)
-                }
-                if let now {
+                content(g.size.width)
+                if let now = day.now {
                     HStack(spacing: 0) {
                         Circle().fill(Theme.red).frame(width: 7, height: 7)
                         Rectangle().fill(Theme.red).frame(height: 1.5)
@@ -90,117 +77,136 @@ struct DayTimeline: View {
                 }
             }
         }
-        .frame(height: y(to))
+        .frame(height: y(day.to))
         .frame(maxWidth: .infinity)
         .clipped()
     }
 
-    private var hourMarks: [Int] {
-        stride(from: (from + 59) / 60 * 60, through: to, by: 60).map { $0 }
+    // MARK: available
+
+    // Names in their own colors, separated by dots; wraps like text.
+    private func names(_ list: [String]) -> Text {
+        var t = Text("")
+        for (i, name) in list.enumerated() {
+            if i > 0 { t = t + Text("  ·  ").foregroundColor(Theme.text2) }
+            t = t + Text(name).foregroundColor(ActivityStyle.of(name).color)
+        }
+        return t
     }
 
-    @ViewBuilder private func block(_ slot: PlanSlot) -> some View {
-        let h = y(slot.end) - y(slot.start)
-        let tall = h >= 24        // room to sit at the top
-        let fits = h >= 12        // room for one line at all
-        if let name = slot.activity {
+    // Nothing at all can start: no activity with hours open, and none for any time either.
+    private func isEmpty(_ p: Period) -> Bool { p.available.isEmpty && day.anyTime.isEmpty }
+
+    private func period(_ p: Period, shade: Bool) -> some View {
+        let h = y(p.end) - y(p.start)
+        let empty = isEmpty(p)
+        let isNow = day.now.map { $0 >= p.start && $0 < p.end } ?? false
+        let past = day.now.map { p.end <= $0 } ?? false
+        let fill: Color = empty ? Theme.redTint.opacity(0.7) : isNow ? Theme.accentTint : Theme.accent.opacity(shade ? 0.05 : 0.10)
+        let edge: Color = empty ? Theme.red.opacity(0.5) : isNow ? Theme.accent.opacity(0.5) : .clear
+        let label: Text = empty ? Text("Nothing can start").foregroundColor(Theme.red) : names(p.available)
+        let what = empty ? "nothing can start" : (p.available + day.anyTime).joined(separator: ", ")
+        return label
+            .font(.system(size: 11, weight: .semibold))
+            .lineSpacing(2)
+            .padding(.horizontal, 8).padding(.vertical, h >= 24 ? 5 : 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: h >= 24 ? .topLeading : .leading)
+            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(fill))
+            .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(edge, style: StrokeStyle(lineWidth: 1, dash: empty ? [4, 3] : [])))
+            .opacity(past ? 0.5 : 1)
+            .clipped()
+            .help("\(clockLabel(p.start % 1440))–\(clockLabel(p.end % 1440)): " + what)
+    }
+
+    // MARK: actual
+
+    @ViewBuilder private func session(_ s: PlanSlot) -> some View {
+        let h = y(s.end) - y(s.start)
+        let tall = h >= 24
+        let fits = h >= 12
+        if s.away {
+            Label("Away · \(minutesLabel(s.minutes))", systemImage: "figure.walk")
+                .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.accent)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: tall ? .topLeading : .leading)
+                .padding(.horizontal, 7).padding(.top, tall ? 4 : 0)
+                .opacity(fits ? 1 : 0)
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Theme.accentTint))
+                .help("Away from the computer \(clockLabel(s.start % 1440))–\(clockLabel(s.end % 1440))")
+        } else if let name = s.activity {
             let st = ActivityStyle.of(name)
-            let repeat_ = slot.round > 1 && !slot.done
             HStack(spacing: 5) {
-                Image(systemName: slot.done ? "checkmark" : (repeat_ ? "arrow.counterclockwise" : st.icon))
-                    .font(.system(size: 10, weight: .semibold))
+                Image(systemName: "checkmark").font(.system(size: 10, weight: .semibold))
                 Text(name).font(.system(size: 11, weight: .semibold)).lineLimit(1)
-                Text(repeat_ ? "again · \(minutesLabel(slot.minutes))" : minutesLabel(slot.minutes))
-                    .font(.system(size: 10)).opacity(0.8).lineLimit(1)
+                Text(minutesLabel(s.minutes)).font(.system(size: 10)).opacity(0.85)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(slot.done ? .white : st.color)
-            .padding(.horizontal, 7)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 7).padding(.top, tall ? 4 : 0)
             .frame(maxHeight: .infinity, alignment: tall ? .top : .center)
-            .padding(.top, tall ? 4 : 0)
             .opacity(fits ? 1 : 0)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(slot.done ? AnyShapeStyle(st.color.opacity(0.85)) : AnyShapeStyle(st.color.opacity(repeat_ ? 0.08 : 0.18)))
-            )
-            .overlay(alignment: .leading) {
-                if !slot.done {
-                    RoundedRectangle(cornerRadius: 2).fill(st.color.opacity(repeat_ ? 0.4 : 1)).frame(width: 3)
-                }
-            }
-            .help("\(name) \(clockLabel(slot.start % 1440))–\(clockLabel(slot.end % 1440))"
-                  + (slot.done ? ", done" : repeat_ ? ", again: its limit started over" : ""))
-        } else if slot.done {
-            Text("No session · \(minutesLabel(slot.minutes))")
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(st.color.opacity(0.85)))
+            .help("\(name) \(clockLabel(s.start % 1440))–\(clockLabel(s.end % 1440))")
+        } else {
+            Text("No session · \(minutesLabel(s.minutes))")
                 .font(.system(size: 11)).foregroundStyle(Theme.text2)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: tall ? .topLeading : .leading)
                 .padding(.horizontal, 7).padding(.top, tall ? 4 : 0)
                 .opacity(fits ? 1 : 0)
                 .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Theme.pill.opacity(0.6)))
-                .help("\(clockLabel(slot.start % 1440))–\(clockLabel(slot.end % 1440)): no session ran")
-        } else {
-            Text("Nothing can start · \(minutesLabel(slot.minutes))")
-                .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.red)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: tall ? .topLeading : .leading)
-                .padding(.horizontal, 7).padding(.top, tall ? 4 : 0)
-                .opacity(fits ? 1 : 0)
-                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Theme.redTint.opacity(0.7)))
-                .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(Theme.red.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
-                .help("\(clockLabel(slot.start % 1440))–\(clockLabel(slot.end % 1440)): no activity is open")
         }
     }
 }
 
-// The same day in one bar, for the panel: done, planned, repeats lighter, gaps red.
+// Today in one bar, for the panel: what ran until now, then the periods ahead (red where
+// nothing can start).
 struct DayStrip: View {
-    let from: Int
-    let to: Int
-    let slots: [PlanSlot]
-    var now: Int? = nil
+    let day: Model.DayView
 
     var body: some View {
-        let span = CGFloat(max(1, to - from))
-        let gaps = slots.filter { $0.activity == nil && !$0.done }.map(\.minutes).reduce(0, +)
-        let repeats = slots.filter { $0.activity != nil && $0.round > 1 && !$0.done }.map(\.minutes).reduce(0, +)
+        let span = CGFloat(max(1, day.to - day.from))
+        let now = day.now ?? day.from
+        let ahead = day.periods.compactMap { p -> Period? in
+            guard p.end > now else { return nil }
+            var q = p
+            q.start = max(p.start, now)
+            return q
+        }
+        let isEmpty = { (p: Period) in p.available.isEmpty && day.anyTime.isEmpty }
+        let empty = ahead.filter(isEmpty).map(\.minutes).reduce(0, +)
         return VStack(alignment: .leading, spacing: 5) {
             GeometryReader { g in
+                let x = { (m: Int) in g.size.width * CGFloat(m - day.from) / span }
                 ZStack(alignment: .topLeading) {
                     Capsule().fill(Theme.pill).frame(width: g.size.width, height: 12)
-                    ForEach(Array(slots.enumerated()), id: \.offset) { _, slot in
-                        segment(slot)
-                            .frame(width: max(1.5, g.size.width * CGFloat(slot.minutes) / span - 1), height: 12)
-                            .offset(x: g.size.width * CGFloat(slot.start - from) / span)
+                    ForEach(Array(day.actual.enumerated()), id: \.offset) { _, s in
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(s.away ? Theme.accent.opacity(0.35) : s.activity.map { ActivityStyle.of($0).color.opacity(0.9) } ?? Theme.text2.opacity(0.2))
+                            .frame(width: max(1.5, x(s.end) - x(s.start) - 1), height: 12).offset(x: x(s.start))
+                            .help(s.away ? "Away" : s.activity.map { "\($0) \(clockLabel(s.start % 1440))–\(clockLabel(s.end % 1440))" } ?? "No session")
                     }
-                    if let now {
-                        Rectangle().fill(Theme.text).frame(width: 2, height: 18)
-                            .offset(x: g.size.width * CGFloat(now - from) / span - 1, y: -3)
+                    ForEach(Array(ahead.enumerated()), id: \.offset) { _, p in
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(isEmpty(p) ? Theme.red.opacity(0.55) : Theme.accent.opacity(0.15))
+                            .frame(width: max(1.5, x(p.end) - x(p.start) - 1), height: 12).offset(x: x(p.start))
+                            .help("\(clockLabel(p.start % 1440))–\(clockLabel(p.end % 1440)): "
+                                  + (isEmpty(p) ? "nothing can start" : (p.available + day.anyTime).joined(separator: ", ")))
+                    }
+                    if let n = day.now {
+                        Rectangle().fill(Theme.text).frame(width: 2, height: 18).offset(x: x(n) - 1, y: -3)
                     }
                 }
             }
             .frame(height: 12)
             HStack(spacing: 8) {
-                Text(clockLabel(from % 1440))
-                if gaps > 0 { Label(minutesLabel(gaps) + " nothing open", systemImage: "exclamationmark.circle").foregroundStyle(Theme.red) }
-                if repeats > 0 { Label(minutesLabel(repeats) + " again", systemImage: "arrow.counterclockwise") }
+                Text(clockLabel(day.from % 1440))
+                if empty > 0 {
+                    Label(minutesLabel(empty) + " with nothing to start", systemImage: "exclamationmark.circle").foregroundStyle(Theme.red)
+                }
                 Spacer()
-                Text(clockLabel(to % 1440))
+                Text(clockLabel(day.to % 1440))
             }
             .font(.system(size: 10)).foregroundStyle(Theme.text2)
-        }
-    }
-
-    @ViewBuilder private func segment(_ slot: PlanSlot) -> some View {
-        if let name = slot.activity {
-            let c = ActivityStyle.of(name).color
-            RoundedRectangle(cornerRadius: 2).fill(c.opacity(slot.done ? 0.9 : slot.round > 1 ? 0.25 : 0.55))
-                .help("\(name) \(clockLabel(slot.start % 1440))–\(clockLabel(slot.end % 1440))")
-        } else if slot.done {
-            RoundedRectangle(cornerRadius: 2).fill(Theme.text2.opacity(0.2))
-                .help("No session \(clockLabel(slot.start % 1440))–\(clockLabel(slot.end % 1440))")
-        } else {
-            RoundedRectangle(cornerRadius: 2).fill(Theme.red.opacity(0.55))
-                .help("Nothing can start \(clockLabel(slot.start % 1440))–\(clockLabel(slot.end % 1440))")
         }
     }
 }

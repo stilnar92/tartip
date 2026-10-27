@@ -15,6 +15,7 @@ final class Model: ObservableObject {
     @Published var message = ""
     @Published var oneTimeLink = ""
     @Published private(set) var records: [SessionRecord]
+    @Published private(set) var awayRecords: [AwayRecord]
 
     let clock: Clock
     var onPhaseChange: ((AppPhase) -> Void)?
@@ -23,12 +24,15 @@ final class Model: ObservableObject {
     private var lastPhaseIndex: Int?
     private var ticker: Task<Void, Never>?
     private var settingsSub: AnyCancellable?
+    private let keepAwake = KeepAwake()
+    private var lockSubs: [NSObjectProtocol] = []
 
     init(clock: Clock? = nil, blocker: Blocker = NativeBlocker.shared, state: StoredState = StateStore.load()) {
         self.clock = clock ?? Clock()
         self.blocker = blocker
         self.state = state
         records = loadRecords()
+        awayRecords = loadAway()
 
         if self.state.minutes < Settings.current.minMinutes { self.state.minutes = Settings.current.defaultSessionMinutes }
         if let s = state.phase.session, Date() < s.end {
@@ -40,6 +44,21 @@ final class Model: ObservableObject {
         settingsSub = Settings.shared.objectWillChange.sink { [weak self] _ in
             MainActor.assumeIsolated { self?.objectWillChange.send() }
         }
+        // Locking the screen or putting the Mac to sleep is stepping away; unlocking is coming back.
+        let dnc = DistributedNotificationCenter.default()
+        let ws = NSWorkspace.shared.notificationCenter
+        let on = { (center: NotificationCenter, name: Notification.Name, f: @escaping @MainActor (Model) -> Void) in
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { if let self { f(self) } }
+            }
+        }
+        lockSubs = [
+            on(dnc, Notification.Name("com.apple.screenIsLocked")) { $0.wentAway(lock: false) },
+            on(ws, NSWorkspace.willSleepNotification) { $0.wentAway(lock: false) },
+            on(dnc, Notification.Name("com.apple.screenIsUnlocked")) { $0.comeBack() },
+            on(ws, NSWorkspace.didWakeNotification) { if !screenLocked() { $0.comeBack() } },
+        ]
+        if self.state.phase.awaySince != nil { keepAwake.on() }
         ticker = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
@@ -74,7 +93,7 @@ final class Model: ObservableObject {
     func recordsSince(_ from: Date) -> [SessionRecord] {
         var recs = records
         if let s = session, let planned = s.planned {
-            recs.append(SessionRecord(start: s.start, end: min(now, s.end), mode: s.block, planned: planned))
+            recs.append(SessionRecord(start: s.shiftedStart, end: min(now, s.end), mode: s.block, planned: planned))
         }
         return Tartip.records(recs, since: from)
     }
@@ -93,61 +112,46 @@ final class Model: ObservableObject {
     var roundStart: Date { todaysRound?.since ?? Calendar.current.startOfDay(for: now) }
     private var todaysRound: Round? { state.round.flatMap { $0.day == dayKey(now) ? $0 : nil } }
 
-    // Today's waking hours: what's been done so far, then how the rest can go from now on.
+    // Today's waking hours: what can be picked when, and what actually ran so far.
     struct DayView {
         var from: Int
         var to: Int
-        var slots: [PlanSlot]
-        var now: Int?
+        var anyTime: [String]      // planned today without hours: can be picked in every period
+        var periods: [Period]      // the whole waking day, with the activities that have hours
+        var actual: [PlanSlot]     // from waking up until now
+        var now: Int?              // nil outside the waking day
     }
 
-    // Today until now: the sessions that ran, and the time with none.
-    var todayActual: DayView {
-        let w = wakingHours(Settings.current)
+    var today: DayView {
+        let s = Settings.current
+        let w = wakingHours(s)
         // Minutes in the waking day's frame, which may run past midnight.
         let inDay = { (m: Int) in m < w.from && m + 1440 <= w.to ? m + 1440 : m }
         let nowM = inDay(minuteOfDay(now))
-        let done = recordsSince(Calendar.current.startOfDay(for: now)).map { r -> PlanSlot in
+        let dayStart = Calendar.current.startOfDay(for: now)
+        let done = recordsSince(dayStart).map { r -> PlanSlot in
             let start = inDay(minuteOfDay(r.start))
             return PlanSlot(start: start, end: start + max(1, r.seconds / 60),
-                            activity: r.actual.first ?? r.planned ?? otherActivity, done: true)
+                            activity: r.actual.first ?? r.planned ?? otherActivity)
         }
-        return DayView(from: w.from, to: w.to, slots: pastDay(done, from: w.from, until: min(nowM, w.to)),
+        // Time away, the stretch going on now included.
+        let aways = (awayRecords + (phase.awaySince.map { [AwayRecord(start: $0, end: now)] } ?? []))
+            .filter { $0.end > dayStart }
+            .map { r -> PlanSlot in
+                let start = inDay(minuteOfDay(max(r.start, dayStart)))
+                return PlanSlot(start: start, end: start + max(1, Int(r.end.timeIntervalSince(max(r.start, dayStart))) / 60),
+                                activity: nil, away: true)
+            }
+        let weekday = Calendar.current.component(.weekday, from: now)
+        let anyTime = s.activities.filter { a in
+            !a.name.isEmpty && a.isPlanned(onWeekday: weekday) && (a.fromMinute == nil || a.toMinute == nil || a.fromMinute == a.toMinute)
+        }.map(\.name)
+        let periods = merged(availability(s, weekday: weekday, from: w.from, to: w.to).map {
+            Period(start: $0.start, end: $0.end, available: $0.available.filter { !anyTime.contains($0) })
+        })
+        return DayView(from: w.from, to: w.to, anyTime: anyTime, periods: periods,
+                       actual: pastDay(done + aways, from: w.from, until: min(nowM, w.to)),
                        now: nowM >= w.from && nowM < w.to ? nowM : nil)
-    }
-
-    // Today in one line for the panel: what happened, then how the rest can go from now on.
-    var todayView: DayView {
-        let s = Settings.current
-        let actual = todayActual
-        let w = (from: actual.from, to: actual.to)
-        let nowM = actual.now ?? (minuteOfDay(now) < w.from ? w.from : w.to)
-        var slots = actual.slots
-        // What's running now goes on until it ends; the plan picks up after that.
-        var planFrom = max(nowM, w.from)
-        var used = secondsByActivity(since: roundStart)
-        // Used up in an earlier round today: shown as a repeat from here on.
-        let limits = limits
-        let repeats = secondsByActivity(since: Calendar.current.startOfDay(for: now)).reduce(into: [String: Int]()) { out, e in
-            let limit = limits.limitMinutes(e.key) * 60
-            let earlier = e.value - (used[e.key] ?? 0)
-            if limit > 0, earlier >= limit { out[e.key] = earlier / limit }
-        }
-        if let sess = session, let p = sess.planned {
-            let left = max(0, Int(sess.end.timeIntervalSince(now)))
-            slots.append(PlanSlot(start: nowM, end: nowM + left / 60, activity: p, round: (repeats[p] ?? 0) + 1))
-            used[p, default: 0] += left
-            planFrom = max(planFrom, nowM + left / 60)
-        } else if let end = freeTimeEnd {
-            let left = max(0, Int(end.timeIntervalSince(now))) / 60
-            slots.append(PlanSlot(start: nowM, end: nowM + left, activity: "Free time"))
-            planFrom = max(planFrom, nowM + left)
-        }
-        if planFrom < w.to {
-            slots += planDay(s, weekday: Calendar.current.component(.weekday, from: now), from: planFrom, to: w.to,
-                             used: used, repeats: repeats)
-        }
-        return DayView(from: w.from, to: w.to, slots: slots, now: nowM >= w.from && nowM < w.to ? nowM : nil)
     }
 
     // Nothing can start but some work is open and used up: its limits count from zero again.
@@ -283,9 +287,10 @@ final class Model: ObservableObject {
     }
 
     // The session is over: ask what was actually done (sessions under a minute are dropped).
-    private func finish(_ s: Session) {
+    // Time away doesn't count: the record starts that much later.
+    private func finish(_ s: Session, at end: Date = Date()) {
         lastPhaseIndex = nil
-        let r = SessionRecord(start: s.start, end: min(Date(), s.end), mode: s.block, planned: s.planned)
+        let r = SessionRecord(start: s.shiftedStart, end: min(end, s.end), mode: s.block, planned: s.planned)
         state.phase = r.seconds >= 60 ? .reviewing(r) : .idle
     }
 
@@ -296,6 +301,59 @@ final class Model: ObservableObject {
         records.append(r)
         state.phase = .idle
         log("did   \(actual.joined(separator: ", "))\(r.asPlanned ? " (as planned)" : "")")
+    }
+
+    // MARK: away from the computer (no length: until you're back)
+
+    // "Step away": the screen locks, the Mac keeps running, a session pauses. Unlocking ends it.
+    func stepAway() {
+        wentAway(lock: true)
+    }
+
+    // Also when the screen locks or the Mac sleeps by itself. Free time just goes on (it's yours
+    // to spend anywhere), and a question waiting for an answer waits.
+    fileprivate func wentAway(lock: Bool) {
+        let paused: Session?
+        switch phase {
+        case .session(let s): paused = s
+        case .idle, .picking: paused = nil
+        case .away:
+            if lock { lockScreen() }
+            return
+        case .freeTime, .reviewing: return
+        }
+        state.phase = .away(since: now, paused: paused)
+        state.pickingSince = nil
+        keepAwake.on()
+        log("away" + (paused.map { " (\($0.planned ?? $0.block) paused)" } ?? ""))
+        if lock { lockScreen() }
+    }
+
+    // Back at the computer: a paused session goes on where it stopped, with its block moved
+    // by the time away. Away longer than the limit ends it instead, as of when you left.
+    func comeBack() {
+        guard case .away(let since, let paused) = phase else { return }
+        keepAwake.off()
+        let away = max(0, Int(now.timeIntervalSince(since)))
+        if away >= 60 {
+            let r = AwayRecord(start: since, end: now)
+            appendAway(r)
+            awayRecords.append(r)
+        }
+        guard var s = paused else {
+            state.phase = .idle
+            log("back after \(minutesLabel(away / 60))")
+            return
+        }
+        if away > Settings.current.maxAwayMinutes * 60 {
+            log("back after \(minutesLabel(away / 60)): \(s.planned ?? s.block) ended when you left")
+            finish(s, at: since)
+            return
+        }
+        s.paused += away
+        blocker.lock(s.block, until: s.end)
+        state.phase = .session(s)
+        log("back after \(minutesLabel(away / 60)): \(s.planned ?? s.block) until \(Fmt.clock.string(from: s.end))")
     }
 
     // MARK: free time (nothing blocked, from the daily budget, only taken on purpose)
@@ -363,6 +421,9 @@ final class Model: ObservableObject {
             if let at = autoStartAt, now >= at { autoStart() }
         case .reviewing:
             return
+        case .away(let since, _):
+            // The unlock went unheard (or the lock didn't happen): if you're at it, you're back.
+            if now.timeIntervalSince(since) > 5 && !screenLocked() { comeBack() }
         case .idle:
             // Nothing running and it's not night: you always decide what's next, right away.
             // The picker can't be closed; nothing is blocked until you pick.

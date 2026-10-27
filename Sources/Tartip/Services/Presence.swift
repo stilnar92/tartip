@@ -5,6 +5,9 @@ func userPresent() -> Bool {
     // ~0 is kCGAnyInputEventType: the last input of any kind.
     if let anyInput = CGEventType(rawValue: ~0),
        CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput) > 120 { return false }
-    if let d = CGSessionCopyCurrentDictionary() as? [String: Any], d["CGSSessionScreenIsLocked"] as? Bool == true { return false }
-    return true
+    return !screenLocked()
+}
+
+func screenLocked() -> Bool {
+    (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool == true
 }

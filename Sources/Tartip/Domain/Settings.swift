@@ -98,6 +98,9 @@ struct AppSettings: Codable, Equatable {
     var autoStartMinutes = 30        // length of that session
     var pickerFullScreen = false     // "What's next?" covers the whole screen and can't be moved aside
 
+    // Away from the computer: a session waits this long, then ends as of when you left.
+    var maxAwayMinutes = 60
+
     // Night: block stays on, nothing is asked. Minutes since midnight.
     var nightEnabled = true
     var nightFrom = 0
