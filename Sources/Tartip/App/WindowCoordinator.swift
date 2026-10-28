@@ -41,7 +41,7 @@ final class WindowCoordinator {
     private func show(for phase: AppPhase) {
         switch phase {
         case .picking: prompt.show(ActivityPickerView(model: model, clock: model.clock), fullScreen: Settings.current.pickerFullScreen)
-        case .reviewing: prompt.show(ReviewView(model: model))
+        case .reviewing: prompt.show(ReviewView(model: model), fullScreen: Settings.current.reviewFullScreen)
         case .idle, .session, .freeTime, .away: prompt.hide()
         }
     }

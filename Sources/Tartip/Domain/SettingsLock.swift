@@ -80,6 +80,7 @@ func loosenings(from o: AppSettings, to n: AppSettings) -> [String] {
     if n.autoStartMinutes < o.autoStartMinutes { out.append("shorter auto-started sessions") }
     if n.minMinutes < o.minMinutes { out.append("a shorter minimum session") }
     if o.pickerFullScreen && !n.pickerFullScreen { out.append("a smaller \"What's next?\"") }
+    if o.reviewFullScreen && !n.reviewFullScreen { out.append("a smaller review") }
 
     let lo = o.lock, ln = n.lock
     let weaker: Bool = switch lo.mode {

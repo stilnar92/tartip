@@ -185,6 +185,10 @@ struct SettingsView: View {
                  ? "Covers the whole screen and can't be moved; other screens go dark."
                  : "A window in the middle of the screen that can be dragged aside but not closed.")
                 .font(.system(size: 11)).foregroundStyle(.secondary)
+            Toggle("Review full screen", isOn: $settings.value.reviewFullScreen)
+                .toggleStyle(.switch).controlSize(.small)
+            Text("\"Session done\" covers the whole screen too, until you say what you did. One click: the plan is already checked.")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
         }
     }
 

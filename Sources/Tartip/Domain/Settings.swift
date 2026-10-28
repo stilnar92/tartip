@@ -97,6 +97,7 @@ struct AppSettings: Codable, Equatable {
     var autoStartAfterMinutes = 15   // 0 = never
     var autoStartMinutes = 30        // length of that session
     var pickerFullScreen = false     // "What's next?" covers the whole screen and can't be moved aside
+    var reviewFullScreen = false     // so does "Session done", until it's answered
 
     // Away from the computer: a session waits this long, then ends as of when you left.
     var maxAwayMinutes = 60
@@ -123,7 +124,11 @@ extension AppSettings {
     var sessionLengths: [Int] { durationOptions.filter { $0 >= minMinutes }.sorted() }
     var defaultSessionMinutes: Int { max(defaultMinutes, minMinutes) }
     // Free time lengths offered, never longer than one stretch may be.
-    var freeTimeLengths: [Int] { [15, 30, 45, 60, 90, 120].filter { $0 <= maxRestMinutes } }
+    // The cap itself is always one of them, so a cap under 15 minutes still leaves a choice.
+    var freeTimeLengths: [Int] {
+        let under = [15, 30, 45, 60, 90, 120].filter { $0 < maxRestMinutes }
+        return maxRestMinutes > 0 ? under + [maxRestMinutes] : under
+    }
 
     func pomodoroPhases() -> [Phase] {
         let rounds = max(1, pomodoroRounds)

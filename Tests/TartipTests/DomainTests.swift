@@ -203,6 +203,20 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
     }
 }
 
+@Suite struct FreeTimeLengthTests {
+    private func lengths(cap: Int) -> [Int] {
+        var s = AppSettings()
+        s.maxRestMinutes = cap
+        return s.freeTimeLengths
+    }
+
+    @Test func theCapIsAlwaysOffered() {
+        #expect(lengths(cap: 10) == [10])            // under the smallest standard length
+        #expect(lengths(cap: 40) == [15, 30, 40])
+        #expect(lengths(cap: 60) == [15, 30, 45, 60])
+    }
+}
+
 @Suite struct ActivityIdentityTests {
     @Test func oldActivityLoadsWithItsNameAsBlock() throws {
         let json = #"{"activities": [{"id": "6F9619FF-8B86-D011-B42D-00CF4FC964FF", "name": "Work", "dailyMinutes": 60}]}"#

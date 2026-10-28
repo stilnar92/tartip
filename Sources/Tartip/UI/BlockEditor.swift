@@ -12,16 +12,20 @@ struct BlockEditor: View {
     var body: some View {
         let r = blocker.rule(block)
         // A running block, or the settings lock: either way it can only get stricter.
-        let locked = blocker.isLocked(block) || Settings.shared.lockedUntil != nil
+        let sessionUntil = blocker.isLocked(block) ? blocker.locks[block] : nil
+        let settingsUntil = Settings.shared.lockedUntil
+        let locked = sessionUntil != nil || settingsUntil != nil
+        let until = [sessionUntil, settingsUntil].compactMap { $0 }.max().map { Fmt.clock.string(from: $0) } ?? ""
+        let why = sessionUntil != nil
+            ? "On until \(until): you can add apps and sites now; removing them and allowing sites works again after."
+            : "Settings are locked until \(until): only stricter changes for now."
         let tint = ActivityStyle.of(block).color
         return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                SectionLabel(text: "Blocks")
-                Spacer()
-                if let until = blocker.locks[block], locked {
-                    Label("locked until \(Fmt.clock.string(from: until))", systemImage: "lock.fill")
-                        .font(.system(size: 11)).foregroundStyle(.secondary)
-                }
+            SectionLabel(text: "Blocks")
+            if locked {
+                Label(why, systemImage: "lock.fill")
+                    .font(.system(size: 11)).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
                 ForEach(r.apps, id: \.self) { id in
@@ -39,20 +43,24 @@ struct BlockEditor: View {
                 .buttonStyle(.plain).foregroundStyle(.secondary)
                 .help("Apps to quit while this block is on")
             }
-            entries("Sites", r.web, icon: "nosign", tint: tint, removable: !locked) { s in
+            entries("Sites", r.web, icon: "nosign", tint: tint, removable: !locked, heldWhy: why) { s in
                 blocker.update(block) { $0.web.removeAll { $0 == s } }
             }
             addField("Block a site (google.com, * for all)", $newSite) { s in
                 blocker.update(block) { if !$0.web.contains(s) { $0.web.append(s) } }
             }
-            entries("Always allowed", r.exceptions, icon: "checkmark.circle", tint: .green, removable: true) { s in
+            // Always shown: while locked the field stays, just disabled, so it's clear it's held, not gone.
+            entries("Always allowed", r.exceptions, icon: "checkmark.circle", tint: .green, removable: true, heldWhy: why,
+                    showEmpty: true) { s in
                 blocker.update(block) { $0.exceptions.removeAll { $0 == s } }
             }
-            if !locked {
-                addField("Allow a site (github.com, youtube.com/watch*)", $newException) { s in
-                    blocker.update(block) { if !$0.exceptions.contains(s) { $0.exceptions.append(s) } }
-                }
+            addField(locked ? "Allowing sites works again after \(until)" : "Allow a site (github.com, youtube.com/watch*)",
+                     $newException) { s in
+                blocker.update(block) { if !$0.exceptions.contains(s) { $0.exceptions.append(s) } }
             }
+            .disabled(locked)
+            .opacity(locked ? 0.6 : 1)
+            .help(locked ? why : "")
         }
     }
 
@@ -68,9 +76,11 @@ struct BlockEditor: View {
 
     @ViewBuilder
     private func entries(_ title: String, _ list: [String], icon: String, tint: Color, removable: Bool,
-                         remove: @escaping (String) -> Void) -> some View {
-        if !list.isEmpty {
+                         heldWhy: String = "", showEmpty: Bool = false, remove: @escaping (String) -> Void) -> some View {
+        if !list.isEmpty || showEmpty {
             Text(title).font(.system(size: 11)).foregroundStyle(.secondary)
+        }
+        if !list.isEmpty {
             LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)], spacing: 4) {
                 ForEach(list, id: \.self) { s in
                     HStack(spacing: 5) {
@@ -80,6 +90,8 @@ struct BlockEditor: View {
                         if removable {
                             Button { remove(s) } label: { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)) }
                                 .buttonStyle(.plain).foregroundStyle(.secondary)
+                        } else {
+                            Image(systemName: "lock.fill").font(.system(size: 9)).foregroundStyle(.tertiary).help(heldWhy)
                         }
                     }
                     .font(.system(size: 12))
