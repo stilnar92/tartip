@@ -320,7 +320,9 @@ final class Model: ObservableObject {
         case .away:
             if lock { lockScreen() }
             return
-        case .freeTime, .reviewing: return
+        case .freeTime, .reviewing:     // the shortcut still locks; nothing pauses
+            if lock { lockScreen() }
+            return
         }
         state.phase = .away(since: now, paused: paused)
         state.pickingSince = nil

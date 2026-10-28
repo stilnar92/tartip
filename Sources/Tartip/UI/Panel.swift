@@ -123,8 +123,9 @@ struct ContentView: View {
 
     // MARK: session
 
-    // During a session only what matters: what you're doing, the time left (huge),
-    // when it ends, and today's progress on this activity. Stop is a quiet link.
+    // During a session only what matters, compact: what you're doing and the time left on one
+    // line, today's progress on this activity as a bar, and Step away as the main button
+    // (you often need it). Stop is a quiet link.
     private func sessionCard(_ s: Session, _ cur: (index: Int, end: Date)) -> some View {
         let p = s.phases[cur.index]
         let name = s.planned ?? s.block.replacingOccurrences(of: "_", with: " ")
@@ -135,45 +136,50 @@ struct ContentView: View {
         let f = Fmt.clock
         let color = p.isBreak ? Color.green : st.color
 
-        return VStack(spacing: 18) {
-            // What
-            HStack(spacing: 10) {
-                Image(systemName: p.isBreak ? "cup.and.saucer.fill" : st.icon)
-                    .font(.system(size: 18, weight: .semibold)).foregroundStyle(color)
-                Text(p.isBreak ? "Break" : name)
-                    .font(.system(size: 22, weight: .bold)).foregroundStyle(Theme.text)
-                if s.workRounds > 1 {
-                    Tag(text: "\(s.round(of: cur.index))/\(s.workRounds)", color: color, fill: color.opacity(0.12))
-                }
-            }
-
-            // How long: ring + huge time, end time right under it
-            ZStack {
-                Circle().stroke(Theme.pill, lineWidth: 8)
-                Circle().trim(from: 0, to: progress)
-                    .stroke(color, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 1), value: progress)
-                VStack(spacing: 2) {
+        return VStack(spacing: 16) {
+            // What, and how long
+            VStack(spacing: 8) {
+                HStack(spacing: 10) {
+                    Image(systemName: p.isBreak ? "cup.and.saucer.fill" : st.icon)
+                        .font(.system(size: 17, weight: .semibold)).foregroundStyle(color)
+                        .frame(width: 34, height: 34)
+                        .background(RoundedRectangle(cornerRadius: 9).fill(color.opacity(0.12)))
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 6) {
+                            Text(p.isBreak ? "Break" : name)
+                                .font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                            if s.workRounds > 1 {
+                                Tag(text: "\(s.round(of: cur.index))/\(s.workRounds)", color: color, fill: color.opacity(0.12))
+                            }
+                        }
+                        Text(p.isBreak ? "stand up · back at \(f.string(from: cur.end))" : "until \(f.string(from: s.end))")
+                            .font(.system(size: 12)).foregroundStyle(Theme.text2)
+                    }
+                    Spacer(minLength: 8)
                     Text(countdown(to: cur.end, from: model.now))
-                        .font(.system(size: 56, weight: .semibold))
-                        .monospacedDigit()
+                        .font(.system(size: 22, weight: .semibold)).monospacedDigit()
                         .foregroundStyle(Theme.text)
                         .contentTransition(.numericText(countsDown: true))
-                    Text(p.isBreak ? "stand up · back at \(f.string(from: cur.end))" : "until \(f.string(from: s.end))")
-                        .font(.system(size: 13)).foregroundStyle(Theme.text2)
                 }
+                bar(progress, color, height: 4)
+                    .animation(.linear(duration: 1), value: progress)
             }
-            .frame(width: 220, height: 220)
 
             if !p.isBreak { dailyProgress(name, color) }
 
-            HStack(spacing: 18) {
+            VStack(spacing: 8) {
                 Button { model.stepAway() } label: {
-                    Label("Step away", systemImage: "figure.walk").font(.system(size: 12, weight: .medium))
+                    HStack(spacing: 8) {
+                        Image(systemName: "figure.walk")
+                        Text("Step away")
+                        Text("⌃⌥⌘L").font(.system(size: 11)).opacity(0.7)
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(maxWidth: .infinity).padding(.vertical, 10)
+                    .pill(selected: true)
                 }
-                .buttonStyle(.plain).foregroundStyle(Theme.accent)
-                .help("Locks the screen and pauses the timer; your tasks keep running. Unlock to carry on.")
+                .buttonStyle(.plain)
+                .help("Locks the screen and pauses the timer; your tasks keep running. Unlock to carry on. ⌃⌥⌘L from any app.")
                 Button { model.stop() } label: {
                     Text("Stop session").font(.system(size: 12)).foregroundStyle(Theme.text2).underline()
                 }
@@ -181,36 +187,46 @@ struct ContentView: View {
                 .help("The block stays on until \(f.string(from: s.end))")
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 20).padding(.horizontal, 16)
-        .card(radius: 18)
+        .padding(16)
+        .card(radius: 16)
     }
 
-    // Today's progress on this activity, counting this session live. Centered like the rest:
-    // "25m left today", a bar, then "34m of 1h".
+    private func bar(_ fraction: Double, _ color: Color, height: CGFloat) -> some View {
+        GeometryReader { g in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Theme.pill)
+                Capsule().fill(color).frame(width: g.size.width * min(1, max(0, fraction)))
+            }
+        }
+        .frame(height: height)
+    }
+
+    // Today on this activity, counting this session live: spent on the left, left on the right,
+    // the bar between them.
     private func dailyProgress(_ name: String, _ color: Color) -> some View {
         let limits = model.limits
         let used = limits.usedToday(name)
         let limit = limits.limitMinutes(name)
         let left = limits.secondsLeftToday(name) ?? 0
+        let done = limit > 0 && left == 0
         return VStack(spacing: 6) {
-            Text(limit > 0 ? (left > 0 ? "\(formatDuration(left)) left today" : "Daily limit reached")
-                           : "\(formatDuration(used)) today")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(limit > 0 && left == 0 ? Theme.red : Theme.text)
-            if limit > 0 {
-                GeometryReader { g in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Theme.pill)
-                        Capsule().fill(color.opacity(0.85))
-                            .frame(width: g.size.width * min(1, CGFloat(used) / CGFloat(limit * 60)))
-                    }
+            HStack {
+                Text("Today").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.text)
+                Spacer()
+                if limit > 0 {
+                    Text(done ? "Daily limit reached" : "\(formatDuration(left)) left")
+                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(done ? Theme.red : Theme.text)
                 }
-                .frame(width: 200, height: 6)
-                Text("\(formatDuration(used)) of \(limitLabel(limit))").font(.system(size: 12)).foregroundStyle(Theme.text2)
+            }
+            if limit > 0 { bar(Double(used) / Double(limit * 60), color.opacity(0.85), height: 8) }
+            HStack {
+                Text("\(formatDuration(used)) spent").font(.system(size: 11)).foregroundStyle(Theme.text2)
+                Spacer()
+                if limit > 0 { Text("of \(limitLabel(limit))").font(.system(size: 11)).foregroundStyle(Theme.text2) }
             }
         }
-        .frame(maxWidth: .infinity)
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.pill.opacity(0.5)))
     }
 
     // MARK: free time

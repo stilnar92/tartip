@@ -61,3 +61,10 @@ func countdown(to end: Date, from now: Date) -> String {
     let sec = max(0, Int(end.timeIntervalSince(now)))
     return String(format: "%d:%02d", sec / 60, sec % 60)
 }
+
+// "a.com, b.com" or a pasted column of links: one entry each, in order, without repeats.
+func splitList(_ text: String) -> [String] {
+    var seen = Set<String>()
+    return text.split(whereSeparator: { $0 == "," || $0.isWhitespace }).map(String.init)
+        .filter { seen.insert($0).inserted }
+}

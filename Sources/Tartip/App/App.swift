@@ -3,6 +3,7 @@
 import SwiftUI
 import AppKit
 import UserNotifications
+import Carbon.HIToolbox
 
 // Builds the app's objects once, in order: the single-instance check has to run
 // before the model starts quitting blocked apps.
@@ -36,6 +37,12 @@ private func enforceSingleInstance() {
     log("launch pid=\(mine) via \(fromLaunchd ? "launchd" : "other")")
 }
 
+// Global shortcuts, all ⌃⌥⌘ so they don't clash with other apps.
+@MainActor let shortcuts: [Hotkey] = [
+    Hotkey(key: kVK_ANSI_L, label: "⌃⌥⌘L", name: "Step away") { AppRoot.shared.model.stepAway() },
+    Hotkey(key: kVK_ANSI_T, label: "⌃⌥⌘T", name: "Open Today") { AppRoot.shared.windows.openMain(.activities) },
+]
+
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.appearance = NSAppearance(named: .aqua)   // Craft-like light look everywhere
@@ -43,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // A new install asks on Get started, where it's explained, not at launch.
         if !Setup.isPending { requestNotificationPermission() }
         AppRoot.shared.windows.start()
+        Hotkeys.shared.register(shortcuts)
     }
 
     // Opening the app again (Finder, Spotlight) while setup isn't done brings Get started back:

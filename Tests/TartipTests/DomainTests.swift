@@ -249,4 +249,10 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(limitLabel(0) == "No limit")
         #expect(formatDuration(3_900) == "1h 5m")
     }
+
+    @Test func pastedList() {
+        #expect(splitList("a.com, b.com,c.com") == ["a.com", "b.com", "c.com"])
+        #expect(splitList(" x.com\ny.com  x.com ,") == ["x.com", "y.com"])
+        #expect(splitList("  ").isEmpty)
+    }
 }

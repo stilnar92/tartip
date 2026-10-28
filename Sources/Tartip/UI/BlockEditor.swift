@@ -46,17 +46,17 @@ struct BlockEditor: View {
             entries("Sites", r.web, icon: "nosign", tint: tint, removable: !locked, heldWhy: why) { s in
                 blocker.update(block) { $0.web.removeAll { $0 == s } }
             }
-            addField("Block a site (google.com, * for all)", $newSite) { s in
-                blocker.update(block) { if !$0.web.contains(s) { $0.web.append(s) } }
+            addField("Block sites (google.com, x.com; * for all)", $newSite) { list in
+                blocker.update(block) { r in for s in list where !r.web.contains(s) { r.web.append(s) } }
             }
             // Always shown: while locked the field stays, just disabled, so it's clear it's held, not gone.
             entries("Always allowed", r.exceptions, icon: "checkmark.circle", tint: .green, removable: true, heldWhy: why,
                     showEmpty: true) { s in
                 blocker.update(block) { $0.exceptions.removeAll { $0 == s } }
             }
-            addField(locked ? "Allowing sites works again after \(until)" : "Allow a site (github.com, youtube.com/watch*)",
-                     $newException) { s in
-                blocker.update(block) { if !$0.exceptions.contains(s) { $0.exceptions.append(s) } }
+            addField(locked ? "Allowing sites works again after \(until)" : "Allow sites (github.com, youtube.com/watch*)",
+                     $newException) { list in
+                blocker.update(block) { r in for s in list where !r.exceptions.contains(s) { r.exceptions.append(s) } }
             }
             .disabled(locked)
             .opacity(locked ? 0.6 : 1)
@@ -100,16 +100,18 @@ struct BlockEditor: View {
         }
     }
 
-    private func addField(_ prompt: String, _ text: Binding<String>, add: @escaping (String) -> Void) -> some View {
+    // Takes one site or a list: separated by commas, spaces or new lines, as pasted.
+    private func addField(_ prompt: String, _ text: Binding<String>, add: @escaping ([String]) -> Void) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "plus").foregroundStyle(.secondary)
             TextField(prompt, text: text)
                 .textFieldStyle(.plain)
                 .onSubmit {
-                    let s = text.wrappedValue.trimmingCharacters(in: .whitespaces)
-                        .replacingOccurrences(of: "https://", with: "").replacingOccurrences(of: "http://", with: "")
+                    let list = splitList(text.wrappedValue).map {
+                        $0.replacingOccurrences(of: "https://", with: "").replacingOccurrences(of: "http://", with: "")
+                    }
                     text.wrappedValue = ""
-                    if !s.isEmpty { add(s) }
+                    if !list.isEmpty { add(list) }
                 }
         }
         .font(.system(size: 12))

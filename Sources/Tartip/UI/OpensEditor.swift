@@ -66,7 +66,7 @@ struct OpensEditor: View {
             }
             HStack(spacing: 6) {
                 Image(systemName: "link").foregroundStyle(.secondary)
-                TextField("Paste a link and press Enter", text: $newLink)
+                TextField("Paste links (commas between) and press Enter", text: $newLink)
                     .textFieldStyle(.plain)
                     .onSubmit(addLink)
             }
@@ -92,9 +92,9 @@ struct OpensEditor: View {
     }
 
     private func addLink() {
-        let l = newLink.trimmingCharacters(in: .whitespaces)
+        let list = splitList(newLink)
         newLink = ""
-        guard !l.isEmpty else { return }
-        model.updateOpens(activity.id) { if !$0.urls.contains(l) { $0.urls.append(l) } }
+        guard !list.isEmpty else { return }
+        model.updateOpens(activity.id) { o in for l in list where !o.urls.contains(l) { o.urls.append(l) } }
     }
 }

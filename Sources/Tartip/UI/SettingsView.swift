@@ -56,6 +56,11 @@ struct SettingsView: View {
             freeTimeSection
             durationSection
             lockSection
+            group("Shortcuts", "Work from any app.") {
+                ForEach(shortcuts, id: \.label) { k in
+                    row(k.name) { Text(k.label).foregroundStyle(.secondary) }
+                }
+            }
             group("Permissions", "What macOS lets Tartip do. Rechecked when you come back from System Settings.") {
                 PermissionsList(perms: perms, blocksSites: NativeBlocker.shared.rules.values.contains { !$0.web.isEmpty })
             }
