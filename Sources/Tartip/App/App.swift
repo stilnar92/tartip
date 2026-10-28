@@ -18,6 +18,7 @@ final class AppRoot {
         Setup.resolve()          // first: everything after this writes files that would hide a new install
         enforceSingleInstance()
         AutoStart.ensure()       // a copy opened by hand hands over to launchd, which closes it
+        writeSchema()
         model = Model()
         windows = WindowCoordinator(model: model)
     }

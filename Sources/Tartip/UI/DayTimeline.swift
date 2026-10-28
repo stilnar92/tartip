@@ -133,6 +133,14 @@ struct DayTimeline: View {
                 .opacity(fits ? 1 : 0)
                 .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Theme.accentTint))
                 .help("Away from the computer \(clockLabel(s.start % 1440))–\(clockLabel(s.end % 1440))")
+        } else if s.free {
+            Text("🍿 Free time · \(minutesLabel(s.minutes))")
+                .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.text)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: tall ? .topLeading : .leading)
+                .padding(.horizontal, 7).padding(.top, tall ? 4 : 0)
+                .opacity(fits ? 1 : 0)
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.yellow.opacity(0.3)))
+                .help("Free time \(clockLabel(s.start % 1440))–\(clockLabel(s.end % 1440))")
         } else if let name = s.activity {
             let st = ActivityStyle.of(name)
             HStack(spacing: 5) {
@@ -181,9 +189,9 @@ struct DayStrip: View {
                     Capsule().fill(Theme.pill).frame(width: g.size.width, height: 12)
                     ForEach(Array(day.actual.enumerated()), id: \.offset) { _, s in
                         RoundedRectangle(cornerRadius: 2)
-                            .fill(s.away ? Theme.accent.opacity(0.35) : s.activity.map { ActivityStyle.of($0).color.opacity(0.9) } ?? Theme.text2.opacity(0.2))
+                            .fill(s.away ? Theme.accent.opacity(0.35) : s.free ? Color.yellow.opacity(0.5) : s.activity.map { ActivityStyle.of($0).color.opacity(0.9) } ?? Theme.text2.opacity(0.2))
                             .frame(width: max(1.5, x(s.end) - x(s.start) - 1), height: 12).offset(x: x(s.start))
-                            .help(s.away ? "Away" : s.activity.map { "\($0) \(clockLabel(s.start % 1440))–\(clockLabel(s.end % 1440))" } ?? "No session")
+                            .help(s.away ? "Away" : s.free ? "Free time" : s.activity.map { "\($0) \(clockLabel(s.start % 1440))–\(clockLabel(s.end % 1440))" } ?? "No session")
                     }
                     ForEach(Array(ahead.enumerated()), id: \.offset) { _, p in
                         RoundedRectangle(cornerRadius: 2)

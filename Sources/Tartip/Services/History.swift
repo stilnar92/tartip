@@ -2,7 +2,7 @@ import Foundation
 
 // Session history: one JSON line per session in ~/modes/logs/sessions.jsonl.
 
-private func recordEncoder() -> JSONEncoder {
+func recordEncoder() -> JSONEncoder {
     let e = JSONEncoder()
     e.dateEncodingStrategy = .iso8601
     return e

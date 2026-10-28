@@ -11,6 +11,8 @@ struct Session: Codable, Equatable {
     var start: Date
     var planned: String? = nil      // activity picked before the start
     var paused = 0                  // seconds spent away from the computer, which don't count
+    var auto: Bool? = nil           // started by itself (for the record)
+    var pickSeconds: Int? = nil     // time "What's next?" was open before the start (for the record)
 
     var totalMinutes: Int { phases.reduce(0) { $0 + $1.minutes } }
     // Where the timer would have started without the time away: phases and the end follow it.
@@ -40,6 +42,8 @@ extension Session {
         start = try c.decode(Date.self, forKey: .start)
         planned = try c.decodeIfPresent(String.self, forKey: .planned)
         paused = try c.decodeIfPresent(Int.self, forKey: .paused) ?? 0
+        auto = try c.decodeIfPresent(Bool.self, forKey: .auto)
+        pickSeconds = try c.decodeIfPresent(Int.self, forKey: .pickSeconds)
     }
 }
 

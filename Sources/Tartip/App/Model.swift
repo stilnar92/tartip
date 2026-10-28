@@ -16,6 +16,7 @@ final class Model: ObservableObject {
     @Published var oneTimeLink = ""
     @Published private(set) var records: [SessionRecord]
     @Published private(set) var awayRecords: [AwayRecord]
+    @Published private(set) var events: [Event] = []      // loaded for Stats
 
     let clock: Clock
     var onPhaseChange: ((AppPhase) -> Void)?
@@ -33,6 +34,7 @@ final class Model: ObservableObject {
         self.state = state
         records = loadRecords()
         awayRecords = loadAway()
+        events = loadEvents()
 
         if self.state.minutes < Settings.current.minMinutes { self.state.minutes = Settings.current.defaultSessionMinutes }
         if let s = state.phase.session, Date() < s.end {
@@ -142,6 +144,10 @@ final class Model: ObservableObject {
                 return PlanSlot(start: start, end: start + max(1, Int(r.end.timeIntervalSince(max(r.start, dayStart))) / 60),
                                 activity: nil, away: true)
             }
+        let frees = freePieces.filter { $0.t.addingTimeInterval(Double($0.seconds ?? 0)) > dayStart }.map { e -> PlanSlot in
+            let start = inDay(minuteOfDay(max(e.t, dayStart)))
+            return PlanSlot(start: start, end: start + max(1, (e.seconds ?? 0) / 60), activity: nil, free: true)
+        }
         let weekday = Calendar.current.component(.weekday, from: now)
         let anyTime = s.activities.filter { a in
             !a.name.isEmpty && a.isPlanned(onWeekday: weekday) && (a.fromMinute == nil || a.toMinute == nil || a.fromMinute == a.toMinute)
@@ -150,7 +156,7 @@ final class Model: ObservableObject {
             Period(start: $0.start, end: $0.end, available: $0.available.filter { !anyTime.contains($0) })
         })
         return DayView(from: w.from, to: w.to, anyTime: anyTime, periods: periods,
-                       actual: pastDay(done + aways, from: w.from, until: min(nowM, w.to)),
+                       actual: pastDay(done + aways + frees, from: w.from, until: min(nowM, w.to)),
                        now: nowM >= w.from && nowM < w.to ? nowM : nil)
     }
 
@@ -159,6 +165,7 @@ final class Model: ObservableObject {
         guard limits.needsNewRound(todayActivities) else { return }
         state.round = Round(day: dayKey(now), number: roundNumber + 1, since: now)
         log("round \(roundNumber): limits start over")
+        record(Event(t: now, type: "round", number: roundNumber))
     }
 
     // Time in sessions today, by the clock, counting the running one.
@@ -166,7 +173,19 @@ final class Model: ObservableObject {
         secondsByActivity(since: Calendar.current.startOfDay(for: now)).values.reduce(0, +)
     }
 
-    func reloadRecords() { records = loadRecords() }
+    // Free time pieces, the running one included (as used so far).
+    var freePieces: [Event] {
+        var out = events.filter { $0.type == "free" }
+        if case .freeTime(let start, let end) = phase {
+            out.append(Event(t: start, type: "free", seconds: freeTimeElapsed, minutes: Int(end.timeIntervalSince(start)) / 60))
+        }
+        return out
+    }
+
+    func reloadRecords() {
+        records = loadRecords()
+        events = loadEvents()
+    }
 
     // MARK: first-run setup
 
@@ -246,14 +265,23 @@ final class Model: ObservableObject {
     private func autoStart() {
         guard let activity = autoStartActivity else { return }
         log("auto  \(activity) after \(Settings.current.autoStartAfterMinutes)m unanswered")
-        startNow(activity, phases: [Phase(isBreak: false, minutes: max(Settings.current.minMinutes, Settings.current.autoStartMinutes))])
+        startNow(activity, phases: [Phase(isBreak: false, minutes: max(Settings.current.minMinutes, Settings.current.autoStartMinutes))],
+                 auto: true)
     }
 
-    private func startNow(_ activity: String, phases: [Phase]) {
+    private func startNow(_ activity: String, phases: [Phase], auto: Bool = false) {
         let extra = oneTimeLink.trimmingCharacters(in: .whitespaces)
         oneTimeLink = ""
-        start(Session(block: Settings.current.block(for: activity), phases: phases, start: Date(), planned: activity),
-              extraURLs: extra.isEmpty ? [] : [extra])
+        var s = Session(block: Settings.current.block(for: activity), phases: phases, start: Date(), planned: activity)
+        s.auto = auto ? true : nil
+        s.pickSeconds = pickSeconds
+        start(s, extraURLs: extra.isEmpty ? [] : [extra])
+    }
+
+    // How long "What's next?" has been open; nil when the start didn't come from it.
+    private var pickSeconds: Int? {
+        guard phase == .picking, let since = state.pickingSince else { return nil }
+        return max(0, Int(Date().timeIntervalSince(since)))
     }
 
     private func start(_ s: Session, extraURLs: [String]) {
@@ -283,14 +311,21 @@ final class Model: ObservableObject {
             message = "Locked until \(Fmt.clock.string(from: s.end)). Timer stopped, block stays."
         }
         log("off   \(s.block) (app)")
-        finish(s)
+        finish(s, ended: "stopped")
     }
 
     // The session is over: ask what was actually done (sessions under a minute are dropped).
     // Time away doesn't count: the record starts that much later.
-    private func finish(_ s: Session, at end: Date = Date()) {
+    private func finish(_ s: Session, at end: Date = Date(), ended: String) {
         lastPhaseIndex = nil
-        let r = SessionRecord(start: s.shiftedStart, end: min(end, s.end), mode: s.block, planned: s.planned)
+        var r = SessionRecord(start: s.shiftedStart, end: min(end, s.end), mode: s.block, planned: s.planned)
+        r.began = s.start
+        r.plannedMinutes = s.totalMinutes
+        r.rounds = s.workRounds > 1 ? s.workRounds : nil
+        r.paused = s.paused > 0 ? s.paused : nil
+        r.ended = ended
+        r.auto = s.auto
+        r.pickSeconds = s.pickSeconds
         state.phase = r.seconds >= 60 ? .reviewing(r) : .idle
     }
 
@@ -349,7 +384,7 @@ final class Model: ObservableObject {
         }
         if away > Settings.current.maxAwayMinutes * 60 {
             log("back after \(minutesLabel(away / 60)): \(s.planned ?? s.block) ended when you left")
-            finish(s, at: since)
+            finish(s, at: since, ended: "away")
             return
         }
         s.paused += away
@@ -383,8 +418,11 @@ final class Model: ObservableObject {
     }
 
     func endRest() {
-        guard case .freeTime = phase else { return }
+        guard case .freeTime(let start, let end) = phase else { return }
         let used = freeTimeElapsed
+        let piece = Event(t: start, type: "free", seconds: used, minutes: Int(end.timeIntervalSince(start)) / 60)
+        record(piece)
+        events.append(piece)
         let today = dayKey(now)
         state.freeUsed = DayStats(day: today, free: (state.freeUsed.day == today ? state.freeUsed.free : 0) + used)
         state.phase = .idle
@@ -404,7 +442,7 @@ final class Model: ObservableObject {
             guard let cur = s.current(at: now) else {
                 log("done  \(s.block) (app)")
                 notify("Focus: \(s.block)", "Session done 🎉")
-                finish(s)
+                finish(s, ended: "done")
                 return
             }
             if cur.index != lastPhaseIndex {

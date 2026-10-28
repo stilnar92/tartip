@@ -140,6 +140,7 @@ final class NativeBlocker: ObservableObject, Blocker {
         quitting[pid] = Date()
         app.terminate()
         log("quit  \(app.bundleIdentifier ?? what) (\(b.name))")
+        recordBlocked(app.bundleIdentifier ?? what, block: b.name, until: b.until)
         let key = app.bundleIdentifier ?? what
         if Date().timeIntervalSince(lastNotice[key] ?? .distantPast) > 60 {
             lastNotice[key] = Date()
@@ -189,6 +190,7 @@ final class NativeBlocker: ObservableObject, Blocker {
                           let hit = act.first(where: { $0.rule.blocks(url: url) }) else { continue }
                     (tabs.object(at: i) as? SBObject)?.setValue(blockedPageURL(url, block: hit.name, until: hit.until), forKey: "URL")
                     log("site  \(url.prefix(120)) (\(hit.name))")
+                    if let host = siteName(url) { recordBlocked(host, block: hit.name, until: hit.until) }
                 }
                 if errors.notAllowed { break }
             }

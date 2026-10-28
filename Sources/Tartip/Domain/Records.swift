@@ -10,6 +10,14 @@ struct SessionRecord: Codable, Equatable {
     var planned: String?
     var actual: [String] = []
     var note: String?               // only in old records
+    // For analysis (see logs/SCHEMA.md). All optional: older lines have none of them.
+    var began: Date?                // when it really started; `start` is moved later by the time away
+    var plannedMinutes: Int?        // the length it was started with, breaks included
+    var rounds: Int?                // Pomodoro work rounds, when more than one
+    var paused: Int?                // seconds away from the computer in the middle of it
+    var ended: String?              // "done", "stopped" (the block stays on) or "away" (gone too long)
+    var auto: Bool?                 // started by itself after "What's next?" went unanswered
+    var pickSeconds: Int?           // from "What's next?" opening to the start
 
     var seconds: Int { max(0, Int(end.timeIntervalSince(start))) }
     var asPlanned: Bool { planned.map { actual == [$0] } ?? false }

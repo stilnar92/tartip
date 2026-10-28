@@ -10,6 +10,7 @@ struct PlanSlot: Equatable {
     var end: Int
     var activity: String?      // nil: no session ran then
     var away = false           // away from the computer (no activity)
+    var free = false           // free time (no activity)
 
     var minutes: Int { end - start }
 }
@@ -91,7 +92,7 @@ func pastDay(_ sessions: [PlanSlot], from: Int, until: Int) -> [PlanSlot] {
     for var s in sessions.sorted(by: { $0.start < $1.start }) where s.end > max(from, at) {
         s.start = max(s.start, from, at)   // overlaps (a session paused while away) go to the earlier one
         if s.start - at >= 5 { out.append(PlanSlot(start: at, end: s.start, activity: nil)) }
-        if var last = out.last, last.activity != nil, last.activity == s.activity, last.away == s.away, s.start - last.end <= 2 {
+        if var last = out.last, last.activity != nil, last.activity == s.activity, last.away == s.away, last.free == s.free, s.start - last.end <= 2 {
             last.end = max(last.end, s.end)
             out[out.count - 1] = last
         } else {

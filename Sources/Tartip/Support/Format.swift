@@ -4,6 +4,7 @@ import Foundation
 enum Fmt {
     static let clock = make("HH:mm")
     static let weekdayClock = make("EEE HH:mm")
+    static let dayClock = make("d MMM HH:mm")
     static let dayTitle = make("EEEE · d MMM")
     static let dayKey = make("yyyy-MM-dd")
     static let logStamp = make("yyyy-MM-dd HH:mm:ss")
@@ -68,3 +69,6 @@ func splitList(_ text: String) -> [String] {
     return text.split(whereSeparator: { $0 == "," || $0.isWhitespace }).map(String.init)
         .filter { seen.insert($0).inserted }
 }
+
+// "45s", "3m", "1h 5m": for times that are often under a minute.
+func shortDuration(_ seconds: Int) -> String { seconds < 60 ? "\(seconds)s" : formatDuration(seconds) }

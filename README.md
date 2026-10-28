@@ -73,7 +73,7 @@ Your data in `~/modes` is kept either way.
 
 **Shortcuts** (from any app, listed in Rules): **⌃⌥⌘L** steps away, **⌃⌥⌘T** opens Today.
 
-All the numbers above are defaults. **Stats**, **Activities** (list, daily limits, hours, what each opens) and **Rules** (night, free time, session length) live in one window with a sidebar, opened from the panel's toolbar.
+All the numbers above are defaults. **Stats** (today, 7 or 30 days: time per activity, how many sessions ran their full time, auto-starts, time to decide, free time, time away and what got blocked most), **Activities** (list, daily limits, hours, what each opens) and **Rules** (night, free time, session length) live in one window with a sidebar, opened from the panel's toolbar.
 
 ## Blocks
 
@@ -100,8 +100,10 @@ Everything personal lives in `~/modes`, outside the app:
 | `settings.json` | all settings, including activities, daily limits, the block each locks and what each opens (apps, links, files and folders, stretch windows) |
 | `blocks.json` | what each block blocks (apps, sites, exceptions) |
 | `blocked.html` | the "Not now" page blocked tabs are sent to (written by the app) |
-| `logs/sessions.jsonl` | one line per session: start, end, planned, actual, note |
+| `logs/sessions.jsonl` | one line per session: start, end, planned, actual; since 1.5 also the real start, planned length, time away, how it ended, whether it started by itself and how long you took to decide |
 | `logs/away.jsonl` | one line per stretch away from the computer: start, end |
+| `logs/events.jsonl` | free time pieces, blocked apps and sites (the host only, once per session), new rounds |
+| `logs/SCHEMA.md` | what every field means, for analysis in DuckDB, pandas, Numbers or an AI (written by the app) |
 | `logs/modes.log` | event log: launches, blocks, quit apps, blocked sites, prompts, reviews |
 
 ## Known limits

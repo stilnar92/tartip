@@ -256,3 +256,57 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(splitList("  ").isEmpty)
     }
 }
+
+@Suite struct RecordFieldsTests {
+    @Test func oldLinesStillLoad() throws {
+        let json = #"{"start":"2026-03-01T10:00:00Z","end":"2026-03-01T10:30:00Z","mode":"Work","planned":"Work","actual":["Work"]}"#
+        let r = try recordDecoder().decode(SessionRecord.self, from: Data(json.utf8))
+        #expect(r.seconds == 1800)
+        #expect(r.began == nil && r.ended == nil && r.auto == nil)
+    }
+
+    @Test func newFieldsRoundTripAndOnlyWhenKnown() throws {
+        var r = SessionRecord(start: at(10, 10), end: at(10, 40), mode: "Work", planned: "Work")
+        let bare = String(data: try recordEncoder().encode(r), encoding: .utf8)!
+        #expect(!bare.contains("began") && !bare.contains("auto"))
+        r.began = at(10); r.paused = 600; r.plannedMinutes = 30; r.ended = "done"; r.auto = true; r.pickSeconds = 42
+        #expect(try recordDecoder().decode(SessionRecord.self, from: recordEncoder().encode(r)) == r)
+    }
+
+    @Test func savedStateFromBeforeStillLoads() throws {
+        let json = #"{"block":"Work","phases":[{"isBreak":false,"minutes":30}],"start":0,"paused":60}"#
+        let s = try JSONDecoder().decode(Session.self, from: Data(json.utf8))
+        #expect(s.paused == 60 && s.auto == nil && s.pickSeconds == nil)
+    }
+}
+
+@Suite struct InsightsTests {
+    @Test func numbers() {
+        var a = SessionRecord(start: at(10), end: at(10, 30), mode: "Work", planned: "Work")
+        a.ended = "done"; a.pickSeconds = 30
+        var b = SessionRecord(start: at(11), end: at(11, 10), mode: "Work", planned: "Work")
+        b.ended = "stopped"; b.auto = true; b.pickSeconds = 900
+        var c = SessionRecord(start: at(12), end: at(12, 30), mode: "Work", planned: "Work")
+        c.pickSeconds = 60
+        let old = SessionRecord(start: at(9), end: at(9, 30), mode: "Work", planned: "Work")
+        let events = [Event(t: at(13), type: "free", seconds: 600, minutes: 15),
+                      Event(t: at(14), type: "blocked", name: "youtube.com", block: "Work"),
+                      Event(t: at(15), type: "blocked", name: "youtube.com", block: "Work"),
+                      Event(t: at(15), type: "blocked", name: "ru.keepcoder.Telegram", block: "Work"),
+                      Event(t: at(9, day: 2), type: "blocked", name: "x.com", block: "Work")]   // outside the range
+        let away = [AwayRecord(start: at(16), end: at(16, 20)),
+                    AwayRecord(start: at(1), end: at(7))]                                      // sleep
+        let i = insights([old, a, b, c], events: events, away: away, from: at(0), to: at(0, day: 2))
+        #expect(i.finished == 50)          // old has no `ended`, so it isn't counted either way
+        #expect(i.autoStarted == 1)
+        #expect(i.pickMedian == 60)
+        #expect(i.free == 600)
+        #expect(i.away == 1200)
+        #expect(i.blocked == [.init(name: "youtube.com", count: 2), .init(name: "ru.keepcoder.Telegram", count: 1)])
+    }
+
+    @Test func onlyTheHostOfABlockedSite() {
+        #expect(siteName("https://www.youtube.com/watch?v=abc") == "youtube.com")
+        #expect(siteName("file:///Users/x/a.html") == nil)
+    }
+}
