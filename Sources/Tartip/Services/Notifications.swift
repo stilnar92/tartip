@@ -2,12 +2,15 @@ import AppKit
 import UserNotifications
 
 // A banner plus the Glass sound. Uses Notification Center once it's allowed; until then
-// (or when running outside the app bundle) falls back to AppleScript's notification.
+// (or when running outside the app bundle) falls back to AppleScript's notification, which
+// shows Script Editor's icon rather than ours.
 func notify(_ title: String, _ text: String) {
     NSSound(named: "Glass")?.play()
     guard Bundle.main.bundleIdentifier != nil else { return scriptNotify(title, text) }
     UNUserNotificationCenter.current().getNotificationSettings { settings in
-        guard settings.authorizationStatus == .authorized else { return scriptNotify(title, text) }
+        let allowed = settings.authorizationStatus == .authorized
+        notifyPath.logOnce(allowed ? "notifications: Notification Center" : "notifications: AppleScript (not allowed for Tartip)")
+        guard allowed else { return scriptNotify(title, text) }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = text
@@ -28,3 +31,19 @@ private func scriptNotify(_ title: String, _ text: String) {
         run("/usr/bin/osascript", ["-e", "display notification \(appleString(text)) with title \(appleString(title))"])
     }
 }
+
+// Which way banners go, logged once per launch so a wrong icon is easy to trace.
+private final class LogOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+
+    func logOnce(_ line: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !done else { return }
+        done = true
+        log(line)
+    }
+}
+
+private let notifyPath = LogOnce()

@@ -90,6 +90,10 @@ if ! codesign --force -s "$CERT" "$APP" 2>/dev/null; then
   echo "Note: signing with '$CERT' failed, using ad-hoc (Accessibility must be re-allowed after rebuilds)"
   codesign --force -s - "$APP"
 fi
+# Tell LaunchServices about this build, so the icon it hands to Notification Center and the
+# Dock isn't the one cached from an older version.
+touch "$APP"
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" || true
 echo "Built: $APP"
 
 # Start it again under launchd: runs at login and restarts if quit.
