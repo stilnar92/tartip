@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum MainTab: String, CaseIterable {
-    case setup = "Get started", stats = "Stats", activities = "Activities", rules = "Rules"
+    case setup = "Get started", tasks = "Tasks", activities = "Activities", rules = "Rules", stats = "Stats"
 
     // Until first-run setup is done Get started is the only page: there's nothing to see
     // in Stats yet, and Activities and Rules would compete with it. Afterwards it's gone.
@@ -12,6 +12,7 @@ enum MainTab: String, CaseIterable {
         case .setup: return "sparkles"
         case .stats: return "chart.bar"
         case .activities: return "list.bullet"
+        case .tasks: return "checklist"
         case .rules: return "slider.horizontal.3"
         }
     }
@@ -33,6 +34,7 @@ struct MainView: View {
                     switch tab {
                     case .setup: GetStartedView(model: model, done: close).padding(28)
                     case .stats: StatsView(model: model)
+                    case .tasks: TaskPlanningView(model: model, clock: model.clock).padding(28)
                     case .activities, .rules: SettingsView(model: model, page: tab).padding(28)
                     }
                 }

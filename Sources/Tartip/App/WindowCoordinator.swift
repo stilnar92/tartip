@@ -41,7 +41,13 @@ final class WindowCoordinator {
     private func show(for phase: AppPhase) {
         switch phase {
         case .picking: prompt.show(ActivityPickerView(model: model, clock: model.clock), fullScreen: Settings.current.pickerFullScreen)
-        case .reviewing: prompt.show(ReviewView(model: model), fullScreen: Settings.current.reviewFullScreen)
+        case .reviewing:
+            let fullScreen = Settings.current.reviewFullScreen
+            let screen = NSScreen.main ?? NSScreen.screens.first
+            let available = (fullScreen ? screen?.frame : screen?.visibleFrame)?.size ?? CGSize(width: 1024, height: 768)
+            let size = CGSize(width: min(fullScreen ? 1080 : 880, max(280, available.width - 64)),
+                              height: min(fullScreen ? 820 : 680, max(300, available.height - 80)))
+            prompt.show(ReviewView(model: model, size: size), fullScreen: fullScreen)
         case .idle, .session, .freeTime, .away: prompt.hide()
         }
     }

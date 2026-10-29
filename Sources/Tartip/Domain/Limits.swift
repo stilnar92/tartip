@@ -29,6 +29,12 @@ struct Limits {
         return max(0, limit * 60 - usedToday(activity))
     }
 
+    // Shared by manual starts, Pomodoro, auto-start, and their previews.
+    func sessionSeconds(_ activity: String, requested: Int) -> Int {
+        guard settings.capSessionsToRemainingTime, let left = secondsLeftToday(activity) else { return requested }
+        return min(requested, left)
+    }
+
     func hasTimeLeft(_ activity: String) -> Bool { (secondsLeftToday(activity) ?? 1) > 0 }
 
     // Activity hours: outside them the activity is greyed out in the picker.

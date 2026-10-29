@@ -12,6 +12,18 @@ final class Model: ObservableObject {
             if state.phase != oldValue.phase { onPhaseChange?(state.phase) }
         }
     }
+    @Published private(set) var dailyTasks = DailyTaskStore.load() {
+        didSet { if dailyTasks != oldValue { DailyTaskStore.save(dailyTasks) } }
+    }
+
+    func tasks(for activity: UUID, day: String) -> [ActivityTask] {
+        dailyTasks.tasks(day: day, activity: activity)
+    }
+
+    func setTasks(_ tasks: [ActivityTask], for activity: UUID, day: String) {
+        dailyTasks.set(tasks, day: day, activity: activity)
+    }
+
     @Published var message = ""
     @Published var oneTimeLink = ""
     @Published private(set) var records: [SessionRecord]
@@ -273,6 +285,7 @@ final class Model: ObservableObject {
         let extra = oneTimeLink.trimmingCharacters(in: .whitespaces)
         oneTimeLink = ""
         var s = Session(block: Settings.current.block(for: activity), phases: phases, start: Date(), planned: activity)
+        s.maxDurationSeconds = limits.sessionSeconds(activity, requested: s.totalMinutes * 60)
         s.auto = auto ? true : nil
         s.pickSeconds = pickSeconds
         start(s, extraURLs: extra.isEmpty ? [] : [extra])
@@ -302,7 +315,8 @@ final class Model: ObservableObject {
         let first = s.phases.first?.minutes ?? s.totalMinutes
         let desc = s.workRounds > 1 ? "pomodoro \(first)/\(Settings.current.pomodoroBreak)x\(s.workRounds)" : "\(s.totalMinutes)m"
         log("start \(s.block) (app, \(desc), lock \(s.totalMinutes)m)")
-        notify("Focus: \(s.block)", s.workRounds > 1 ? "Round 1/\(s.workRounds) — \(first) min. Go!" : "\(s.totalMinutes) min. Go!")
+        let actualDuration = formatDuration(Int(s.end.timeIntervalSince(s.shiftedStart)))
+        notify("Focus: \(s.block)", "\(actualDuration). Go!")
     }
 
     func stop() {
@@ -329,9 +343,12 @@ final class Model: ObservableObject {
         state.phase = r.seconds >= 60 ? .reviewing(r) : .idle
     }
 
-    func saveReview(actual: [String]) {
-        guard var r = review else { return }
+    func saveReview(actual: [String], selectedTasks: Set<UUID> = [], otherWork: [String: String] = [:]) {
+        guard var r = review, !actual.isEmpty else { return }
         r.actual = actual
+        let completed = dailyTasks.complete(day: dayKey(r.began ?? r.start), activities: Settings.current.activities,
+                                            actual: actual, selected: selectedTasks, otherWork: otherWork)
+        r.completedTasks = completed.isEmpty ? nil : completed
         appendRecord(r)
         records.append(r)
         state.phase = .idle

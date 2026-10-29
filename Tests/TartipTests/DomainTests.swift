@@ -310,3 +310,33 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(siteName("file:///Users/x/a.html") == nil)
     }
 }
+
+@Suite struct RemainingSessionTests {
+    @Test func capsLongSessionsAndAllowsOptOut() {
+        var settings = AppSettings()
+        settings.activities = [ActivitySetting(name: "PrepareDay", dailyMinutes: 15)]
+        let limits = Limits(settings: settings, today: [], now: at(10), calendar: cal)
+        #expect(limits.sessionSeconds("PrepareDay", requested: 3600) == 900)
+        #expect(limits.sessionSeconds("PrepareDay", requested: 300) == 300)
+        #expect(limits.sessionSeconds("Other", requested: 3600) == 3600)
+        settings.capSessionsToRemainingTime = false
+        #expect(Limits(settings: settings, today: [], now: at(10), calendar: cal)
+            .sessionSeconds("PrepareDay", requested: 3600) == 3600)
+    }
+
+    @Test func exactCapEndsPomodoroAndSurvivesPersistence() throws {
+        var session = Session(block: "Work", phases: [Phase(isBreak: false, minutes: 25),
+            Phase(isBreak: true, minutes: 5), Phase(isBreak: false, minutes: 25)], start: at(10))
+        session.maxDurationSeconds = 47
+        #expect(session.end == at(10).addingTimeInterval(47))
+        #expect(session.current(at: at(10))?.end == session.end)
+        #expect(session.current(at: session.end) == nil)
+        session.paused = 60
+        #expect(session.end == at(10).addingTimeInterval(107))
+        #expect(try JSONDecoder().decode(Session.self, from: JSONEncoder().encode(session)) == session)
+    }
+
+    @Test func oldSettingsEnableCap() {
+        #expect(AppSettings.merged(over: Data("{}".utf8))?.capSessionsToRemainingTime == true)
+    }
+}

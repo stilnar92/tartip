@@ -23,7 +23,13 @@ struct TodayList: View {
             if !names.isEmpty {
                 VStack(spacing: 0) {
                     ForEach(Array(names.enumerated()), id: \.element) { i, a in
-                        row(a, limits)
+                        VStack(alignment: .leading, spacing: 0) {
+                            row(a, limits)
+                            if let activity = Settings.current.activity(named: a) {
+                                DailyTaskPreview(model: model, clock: clock, activity: activity.id)
+                                    .padding(.leading, 46).padding(.trailing, 12).padding(.bottom, 10)
+                            }
+                        }
                         if i < names.count - 1 { Divider().opacity(0.4).padding(.leading, 44) }
                     }
                 }
@@ -69,7 +75,8 @@ struct TodayList: View {
 
     private func length(_ r: StartRequest) -> Int {
         let s = Settings.current
-        return r.pomodoro ?? model.pomodoro ? s.pomodoroPhases().reduce(0) { $0 + $1.minutes } : max(s.minMinutes, r.minutes ?? model.minutes)
+        let requested = r.pomodoro ?? model.pomodoro ? s.pomodoroPhases().reduce(0) { $0 + $1.minutes } : max(s.minMinutes, r.minutes ?? model.minutes)
+        return (model.limits.sessionSeconds(r.activity, requested: requested * 60) + 59) / 60
     }
 
     // Length for the next start: pills, plus 🍅 for Pomodoro.
@@ -120,7 +127,7 @@ struct TodayList: View {
                     .lineLimit(1)
                 Spacer(minLength: 6)
                 if hover {
-                    Label(model.pomodoro ? "Start 🍅" : "Start \(model.minutes)m", systemImage: "play.fill")
+                    Label("Start \(formatDuration(limits.sessionSeconds(a, requested: (model.pomodoro ? Settings.current.pomodoroPhases().reduce(0) { $0 + $1.minutes } : max(Settings.current.minMinutes, model.minutes)) * 60)))", systemImage: "play.fill")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 9).padding(.vertical, 4)
@@ -143,7 +150,7 @@ struct TodayList: View {
         // Right-click: start with a specific length.
         .contextMenu {
             ForEach(Settings.current.sessionLengths, id: \.self) { n in
-                Button("Start for \(minutesLabel(n))") { tryStart(a, minutes: n, pomodoro: false) }
+                Button("Start for \(formatDuration(limits.sessionSeconds(a, requested: n * 60)))") { tryStart(a, minutes: n, pomodoro: false) }
             }
             Button("Start Pomodoro") { tryStart(a, pomodoro: true) }
         }

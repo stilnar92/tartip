@@ -9,6 +9,7 @@ struct SessionRecord: Codable, Equatable {
     var mode: String
     var planned: String?
     var actual: [String] = []
+    var completedTasks: [CompletedTask]? // task snapshots selected during this session’s review
     var note: String?               // only in old records
     // For analysis (see logs/SCHEMA.md). All optional: older lines have none of them.
     var began: Date?                // when it really started; `start` is moved later by the time away

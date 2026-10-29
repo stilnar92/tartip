@@ -87,6 +87,7 @@ struct AppSettings: Codable, Equatable {
 
     // Session length
     var durationOptions = [15, 20, 30, 45, 60]
+    var capSessionsToRemainingTime = true
     var defaultMinutes = 30
     var minMinutes = 15
     var pomodoroWork = 25

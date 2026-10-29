@@ -71,6 +71,8 @@ Your data in `~/modes` is kept either way.
 8. **Night.** From 00:00 to 08:00 the night block is locked until morning (set what it blocks in Rules → Night). No prompts, no timers, and nothing can be started.
 9. **Settings lock** (Rules → Changing settings; off by default). So a plan made calmly can't be undone in a weak moment: **Lock after a change** keeps settings locked for 2 h … 1 week, starting 10 minutes after your first change; **Only at set hours** allows loosening only in a daily window (e.g. 21:00–21:30). While locked, anything stricter still works (more days, more apps or sites, less free time); anything looser is undone with a note saying why (removing an activity or a blocked site, fewer days, shorter hours, more free time, turning night or auto-start off, weakening the lock itself).
 
+**Daily tasks.** Open **Tasks** in the main window to plan a checklist for each activity for the current day. Press Return to add another task, or paste multiple lines. Edit, reorder and delete tasks there. Before starting a session, expand **Today's tasks** under an activity to preview its checklist. The timer screen stays free of task controls. After a session, select the activities you actually worked on: each selected activity reveals its tasks to mark as completed, plus an optional field for other work. You can report several activities or choose **Other**. Saving the review marks the selected tasks complete and records a snapshot in session history. A session crossing midnight reviews the tasks from the day it began. Tasks survive activity renames and restarts; each day has its own list without automatic carryover.
+
 **Shortcuts** (from any app, listed in Rules): **⌃⌥⌘L** steps away, **⌃⌥⌘T** opens Today.
 
 All the numbers above are defaults. **Stats** (today, 7 or 30 days: time per activity, how many sessions ran their full time, auto-starts, time to decide, free time, time away and what got blocked most), **Activities** (list, daily limits, hours, what each opens) and **Rules** (night, free time, session length) live in one window with a sidebar, opened from the panel's toolbar.
@@ -93,7 +95,7 @@ On first launch, **Start** on Get started fills every block that's still empty w
 
 ## Your data
 
-Everything personal lives in `~/modes`, outside the app:
+Settings and history live in `~/modes`, outside the app. Daily task checklists are stored in the app’s UserDefaults under `dailyActivityTasks`:
 
 | File | What |
 |---|---|

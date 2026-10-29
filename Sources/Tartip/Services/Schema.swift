@@ -27,6 +27,7 @@ This is the one record of time spent: limits and Stats count from it.
 | `mode` | The block that was on. |
 | `planned` | The activity picked. |
 | `actual` | What you said you did at the review. Empty: not reviewed. Several: the time is split evenly. |
+| `completedTasks` | Work reported at review: activity name, optional taskID, title snapshot and local planning day. Missing when no tasks were reported. |
 | `note` | Old lines only. |
 | `began` | When it really started, by the clock. |
 | `plannedMinutes` | The length it was started with, Pomodoro breaks included. |

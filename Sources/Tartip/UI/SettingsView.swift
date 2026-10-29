@@ -22,7 +22,7 @@ struct SettingsView: View {
         switch page {
         case .activities: activitiesPage
         case .rules: rulesPage
-        case .setup, .stats: EmptyView()
+        case .setup, .stats, .tasks: EmptyView()
         }
     }
 
@@ -234,6 +234,8 @@ struct SettingsView: View {
                     .onSubmit(saveOptions)
                     .onChange(of: optionsText) { _ in saveOptions() }
             }
+            Toggle("Limit sessions to the task’s remaining daily time", isOn: $settings.value.capSessionsToRemainingTime)
+                .help("Shorten manual, Pomodoro, and auto-started sessions to the remaining allowance, even below the minimum session length.")
             row("Default") { minuteStepper($settings.value.defaultMinutes, 5...240, step: 5) }
             row("Auto-start if unanswered for") {
                 HStack(spacing: 6) {
