@@ -53,10 +53,10 @@ final class Model: ObservableObject {
             self.state.pickingSince = nil
         }
         if self.state.minutes < Settings.current.minMinutes { self.state.minutes = Settings.current.defaultSessionMinutes }
-        if let s = state.phase.session, Date() < s.end {
-            // Restarted mid-session: make sure the block is on for the time that's left.
-            if s.policy.blocking { blocker.lock(s.block, until: s.end) }
-            lastPhaseIndex = s.current(at: Date())?.index
+        if let s = state.phase.session, Date() < s.end, let cur = s.current(at: Date()) {
+            // Restarted mid-session: make sure the block matches the phase that's running (off on a break).
+            if s.policy.blocking && !s.phases[cur.index].isBreak { blocker.lock(s.block, until: cur.end) }
+            lastPhaseIndex = cur.index
         }
         // Settings edits refresh the panel and the activity list right away.
         settingsSub = Settings.shared.objectWillChange.sink { [weak self] _ in
@@ -298,7 +298,7 @@ final class Model: ObservableObject {
     }
 
     private func start(_ s: Session, extraURLs: [String]) {
-        if s.policy.blocking { blocker.lock(s.block, until: s.end) }
+        if s.policy.blocking, let cur = s.current(at: Date()) { blocker.lock(s.block, until: cur.end) }
         message = ""
         if Settings.current.has(.workspace) {
             let c = s.planned.flatMap { Settings.current.activity(named: $0)?.opens } ?? ModeConfig()
@@ -427,7 +427,10 @@ final class Model: ObservableObject {
             return
         }
         s.paused += away
-        if s.policy.blocking { blocker.lock(s.block, until: s.end) }
+        if s.policy.blocking, let cur = s.current(at: now), !s.phases[cur.index].isBreak {
+            blocker.lock(s.block, until: cur.end)
+        }
+        lastPhaseIndex = s.current(at: now)?.index
         state.phase = .session(s)
         log("back after \(minutesLabel(away / 60)): \(s.planned ?? s.block) until \(Fmt.clock.string(from: s.end))")
     }
@@ -489,8 +492,13 @@ final class Model: ObservableObject {
             if cur.index != lastPhaseIndex {
                 lastPhaseIndex = cur.index
                 let p = s.phases[cur.index]
-                if p.isBreak { notify("Break \(p.minutes) min", "Stand up, drink water. Next round starts automatically.") }
-                else { notify("Round \(s.round(of: cur.index))/\(s.workRounds)", "\(p.minutes) min. Back to work!") }
+                if p.isBreak {
+                    if s.policy.blocking { blocker.unlock(s.block) }
+                    notify("Break \(p.minutes) min", "Blocking is off. Next round starts automatically.")
+                } else {
+                    if s.policy.blocking { blocker.lock(s.block, until: cur.end) }
+                    notify("Round \(s.round(of: cur.index))/\(s.workRounds)", "\(p.minutes) min. Back to work!")
+                }
             }
         case .freeTime(_, let end):
             guard now >= end else { return }
