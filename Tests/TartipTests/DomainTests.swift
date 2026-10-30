@@ -88,6 +88,20 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(records([r], since: at(1, day: 2)).isEmpty)
     }
 
+    @Test func boundedRangeExcludesTheNextDay() {
+        let yesterday = SessionRecord(start: at(10, day: 1), end: at(11, day: 1), mode: "Work", planned: "Work")
+        let today = SessionRecord(start: at(10, day: 2), end: at(11, day: 2), mode: "Work", planned: "Work")
+        let out = records([yesterday, today], from: at(0, day: 1), to: at(0, day: 2))
+        #expect(out.count == 1)
+        #expect(out.first?.seconds == 3600)
+    }
+
+    @Test func boundedRangeClipsASessionCrossingTheUpperBound() {
+        let r = SessionRecord(start: at(23, 40, day: 1), end: at(0, 20, day: 3), mode: "Work", planned: "Work")
+        let out = records([r], from: at(0, day: 2), to: at(0, day: 3))
+        #expect(out.first?.seconds == 24 * 3600)
+    }
+
     @Test func splitKeepsEverySecond() {
         let r = SessionRecord(start: at(10), end: at(10, 0).addingTimeInterval(100), mode: "Work",
                               planned: "Work", actual: ["A", "B", "C"])

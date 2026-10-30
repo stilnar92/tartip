@@ -4,14 +4,23 @@ import SwiftUI
 
 struct StatsView: View {
     @ObservedObject var model: Model
-    @State private var range = 0   // 0 = today, 1 = 7 days, 2 = 30 days
+    @State private var range = 0   // 0 = today, 1 = yesterday, 2 = 7 days, 3 = 30 days
 
     var body: some View {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        let from = range == 0 ? today : cal.date(byAdding: .day, value: range == 1 ? -6 : -29, to: today) ?? today
-        let recs = model.recordsSince(from)
-        var byActivity = model.secondsByActivity(since: from)
+        let yesterday = cal.date(byAdding: .day, value: -1, to: today) ?? today
+        let from: Date = {
+            switch range {
+            case 0: return today
+            case 1: return yesterday
+            case 2: return cal.date(byAdding: .day, value: -6, to: today) ?? today
+            default: return cal.date(byAdding: .day, value: -29, to: today) ?? today
+            }
+        }()
+        let to = range == 1 ? today : Date()
+        let recs = model.recordsSince(from, upTo: to)
+        var byActivity = model.secondsByActivity(since: from, upTo: to)
         for a in model.activities where byActivity[a] == nil { byActivity[a] = 0 }
         // Every activity from the list is shown, busiest first; empty ones stay at the bottom.
         let order = model.activities + [otherActivity]
@@ -23,7 +32,7 @@ struct StatsView: View {
         let limits = model.limits
         let reviewed = recs.filter { !$0.actual.isEmpty && $0.planned != nil }
         let kept = reviewed.filter(\.asPlanned).count
-        let more = insights(recs, events: model.events.filter { $0.type != "free" } + model.freePieces, away: model.awayRecords, from: from, to: Date())
+        let more = insights(recs, events: model.events.filter { $0.type != "free" } + model.freePieces, away: model.awayRecords, from: from, to: to)
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -31,10 +40,11 @@ struct StatsView: View {
                 Spacer()
                 Picker("", selection: $range) {
                     Text("Today").tag(0)
-                    Text("7 days").tag(1)
-                    Text("30 days").tag(2)
+                    Text("Yesterday").tag(1)
+                    Text("7 days").tag(2)
+                    Text("30 days").tag(3)
                 }
-                .pickerStyle(.segmented).labelsHidden().frame(width: 220)
+                .pickerStyle(.segmented).labelsHidden().frame(width: 280)
             }
 
             HStack(spacing: 0) {
@@ -119,7 +129,7 @@ struct StatsView: View {
     }
 
     private func sessionRow(_ r: SessionRecord) -> some View {
-        let f = range == 0 ? Fmt.clock : range == 1 ? Fmt.weekdayClock : Fmt.dayClock
+        let f = range <= 1 ? Fmt.clock : range == 2 ? Fmt.weekdayClock : Fmt.dayClock
         let planned = r.planned ?? "–"
         let actual = r.actual.isEmpty ? "not reviewed" : r.actual.joined(separator: ", ")
         return HStack(spacing: 8) {
