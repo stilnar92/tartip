@@ -5,7 +5,7 @@ enum MainTab: String, CaseIterable {
 
     // Until first-run setup is done Get started is the only page: there's nothing to see
     // in Stats yet, and Activities and Rules would compete with it. Afterwards it's gone.
-    @MainActor static var shown: [MainTab] { Setup.isPending ? [.setup] : [.activities, .rules] + (Settings.current.has(.tasks) ? [.tasks] : []) + (Settings.current.has(.statistics) ? [.stats] : []) }
+    @MainActor static var shown: [MainTab] { Setup.isPending ? [.setup] : [.activities] + (Settings.current.has(.tasks) ? [.tasks] : []) + (Settings.current.has(.statistics) ? [.stats] : []) + [.rules] }
 
     var icon: String {
         switch self {
