@@ -23,6 +23,16 @@ struct OpensEditor: View {
                         .contextMenu {
                             Button("Remove", role: .destructive) { model.updateOpens(id) { $0.apps.removeAll { $0 == path } } }
                         }
+                        .overlay(alignment: .topTrailing) {
+                            Button { model.updateOpens(id) { $0.apps.removeAll { $0 == path } } } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                                    .background(Circle().fill(.background))
+                            }
+                            .buttonStyle(.plain)
+                            .offset(x: 6, y: -6)
+                        }
                 }
                 Button { model.chooseApps(for: id) } label: {
                     Image(systemName: "plus.app")
