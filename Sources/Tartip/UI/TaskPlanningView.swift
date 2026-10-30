@@ -15,7 +15,7 @@ struct TaskPlanningView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            PageTitle(title: "Tasks", subtitle: "Plan today's work by activity. Review what you completed after each session.")
+            PageTitle(title: "Tasks", subtitle: "Plan and check off today's work by activity.")
             Text(Fmt.dayTitle.string(from: clock.now))
                 .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text2)
             if settings.value.activities.isEmpty {

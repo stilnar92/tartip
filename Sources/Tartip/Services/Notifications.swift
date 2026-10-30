@@ -4,7 +4,9 @@ import UserNotifications
 // A banner plus the Glass sound. Uses Notification Center once it's allowed; until then
 // (or when running outside the app bundle) falls back to AppleScript's notification, which
 // shows Script Editor's icon rather than ours.
+@MainActor
 func notify(_ title: String, _ text: String) {
+    guard Settings.current.has(.notifications) else { return }
     NSSound(named: "Glass")?.play()
     guard Bundle.main.bundleIdentifier != nil else { return scriptNotify(title, text) }
     UNUserNotificationCenter.current().getNotificationSettings { settings in

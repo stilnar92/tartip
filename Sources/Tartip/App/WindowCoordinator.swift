@@ -21,7 +21,7 @@ final class WindowCoordinator {
             // A closed Get started comes back every 30 min while you're at the computer,
             // so a new install doesn't sit there doing nothing.
             setupReminder = Task { [weak self] in
-                while !Task.isCancelled && Setup.isPending {
+                while !Task.isCancelled && Setup.isPending && Settings.current.has(.guidance) {
                     try? await Task.sleep(for: .seconds(30 * 60))
                     guard let self, Setup.isPending, !self.main.isVisible, userPresent() else { continue }
                     self.openMain(.setup)

@@ -49,9 +49,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         NSApp.appearance = NSAppearance(named: .aqua)   // Craft-like light look everywhere
         if Bundle.main.bundleIdentifier != nil { UNUserNotificationCenter.current().delegate = self }
         // A new install asks on Get started, where it's explained, not at launch.
-        if !Setup.isPending { requestNotificationPermission() }
+        if !Setup.isPending && Settings.current.has(.notifications) { requestNotificationPermission() }
         AppRoot.shared.windows.start()
-        Hotkeys.shared.register(shortcuts)
+        Hotkeys.shared.register(shortcuts.filter { $0.name != "Step away" || Settings.current.has(.away) })
     }
 
     // Opening the app again (Finder, Spotlight) while setup isn't done brings Get started back:

@@ -1,11 +1,11 @@
 import SwiftUI
 
 enum MainTab: String, CaseIterable {
-    case setup = "Get started", tasks = "Tasks", activities = "Activities", rules = "Rules", stats = "Stats"
+    case setup = "Get started", tasks = "Tasks", activities = "Activities", rules = "Optional features", stats = "Stats"
 
     // Until first-run setup is done Get started is the only page: there's nothing to see
     // in Stats yet, and Activities and Rules would compete with it. Afterwards it's gone.
-    @MainActor static var shown: [MainTab] { Setup.isPending ? [.setup] : allCases.filter { $0 != .setup } }
+    @MainActor static var shown: [MainTab] { Setup.isPending ? [.setup] : [.activities, .rules] + (Settings.current.has(.tasks) ? [.tasks] : []) + (Settings.current.has(.statistics) ? [.stats] : []) }
 
     var icon: String {
         switch self {
@@ -22,6 +22,7 @@ enum MainTab: String, CaseIterable {
 // the selected page on the right.
 struct MainView: View {
     @ObservedObject var model: Model
+    @ObservedObject private var settings = Settings.shared
     @State var tab: MainTab
     var close: () -> Void = {}
 
@@ -45,6 +46,9 @@ struct MainView: View {
         }
         .frame(width: 820, height: 620)
         .environment(\.colorScheme, .light)
+        .onChange(of: settings.value.features) { _ in
+            if !MainTab.shown.contains(tab) { tab = .activities }
+        }
     }
 
     private var sidebar: some View {

@@ -8,6 +8,7 @@ struct DayStats: Codable, Equatable {
 
 // Everything the app needs to pick up where it left off after a restart.
 struct StoredState: Codable, Equatable {
+    var pendingRecords: [SessionRecord]? = nil // durable outbox until history append succeeds
     var phase: AppPhase = .idle
     var minutes = 0                    // length picked for the next start
     var pomodoro = false

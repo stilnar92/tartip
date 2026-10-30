@@ -50,6 +50,9 @@ struct LockSettings: Codable, Equatable {
 // What in `n` is looser than in `o`, in words; empty = the change is as strict or stricter.
 func loosenings(from o: AppSettings, to n: AppSettings) -> [String] {
     var out: [String] = []
+    for feature in [Feature.blocking, .scheduling, .review, .guidance, .night, .settingsLock, .relaunch, .login] {
+        if o.has(feature) && !n.has(feature) { out.append("turning off " + feature.title) }
+    }
     // A limit of 0 means no limit, the most time an activity can take.
     let cap = { (m: Int) in m == 0 ? Int.max : m }
     let span = { (from: Int?, to: Int?) -> Int in

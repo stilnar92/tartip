@@ -22,12 +22,18 @@ scripts/make-dmg.sh          # universal build → build/Tartip.dmg (the install
 
 ### Auto-start
 
-The app needs the launch agent to start at login and come back after a quit. There are two ways it gets installed:
+Startup behavior is optional. `AppSettings.fresh` disables all feature modules. Legacy settings without `features` retain the previous capabilities. `AutoStart.ensure()` respects the saved login/relaunch choices and runs only from an Applications directory; development builds do not register themselves.
 
-- `install.sh` / `scripts/build.sh` copy [launchd/com.user.tartip.plist](launchd/com.user.tartip.plist) into `~/Library/LaunchAgents`.
-- `AutoStart.ensure()` ([AutoStart.swift](Sources/Tartip/Services/AutoStart.swift)) handles DMG installs. When the app is opened by hand from an Applications folder and the agent is missing, points elsewhere, or isn't loaded, it writes the agent and bootstraps it. The launchd copy then starts and closes the hand-opened one. It does nothing for `swift run` (no bundle id) or when opened from the DMG or a build folder.
+`install.sh` and `scripts/build.sh` preserve an existing launch agent. With none present, they open the installed application normally; the app installs an agent only when login launch is enabled. KeepAlive is a separate choice. Startup changes submit a separate one-shot launchd helper because unloading a running launch agent can terminate the app and its child processes.
 
-Keep `AutoStart.agent` and the plist file in step with each other.
+### Feature policy and persistence
+
+- `Domain/Features.swift` defines typed capabilities, dependencies, fresh settings, and the persisted session policy.
+- Keep missing-key legacy behavior separate from fresh defaults. Incomplete old onboarding disables modules without deleting configuration.
+- Check optional behavior in both the UI and runtime paths, including context menus, shortcuts, restore, and wake.
+- Running sessions retain blocking and review commitments. Independent block deadlines keep ticking even when future blocking is disabled.
+- Unreviewed sessions keep `actual` empty. `StoredState.pendingRecords` is a durable history outbox; replay deduplicates by original start, mode, and planned activity at history timestamp precision.
+- Feature switches that weaken restrictions participate in `loosenings`; evaluate changes against the old settings lock.
 
 ### Distribution
 
@@ -41,7 +47,7 @@ The DMG is signed with the local "Tartip Local" certificate, so on other Macs Ga
 2. Stops the running copy (`launchctl bootout`, `pkill`) and wraps the binary into `/Applications/Tartip.app` with a generated `Info.plist` (bundle id `com.user.tartip`, `LSUIElement`, so there's no Dock icon).
 3. Draws the icon: `scripts/make-icon.swift` is compiled together with `Sources/Tartip/UI/Logo.swift` (the same mark the app draws), and every size is packed into `AppIcon.icns`.
 4. Signs the app with **"Tartip Local"**, a self-signed code-signing certificate created once in the login keychain. A stable signature lets macOS keep the Accessibility permission across rebuilds; ad-hoc signatures change every build. If signing fails, it falls back to ad-hoc and says so.
-5. Starts the app again under launchd from `~/Library/LaunchAgents/com.user.tartip.plist` (a copy of [launchd/com.user.tartip.plist](launchd/com.user.tartip.plist)): `RunAtLoad`, `KeepAlive` (it relaunches after any exit, even a normal quit) and `TARTIP_LAUNCHD=1`.
+5. Starts the app normally on a new installation, or under the existing launch agent from `~/Library/LaunchAgents/com.user.tartip.plist` (a copy of [launchd/com.user.tartip.plist](launchd/com.user.tartip.plist)): `RunAtLoad`, `KeepAlive` (it relaunches after any exit, even a normal quit) and `TARTIP_LAUNCHD=1`.
 
 ### Running a dev build
 

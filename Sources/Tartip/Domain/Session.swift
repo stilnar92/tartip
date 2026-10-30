@@ -6,6 +6,7 @@ struct Phase: Codable, Equatable {
 }
 
 struct Session: Codable, Equatable {
+    var policy = SessionPolicy.legacy
     var block: String
     var phases: [Phase]
     var start: Date
@@ -32,6 +33,19 @@ struct Session: Codable, Equatable {
         return nil
     }
 
+    func completedRecord(at end: Date, ended: String) -> SessionRecord? {
+        var r = SessionRecord(start: shiftedStart, end: min(end, self.end), mode: block, planned: planned)
+        guard r.seconds >= 60 else { return nil }
+        r.began = start
+        r.plannedMinutes = totalMinutes
+        r.rounds = workRounds > 1 ? workRounds : nil
+        r.paused = paused > 0 ? paused : nil
+        r.ended = ended
+        r.auto = auto
+        r.pickSeconds = pickSeconds
+        return r
+    }
+
     func round(of index: Int) -> Int { phases[0...index].filter { !$0.isBreak }.count }
 }
 
@@ -39,6 +53,7 @@ extension Session {
     // Sessions saved before time away existed still load.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        policy = try c.decodeIfPresent(SessionPolicy.self, forKey: .policy) ?? .legacy
         block = try c.decode(String.self, forKey: .block)
         phases = try c.decode([Phase].self, forKey: .phases)
         start = try c.decode(Date.self, forKey: .start)

@@ -14,10 +14,12 @@ func recordDecoder() -> JSONDecoder {
     return d
 }
 
-func appendRecord(_ r: SessionRecord) {
+@discardableResult
+func appendRecord(_ r: SessionRecord) -> Bool {
     guard let data = try? recordEncoder().encode(r), let line = String(data: data, encoding: .utf8),
           appendText(line + "\n", to: sessionsFile)
-    else { return log("error: couldn't save the session to \(sessionsFile.path)") }
+    else { log("error: couldn't save the session to \(sessionsFile.path)"); return false }
+    return true
 }
 
 func loadRecords() -> [SessionRecord] {

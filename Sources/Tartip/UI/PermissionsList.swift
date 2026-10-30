@@ -1,21 +1,24 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 // Where each macOS permission stands, what it's for, and a button to allow it.
 // On Get started (step 5) and in Rules, to check later that nothing was turned off.
 struct PermissionsList: View {
     @ObservedObject var perms: Permissions
-    let blocksSites: Bool          // Chrome control only matters when some block has sites
+    let blocksSites: Bool  // Chrome control only matters when some block has sites
 
     static let hasChrome = NSWorkspace.shared.urlForApplication(withBundleIdentifier: chromeID) != nil
 
     var body: some View {
         VStack(spacing: 8) {
-            if Self.hasChrome {
-                permissionRow("globe", "Control Google Chrome",
-                              !blocksSites ? "Not needed while no sites are blocked."
-                                           : "Lets Tartip see your Chrome tabs and send a blocked site to the \"Not now\" page. Without it Chrome is closed while sites are blocked.",
-                              status: perms.chrome, optional: !blocksSites) {
+            if Self.hasChrome && (Settings.current.has(.workspace) || (Settings.current.has(.blocking) && blocksSites)) {
+                permissionRow(
+                    "globe", "Control Google Chrome",
+                    !blocksSites
+                        ? "Not needed while no sites are blocked."
+                        : "Lets Tartip see your Chrome tabs and send a blocked site to the \"Not now\" page. Without it Chrome is closed while sites are blocked.",
+                    status: perms.chrome, optional: !blocksSites
+                ) {
                     switch perms.chrome {
                     case .granted: EmptyView()
                     case .denied: actionButton("Open System Settings") { perms.openSettings("Privacy_Automation") }
@@ -24,27 +27,38 @@ struct PermissionsList: View {
                     }
                 }
             }
-            permissionRow("bell.badge.fill", "Notifications",
-                          "Tells you when a round ends, a session is done, or an app was closed.",
-                          status: perms.notifications, optional: false) {
-                switch perms.notifications {
-                case .granted: EmptyView()
-                case .denied: actionButton("Open System Settings") { perms.openNotificationSettings() }
-                default: actionButton("Allow") { perms.askNotifications() }
+            if Settings.current.has(.notifications) {
+                permissionRow(
+                    "bell.badge.fill", "Notifications",
+                    "Tells you when a round ends, a session is done, or an app was closed.",
+                    status: perms.notifications, optional: false
+                ) {
+                    switch perms.notifications {
+                    case .granted: EmptyView()
+                    case .denied: actionButton("Open System Settings") { perms.openNotificationSettings() }
+                    default: actionButton("Allow") { perms.askNotifications() }
+                    }
                 }
             }
-            permissionRow("macwindow", "Accessibility",
-                          "Only to stretch the apps an activity opens to fill the screen. Blocking works without it.",
-                          status: perms.accessibility, optional: true) {
-                if perms.accessibility != .granted {
-                    actionButton("Open System Settings") { perms.openSettings("Privacy_Accessibility") }
+            if Settings.current.has(.workspace) {
+                permissionRow(
+                    "macwindow", "Accessibility",
+                    "Only to stretch the apps an activity opens to fill the screen. Blocking works without it.",
+                    status: perms.accessibility, optional: true
+                ) {
+                    if perms.accessibility != .granted {
+                        actionButton("Open System Settings") { perms.openSettings("Privacy_Accessibility") }
+                    }
                 }
             }
+
         }
     }
 
-    private func permissionRow<Action: View>(_ icon: String, _ title: String, _ why: String, status: Access, optional: Bool,
-                                             @ViewBuilder action: () -> Action) -> some View {
+    private func permissionRow<Action: View>(
+        _ icon: String, _ title: String, _ why: String, status: Access, optional: Bool,
+        @ViewBuilder action: () -> Action
+    ) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon).font(.system(size: 16)).foregroundStyle(Theme.accent).frame(width: 22)
             VStack(alignment: .leading, spacing: 4) {

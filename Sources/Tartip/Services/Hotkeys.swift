@@ -17,8 +17,12 @@ final class Hotkeys {
     static let shared = Hotkeys()
     private(set) var all: [Hotkey] = []
     private var refs: [EventHotKeyRef] = []
+    private var handler: EventHandlerRef?
 
     func register(_ keys: [Hotkey]) {
+        refs.forEach { UnregisterEventHotKey($0) }
+        refs.removeAll()
+        if let handler { RemoveEventHandler(handler) }
         all = keys
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         InstallEventHandler(GetApplicationEventTarget(), { _, event, _ in
@@ -28,7 +32,7 @@ final class Hotkeys {
             // Carbon delivers hot keys on the main thread.
             MainActor.assumeIsolated { Hotkeys.shared.fire(Int(id.id)) }
             return noErr
-        }, 1, &spec, nil, nil)
+        }, 1, &spec, nil, &handler)
         for (i, k) in keys.enumerated() {
             var ref: EventHotKeyRef?
             let status = RegisterEventHotKey(UInt32(k.key), modifiers, EventHotKeyID(signature: OSType(0x54727470), id: UInt32(i)),

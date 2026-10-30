@@ -50,8 +50,8 @@ import Testing
         }
     }
 
-    @Test func newInstallStartsWithNoActivities() {
-        #expect(AppSettings().activities.isEmpty)
+    @Test func newInstallStartsWithOneReadyActivity() {
+        #expect(AppSettings.fresh.activities.map(\.name) == ["Focus"])
         let t = activityTemplates[0]
         let a = ActivitySetting(template: t)
         #expect(a.name == t.name && a.icon == t.icon && a.color == t.color && a.block == t.name)

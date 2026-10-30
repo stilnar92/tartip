@@ -81,6 +81,7 @@ struct ModeConfig: Codable, Hashable, Sendable {
 }
 
 struct AppSettings: Codable, Equatable {
+    var features = Features.legacy
     // Free time
     var dailyFreeMinutes = 60
     var maxRestMinutes = 60          // longest single stretch of free time
@@ -158,7 +159,7 @@ extension AppSettings {
 
     // Night window, which may cross midnight (e.g. 22:00–06:00).
     func isNight(at d: Date, calendar: Calendar = .current) -> Bool {
-        guard nightEnabled, nightFrom != nightTo else { return false }
+        guard has(.night), nightEnabled, nightFrom != nightTo else { return false }
         return inWindow(minuteOfDay(d, calendar: calendar), nightFrom, nightTo)
     }
 

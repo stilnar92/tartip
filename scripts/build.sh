@@ -11,7 +11,7 @@ APP="${APP:-$INSTALLED}"
 [ "$APP" = "$INSTALLED" ] || NO_START=1
 
 AGENT="$HOME/Library/LaunchAgents/com.user.tartip.plist"
-[ -f "$AGENT" ] || [ -n "$NO_START" ] || cp launchd/com.user.tartip.plist "$AGENT"
+
 
 # Compile first, so a failed build leaves the running copy alone.
 if [ -n "$UNIVERSAL" ]; then
@@ -96,7 +96,7 @@ touch "$APP"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" || true
 echo "Built: $APP"
 
-# Start it again under launchd: runs at login and restarts if quit.
+# Preserve an existing launch policy; new installations start normally.
 if [ "$APP" != "$INSTALLED" ]; then
   :
 elif [ -n "$NO_START" ]; then
@@ -104,5 +104,5 @@ elif [ -n "$NO_START" ]; then
 elif [ -f "$AGENT" ]; then
   launchctl bootstrap "gui/$UID" "$AGENT"
 else
-  echo "Auto-start is off (no $AGENT), so the app was not started."
+  open "$APP"
 fi

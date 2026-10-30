@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 // MARK: - UI
@@ -35,7 +36,7 @@ struct ContentView: View {
                 nightCard
             } else {
                 TodayList(model: model, clock: clock)
-                siteRow
+                if Settings.current.has(.workspace) { siteRow }
             }
             if !model.message.isEmpty {
                 Label(model.message, systemImage: "exclamationmark.triangle.fill")
@@ -43,6 +44,10 @@ struct ContentView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !Setup.isPending && model.session == nil { toolbar }
+            if !Settings.current.has(.relaunch) {
+                Button("Quit Tartip") { NSApplication.shared.terminate(nil) }
+                    .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.text2)
+            }
         }
         .padding(16)
         .frame(width: 360)
@@ -64,8 +69,10 @@ struct ContentView: View {
                     .font(Theme.title).foregroundStyle(Theme.text)
                 Text(Fmt.dayTitle.string(from: model.now)).font(.system(size: 13)).foregroundStyle(Theme.text2)
                 Spacer()
-                if !Setup.isPending {
-                    Button { openMain(.tasks) } label: {
+                if !Setup.isPending && Settings.current.has(.tasks) {
+                    Button {
+                        openMain(.tasks)
+                    } label: {
                         Label("Tasks", systemImage: "checklist")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(Theme.text2)
@@ -79,8 +86,12 @@ struct ContentView: View {
             HStack(spacing: 6) {
                 Tag(text: "⏱ \(formatDuration(model.focusedToday))", color: Theme.accent, fill: Theme.accentTint)
                 Tag(text: "\(sessions) sessions")
-                Tag(text: "🍿 \(model.freeLeft / 60)m", color: model.freeLeft > 0 ? Theme.text2 : Theme.red,
-                    fill: model.freeLeft > 0 ? Theme.pill : Theme.redTint)
+                if Settings.current.has(.guidance) && Settings.current.dailyFreeMinutes > 0 {
+                    Tag(
+                        text: "🍿 \(model.freeLeft / 60)m", color: model.freeLeft > 0 ? Theme.text2 : Theme.red,
+                        fill: model.freeLeft > 0 ? Theme.pill : Theme.redTint)
+                }
+
             }
         }
     }
@@ -99,11 +110,15 @@ struct ContentView: View {
                 .padding(.horizontal, 12).padding(.vertical, 9)
                 .card(radius: 10)
             }
-            Button { showLink.toggle() } label: {
-                Label(model.oneTimeLink.isEmpty ? "Open a site with the next session" : "Site added for the next session",
-                      systemImage: "safari")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(model.oneTimeLink.isEmpty ? Theme.text2 : Theme.accent)
+            Button {
+                showLink.toggle()
+            } label: {
+                Label(
+                    model.oneTimeLink.isEmpty ? "Open a site with the next session" : "Site added for the next session",
+                    systemImage: "safari"
+                )
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(model.oneTimeLink.isEmpty ? Theme.text2 : Theme.accent)
             }
             .buttonStyle(.plain)
         }
@@ -152,15 +167,21 @@ struct ContentView: View {
                 Text(name)
                     .font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
                     .lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
-                Button { openMain(.tasks) } label: {
-                    Image(systemName: "checklist")
-                        .font(.system(size: 16)).foregroundStyle(Theme.text2)
-                        .frame(width: 32, height: 32).contentShape(Rectangle())
+                if Settings.current.has(.tasks) {
+                    Button {
+                        openMain(.tasks)
+                    } label: {
+                        Image(systemName: "checklist")
+                            .font(.system(size: 16)).foregroundStyle(Theme.text2)
+                            .frame(width: 32, height: 32).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Today's tasks")
+                    .help("Today's tasks")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Today's tasks")
-                .help("Today's tasks")
-                Button { openMain(.activities) } label: {
+                Button {
+                    openMain(.activities)
+                } label: {
                     Image(systemName: "gearshape")
                         .font(.system(size: 16)).foregroundStyle(Theme.text2)
                         .frame(width: 32, height: 32).contentShape(Rectangle())
@@ -170,29 +191,33 @@ struct ContentView: View {
                 .help("Settings")
             }
 
-            Button { openMain(.tasks) } label: {
+            Button {
+                if Settings.current.has(.tasks) { openMain(.tasks) }
+            } label: {
                 VStack(spacing: 6) {
-                if s.workRounds > 1 || p.isBreak {
-                    Text(p.isBreak ? "Break" : "Focus · round \(s.round(of: cur.index))/\(s.workRounds)")
-                        .font(.system(size: 12, weight: .medium)).foregroundStyle(color)
-                }
-                Text(countdown(to: cur.end, from: model.now))
-                    .font(.system(size: 48, weight: .medium, design: .rounded)).monospacedDigit()
-                    .foregroundStyle(Theme.text)
-                    .contentTransition(.numericText(countsDown: true))
-                Text(s.workRounds > 1 || p.isBreak
-                     ? "\(p.isBreak ? "Break" : "Focus") ends \(f.string(from: cur.end)) · session ends \(f.string(from: s.end))"
-                     : "ends at \(f.string(from: s.end))")
+                    if s.workRounds > 1 || p.isBreak {
+                        Text(p.isBreak ? "Break" : "Focus · round \(s.round(of: cur.index))/\(s.workRounds)")
+                            .font(.system(size: 12, weight: .medium)).foregroundStyle(color)
+                    }
+                    Text(countdown(to: cur.end, from: model.now))
+                        .font(.system(size: 48, weight: .medium, design: .rounded)).monospacedDigit()
+                        .foregroundStyle(Theme.text)
+                        .contentTransition(.numericText(countsDown: true))
+                    Text(
+                        s.workRounds > 1 || p.isBreak
+                            ? "\(p.isBreak ? "Break" : "Focus") ends \(f.string(from: cur.end)) · session ends \(f.string(from: s.end))"
+                            : "ends at \(f.string(from: s.end))"
+                    )
                     .font(.system(size: 12)).foregroundStyle(Theme.text2)
                     .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
+                }
+                .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Open tasks for \(name)")
-            .help("Open today's tasks")
+            .disabled(!Settings.current.has(.tasks))
+            .accessibilityLabel(Settings.current.has(.tasks) ? "Open tasks for \(name)" : "Session timer")
 
             VStack(spacing: 12) {
                 bar(progress, color, height: 3)
@@ -201,14 +226,19 @@ struct ContentView: View {
             }
 
             VStack(spacing: 10) {
-                Button { model.stepAway() } label: {
-                    Label("Step away", systemImage: "figure.walk")
-                        .font(.system(size: 13, weight: .semibold))
-                        .padding(.horizontal, 24).padding(.vertical, 10)
-                        .pill(selected: true)
+                Button("Stop session") { model.stop() }.buttonStyle(.bordered)
+                if Settings.current.has(.away) {
+                    Button {
+                        model.stepAway()
+                    } label: {
+                        Label("Step away", systemImage: "figure.walk")
+                            .font(.system(size: 13, weight: .semibold))
+                            .padding(.horizontal, 24).padding(.vertical, 10)
+                            .pill(selected: true)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Locks the screen and pauses the timer. ⌃⌥⌘L")
                 }
-                .buttonStyle(.plain)
-                .help("Locks the screen and pauses the timer. ⌃⌥⌘L")
 
             }
             .frame(maxWidth: .infinity)
@@ -230,11 +260,13 @@ struct ContentView: View {
         let limits = model.limits
         let used = formatDuration(limits.usedToday(name))
         let remaining = limits.secondsLeftToday(name)
-        return Text(remaining.map { "Today · \(used) spent · \(formatDuration($0)) left" }
-                    ?? "Today · \(used) spent")
-            .font(.system(size: 11)).foregroundStyle(Theme.text2)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
+        return Text(
+            remaining.map { "Today · \(used) spent · \(formatDuration($0)) left" }
+                ?? "Today · \(used) spent"
+        )
+        .font(.system(size: 11)).foregroundStyle(Theme.text2)
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: free time
@@ -267,7 +299,9 @@ struct ContentView: View {
                 .foregroundStyle(Theme.text)
                 .contentTransition(.numericText(countsDown: true))
                 .frame(maxWidth: .infinity)
-            Button { model.endRest() } label: {
+            Button {
+                model.endRest()
+            } label: {
                 Text("Back to work").font(.system(size: 13, weight: .semibold))
                     .frame(maxWidth: .infinity).padding(.vertical, 9)
                     .pill(selected: true)
@@ -287,9 +321,11 @@ struct ContentView: View {
                 .font(.system(size: 30))
                 .foregroundStyle(Theme.accent)
             Text("Let's set you up").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
-            Text("Pick your activities and what should be blocked. About two minutes.")
+            Text("Choose an activity and a duration. Add optional tools later.")
                 .font(.system(size: 12)).foregroundStyle(Theme.text2).multilineTextAlignment(.center)
-            Button { openMain(.setup) } label: {
+            Button {
+                openMain(.setup)
+            } label: {
                 Text("Get started").font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                     .padding(.horizontal, 18).padding(.vertical, 8)
                     .background(Capsule().fill(Theme.accent))

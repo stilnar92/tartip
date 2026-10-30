@@ -9,13 +9,25 @@ final class Settings: ObservableObject {
         didSet {
             guard value != oldValue else { return }
             // Locked: a looser change is undone right here, so no screen has to know the rules.
-            if let until = lockedUntil, case let why = loosenings(from: oldValue, to: value), !why.isEmpty {
+            if let until = (!Setup.isPending && oldValue.has(.settingsLock) ? oldValue.lock.lockedUntil(now: Date(), changedAt: changedAt) : nil), case let why = loosenings(from: oldValue, to: value), !why.isEmpty {
                 value = oldValue
                 refuse("Locked until \(Fmt.weekdayClock.string(from: until)): no " + why.joined(separator: ", ") + ".")
                 return
             }
-            if value.lock.mode != oldValue.lock.mode { changedAt = Date() } else { noteChange() }
+            let lifecycleChanged = value.has(.login) != oldValue.has(.login) || value.has(.relaunch) != oldValue.has(.relaunch)
+            let locks = UserDefaults.standard.dictionary(forKey: "locks") as? [String: Date] ?? [:]
+            if lifecycleChanged && locks.values.contains(where: { $0 > Date() }) {
+                value = oldValue
+                refuse("Startup behavior can change after the current block locks expire.")
+                return
+            }
+            if value.lock.mode != oldValue.lock.mode || (value.has(.settingsLock) && !oldValue.has(.settingsLock)) { changedAt = Date() } else { noteChange() }
             save()
+            if lifecycleChanged { AutoStart.scheduleUpdate() }
+            if value.has(.away) != oldValue.has(.away) {
+                Hotkeys.shared.register(shortcuts.filter { $0.name != "Step away" || value.has(.away) })
+            }
+            if value.has(.notifications) && !oldValue.has(.notifications) { requestNotificationPermission() }
         }
     }
 
@@ -30,15 +42,15 @@ final class Settings: ObservableObject {
 
     // Until when looser changes are refused; nil = not locked (never during first-run setup).
     var lockedUntil: Date? {
-        Setup.isPending ? nil : value.lock.lockedUntil(now: Date(), changedAt: changedAt)
+        Setup.isPending || !value.has(.settingsLock) ? nil : value.lock.lockedUntil(now: Date(), changedAt: changedAt)
     }
 
     // "Settings lock at 14:32": the grace after a change, while it's still open.
-    var locksAt: Date? { value.lock.locksAt(changedAt: changedAt, now: Date()) }
+    var locksAt: Date? { guard value.has(.settingsLock) else { return nil }; return value.lock.locksAt(changedAt: changedAt, now: Date()) }
 
     // Any change, here or to blocks.json, can start the "after a change" lock.
     func noteChange() {
-        if value.lock.newRound(now: Date(), changedAt: changedAt) { changedAt = Date() }
+        if value.has(.settingsLock) && value.lock.newRound(now: Date(), changedAt: changedAt) { changedAt = Date() }
     }
 
     func refuse(_ message: String) {
@@ -57,7 +69,10 @@ final class Settings: ObservableObject {
         var s = Settings.load()
         let moved = Settings.moveModeConfigs(into: &s)
         value = s
-        if moved || !FileManager.default.fileExists(atPath: settingsFile.path) { save() }
+        let savedData = try? Data(contentsOf: settingsFile)
+        let saved = savedData.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        let migrateFeatures = saved != nil && saved?["features"] == nil && savedData.flatMap({ AppSettings.merged(over: $0) }) != nil
+        if moved || migrateFeatures || !FileManager.default.fileExists(atPath: settingsFile.path) { save() }
     }
 
     func updateActivity(_ id: UUID, _ change: (inout ActivitySetting) -> Void) {
@@ -67,18 +82,20 @@ final class Settings: ObservableObject {
 
     private static func load() -> AppSettings {
         guard let data = try? Data(contentsOf: settingsFile) else { return migrated(AppSettings()) }
-        return AppSettings.merged(over: data) ?? AppSettings()
+        guard var s = AppSettings.merged(over: data) else { return AppSettings.fresh }
+        // An interrupted old onboarding has not activated its discipline loop yet.
+        if Setup.isPending,
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any], json["features"] == nil {
+            s.features = Features()
+        }
+        return s
     }
 
     // No settings.json yet. A new install starts with free time and night off, so Get started
     // doesn't choose for the user. An old install takes its list from activities.txt and the
     // "Other" block from blocks.txt.
     private static func migrated(_ d: AppSettings) -> AppSettings {
-        var s = d
-        if Setup.isPending {
-            s.dailyFreeMinutes = 0
-            s.nightEnabled = false
-        }
+        var s = Setup.isPending ? AppSettings.fresh : d
         if let text = try? String(contentsOf: modesDir.appendingPathComponent("activities.txt"), encoding: .utf8) {
             let names = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
             if !names.isEmpty { s.activities = names.map { ActivitySetting(name: $0) } }
@@ -112,7 +129,7 @@ final class Settings: ObservableObject {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         try? FileManager.default.createDirectory(at: modesDir, withIntermediateDirectories: true)
-        do { try enc.encode(value).write(to: settingsFile) } catch { log("error: couldn't save \(settingsFile.path): \(error)") }
+        do { try enc.encode(value).write(to: settingsFile, options: .atomic) } catch { log("error: couldn't save \(settingsFile.path): \(error)") }
     }
 }
 

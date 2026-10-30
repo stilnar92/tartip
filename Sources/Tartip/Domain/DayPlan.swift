@@ -34,7 +34,7 @@ func roundIsUsedUp(_ open: [OpenActivity]) -> Bool {
 
 // The waking day: from the end of the night to its start, or the whole day with night off.
 func wakingHours(_ s: AppSettings) -> (from: Int, to: Int) {
-    guard s.nightEnabled, s.nightFrom != s.nightTo else { return (0, 1440) }
+    guard s.has(.night), s.nightEnabled, s.nightFrom != s.nightTo else { return (0, 1440) }
     return (s.nightTo, s.nightTo < s.nightFrom ? s.nightFrom : s.nightFrom + 1440)
 }
 

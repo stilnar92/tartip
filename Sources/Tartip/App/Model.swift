@@ -48,10 +48,14 @@ final class Model: ObservableObject {
         awayRecords = loadAway()
         events = loadEvents()
 
+        if self.state.phase == .picking && (!Settings.current.has(.guidance) || Setup.isPending || Settings.current.isNight(at: Date())) {
+            self.state.phase = .idle
+            self.state.pickingSince = nil
+        }
         if self.state.minutes < Settings.current.minMinutes { self.state.minutes = Settings.current.defaultSessionMinutes }
         if let s = state.phase.session, Date() < s.end {
             // Restarted mid-session: make sure the block is on for the time that's left.
-            blocker.lock(s.block, until: s.end)
+            if s.policy.blocking { blocker.lock(s.block, until: s.end) }
             lastPhaseIndex = s.current(at: Date())?.index
         }
         // Settings edits refresh the panel and the activity list right away.
@@ -72,7 +76,7 @@ final class Model: ObservableObject {
             on(dnc, Notification.Name("com.apple.screenIsUnlocked")) { $0.comeBack() },
             on(ws, NSWorkspace.didWakeNotification) { if !screenLocked() { $0.comeBack() } },
         ]
-        if self.state.phase.awaySince != nil { keepAwake.on() }
+        if self.state.phase.awaySince != nil && Settings.current.has(.away) { keepAwake.on() }
         ticker = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
@@ -99,7 +103,7 @@ final class Model: ObservableObject {
         set { state.minutes = newValue }
     }
     var pomodoro: Bool {
-        get { state.pomodoro }
+        get { Settings.current.has(.pomodoro) && state.pomodoro }
         set { state.pomodoro = newValue }
     }
 
@@ -199,26 +203,12 @@ final class Model: ObservableObject {
         events = loadEvents()
     }
 
-    // MARK: first-run setup
-
-    // "Start" on Get started: the picked apps and sites go into every block that has nothing
-    // yet (activities, night, "Other"); blocks that already have rules are kept.
-    // From the next tick on, "What's next?" and the night lock work as usual.
-    func finishSetup(base: BlockRule) {
-        let rules = NativeBlocker.shared
-        rules.load()   // blocks.json may have been imported while setup was open
-        let names = blocksToFill(Settings.current, existing: rules.rules)
-        for name in names { rules.update(name) { $0 = base } }
-        Setup.markDone()
-        log("setup blocks: \(base.apps.count) apps, \(base.web.count) sites → \(names.joined(separator: ", "))")
-    }
-
     // MARK: what each activity opens
 
     func updateOpens(_ activity: UUID, _ change: (inout ModeConfig) -> Void) {
         Settings.shared.updateActivity(activity) { change(&$0.opens) }
         // Stretching windows needs Accessibility; ask as soon as there's something to stretch.
-        if Settings.current.activities.contains(where: { $0.id == activity && !$0.opens.isEmpty }) { _ = axTrusted(prompt: true) }
+        if Settings.current.has(.workspace) && Settings.current.activities.contains(where: { $0.id == activity && $0.opens.maximize && !$0.opens.isEmpty }) { _ = axTrusted(prompt: true) }
     }
 
     func chooseApps(for activity: UUID) {
@@ -258,7 +248,7 @@ final class Model: ObservableObject {
 
     // One click on a row in the Today list: start it now with the chosen length (or Pomodoro).
     func startActivity(_ activity: String, minutes chosen: Int? = nil, pomodoro usePomodoro: Bool? = nil) {
-        guard phase.canStart, limits.canStart(activity) else { return }
+        guard !Setup.isPending, !Settings.current.isNight(at: now), activities.contains(activity), phase.canStart, limits.canStart(activity) else { return }
         if let chosen { minutes = chosen }
         if let usePomodoro { pomodoro = usePomodoro }
         if minutes < Settings.current.minMinutes { minutes = Settings.current.minMinutes }
@@ -267,7 +257,7 @@ final class Model: ObservableObject {
 
     // When auto-start fires, and which activity it would pick right now.
     var autoStartAt: Date? {
-        guard phase == .picking, Settings.current.autoStartAfterMinutes > 0, let since = state.pickingSince else { return nil }
+        guard Settings.current.has(.guidance), phase == .picking, Settings.current.autoStartAfterMinutes > 0, let since = state.pickingSince else { return nil }
         return since.addingTimeInterval(Double(Settings.current.autoStartAfterMinutes * 60))
     }
     var autoStartActivity: String? { limits.autoPick(from: todayActivities) }
@@ -282,9 +272,10 @@ final class Model: ObservableObject {
     }
 
     private func startNow(_ activity: String, phases: [Phase], auto: Bool = false) {
-        let extra = oneTimeLink.trimmingCharacters(in: .whitespaces)
+        let extra = Settings.current.has(.workspace) ? oneTimeLink.trimmingCharacters(in: .whitespaces) : ""
         oneTimeLink = ""
         var s = Session(block: Settings.current.block(for: activity), phases: phases, start: Date(), planned: activity)
+        s.policy = SessionPolicy(settings: Settings.current)
         s.maxDurationSeconds = limits.sessionSeconds(activity, requested: s.totalMinutes * 60)
         s.auto = auto ? true : nil
         s.pickSeconds = pickSeconds
@@ -298,15 +289,17 @@ final class Model: ObservableObject {
     }
 
     private func start(_ s: Session, extraURLs: [String]) {
-        blocker.lock(s.block, until: s.end)
+        if s.policy.blocking { blocker.lock(s.block, until: s.end) }
         message = ""
-        let c = s.planned.flatMap { Settings.current.activity(named: $0)?.opens } ?? ModeConfig()
-        let opensSomething = !c.isEmpty || !extraURLs.isEmpty
-        if opensSomething && c.maximize && !axTrusted(prompt: true) {
-            message = "Allow Tartip in Privacy & Security → Accessibility to resize windows."
-        }
-        openWorkspace(mode: s.block, c, extraURLs: extraURLs, prev: state.opened) { [weak self] opened in
-            self?.state.opened = opened
+        if Settings.current.has(.workspace) {
+            let c = s.planned.flatMap { Settings.current.activity(named: $0)?.opens } ?? ModeConfig()
+            let opensSomething = !c.isEmpty || !extraURLs.isEmpty
+            if opensSomething && c.maximize && !axTrusted(prompt: true) {
+                message = "Allow Tartip in Privacy & Security → Accessibility to resize windows."
+            }
+            openWorkspace(mode: s.block, c, extraURLs: extraURLs, prev: state.opened) { [weak self] opened in
+                self?.state.opened = opened
+            }
         }
 
         state.restTaken = false
@@ -321,7 +314,7 @@ final class Model: ObservableObject {
 
     func stop() {
         guard let s = session else { return }
-        if Date() < s.end {
+        if s.policy.blocking && Date() < s.end {
             message = "Locked until \(Fmt.clock.string(from: s.end)). Timer stopped, block stays."
         }
         log("off   \(s.block) (app)")
@@ -332,26 +325,43 @@ final class Model: ObservableObject {
     // Time away doesn't count: the record starts that much later.
     private func finish(_ s: Session, at end: Date = Date(), ended: String) {
         lastPhaseIndex = nil
-        var r = SessionRecord(start: s.shiftedStart, end: min(end, s.end), mode: s.block, planned: s.planned)
-        r.began = s.start
-        r.plannedMinutes = s.totalMinutes
-        r.rounds = s.workRounds > 1 ? s.workRounds : nil
-        r.paused = s.paused > 0 ? s.paused : nil
-        r.ended = ended
-        r.auto = s.auto
-        r.pickSeconds = s.pickSeconds
-        state.phase = r.seconds >= 60 ? .reviewing(r) : .idle
+        if let r = s.completedRecord(at: end, ended: ended) {
+            // History may have been written immediately before a process exit, while
+            // the saved phase still points at this session. Do not append it twice.
+            if records.contains(where: { $0.isSameSession(as: r) }) { state.phase = .idle; return }
+            if s.policy.review { state.phase = .reviewing(r); return }
+            state.pendingRecords = (state.pendingRecords ?? []) + [r]
+        }
+        state.phase = .idle
+        flushPendingRecords()
+    }
+
+    // Persist the outbox before leaving a session. Retrying after a restart is
+    // idempotent even if history was appended just before the process exited.
+    private func flushPendingRecords() {
+        while let r = state.pendingRecords?.first {
+            if !records.contains(where: { $0.isSameSession(as: r) }) {
+                guard appendRecord(r) else {
+                    message = "Session saved for retry. Could not write history yet."
+                    return
+                }
+                records.append(r)
+            }
+            state.pendingRecords?.removeFirst()
+        }
+        if state.pendingRecords != nil { state.pendingRecords = nil }
+        if message == "Session saved for retry. Could not write history yet." { message = "" }
     }
 
     func saveReview(actual: [String], selectedTasks: Set<UUID> = [], otherWork: [String: String] = [:]) {
         guard var r = review, !actual.isEmpty else { return }
         r.actual = actual
         let completed = dailyTasks.complete(day: dayKey(r.began ?? r.start), activities: Settings.current.activities,
-                                            actual: actual, selected: selectedTasks, otherWork: otherWork)
+                                            actual: actual, selected: Settings.current.has(.tasks) ? selectedTasks : [], otherWork: Settings.current.has(.tasks) ? otherWork : [:])
         r.completedTasks = completed.isEmpty ? nil : completed
-        appendRecord(r)
-        records.append(r)
+        state.pendingRecords = (state.pendingRecords ?? []) + [r]
         state.phase = .idle
+        flushPendingRecords()
         log("did   \(actual.joined(separator: ", "))\(r.asPlanned ? " (as planned)" : "")")
     }
 
@@ -359,6 +369,7 @@ final class Model: ObservableObject {
 
     // "Step away": the screen locks, the Mac keeps running, a session pauses. Unlocking ends it.
     func stepAway() {
+        guard Settings.current.has(.away) else { return }
         wentAway(lock: true)
     }
 
@@ -368,7 +379,9 @@ final class Model: ObservableObject {
         let paused: Session?
         switch phase {
         case .session(let s): paused = s
-        case .idle, .picking: paused = nil
+        case .idle, .picking:
+            guard Settings.current.has(.away) else { return }
+            paused = nil
         case .away:
             if lock { lockScreen() }
             return
@@ -378,7 +391,7 @@ final class Model: ObservableObject {
         }
         state.phase = .away(since: now, paused: paused)
         state.pickingSince = nil
-        keepAwake.on()
+        if Settings.current.has(.away) { keepAwake.on() }
         log("away" + (paused.map { " (\($0.planned ?? $0.block) paused)" } ?? ""))
         if lock { lockScreen() }
     }
@@ -405,7 +418,7 @@ final class Model: ObservableObject {
             return
         }
         s.paused += away
-        blocker.lock(s.block, until: s.end)
+        if s.policy.blocking { blocker.lock(s.block, until: s.end) }
         state.phase = .session(s)
         log("back after \(minutesLabel(away / 60)): \(s.planned ?? s.block) until \(Fmt.clock.string(from: s.end))")
     }
@@ -415,7 +428,7 @@ final class Model: ObservableObject {
     var freeLeft: Int { max(0, Settings.current.dailyFreeSeconds - freeUsedToday - freeTimeElapsed) }
 
     // Free time can't be taken twice in a row: a session has to run in between.
-    var canRest: Bool { freeLeft >= 60 && !state.restTaken }
+    var canRest: Bool { Settings.current.has(.guidance) && freeLeft >= 60 && !state.restTaken }
 
     private var freeUsedToday: Int { state.freeUsed.day == dayKey(now) ? state.freeUsed.free : 0 }
 
@@ -426,7 +439,7 @@ final class Model: ObservableObject {
     }
 
     func startRest(minutes: Int) {
-        guard phase.canStart, canRest else { return }
+        guard !Setup.isPending, !Settings.current.isNight(at: now), phase.canStart, canRest else { return }
         let secs = min(min(minutes, Settings.current.maxRestMinutes) * 60, freeLeft)   // one stretch is capped (Settings)
         let start = Date()
         state.restTaken = true
@@ -449,6 +462,8 @@ final class Model: ObservableObject {
 
     private func tick() {
         clock.now = Date()
+        flushPendingRecords()
+        if !Settings.current.has(.away) { keepAwake.off() }
         let night = Settings.current.isNight(at: now)
         // Until first-run setup is done nothing is pushed: no night lock, no "What's next?".
         if night && !Setup.isPending { enterNightIfNeeded() }
@@ -473,6 +488,11 @@ final class Model: ObservableObject {
             endRest()
             notify("Free time is over", "Pick what's next.")
         case .picking:
+            guard Settings.current.has(.guidance), !Setup.isPending else {
+                state.pickingSince = nil
+                state.phase = .idle
+                return
+            }
             if state.pickingSince == nil { state.pickingSince = now }
             startRoundIfStuck()   // the picker opened, then what was left closed or ran out
             if let at = autoStartAt, now >= at { autoStart() }
@@ -485,14 +505,14 @@ final class Model: ObservableObject {
             // Nothing running and it's not night: you always decide what's next, right away.
             // The picker can't be closed; nothing is blocked until you pick.
             // A day with nothing planned is a day off: nothing is pushed.
-            guard !night, !Setup.isPending, !todayActivities.isEmpty, userPresent() else { return }
+            guard Settings.current.has(.guidance), !night, !Setup.isPending, !todayActivities.isEmpty, userPresent() else { return }
             startRoundIfStuck()
             // Day done: every limit reached and no free time to offer, so there's nothing to choose.
             let limits = limits
             guard activities.contains(where: limits.canStart) || canRest else { return }
             state.phase = .picking
             state.pickingSince = now
-            NSSound(named: "Funk")?.play()
+            if Settings.current.has(.notifications) { NSSound(named: "Funk")?.play() }
             log("ask   what's next")
         }
     }
@@ -501,6 +521,7 @@ final class Model: ObservableObject {
     // A session that's already running just finishes.
     private func enterNightIfNeeded() {
         if phase == .picking { state.phase = .idle }
+        guard Settings.current.has(.blocking) else { return }
         let end = Settings.current.nightEnd(after: now)
         if let applied = state.nightUntil, applied >= end { return }
         blocker.lock(Settings.current.nightBlock, until: end)

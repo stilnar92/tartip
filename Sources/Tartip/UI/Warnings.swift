@@ -52,7 +52,8 @@ enum Warnings {
     }
 
     static func night(_ s: AppSettings) -> String {
-        "Every night from \(clockLabel(s.nightFrom)) to \(clockLabel(s.nightTo)) nothing is asked and the night block stays on. "
+        guard s.has(.blocking) else { return "From \(clockLabel(s.nightFrom)) to \(clockLabel(s.nightTo)), no new sessions or prompts start. Distraction blocking is off." }
+        return "Every night from \(clockLabel(s.nightFrom)) to \(clockLabel(s.nightTo)) nothing is asked and the night block stays on. "
             + blocks(NativeBlocker.shared.rule(s.nightBlock))
             + " Once a night has started it can't be lifted until \(clockLabel(s.nightTo))."
     }

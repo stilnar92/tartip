@@ -21,6 +21,12 @@ struct SessionRecord: Codable, Equatable {
     var pickSeconds: Int?           // from "What's next?" opening to the start
 
     var seconds: Int { max(0, Int(end.timeIntervalSince(start))) }
+    // History uses whole-second ISO dates; persisted state retains fractions.
+    func isSameSession(as other: SessionRecord) -> Bool {
+        mode == other.mode && planned == other.planned &&
+        Int((began ?? start).timeIntervalSince1970) == Int((other.began ?? other.start).timeIntervalSince1970)
+    }
+
     var asPlanned: Bool { planned.map { actual == [$0] } ?? false }
 }
 

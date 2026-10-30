@@ -33,11 +33,6 @@ if ! xcrun --find swift >/dev/null 2>&1; then
   exit 1
 fi
 
-# The agent is what keeps the app running: copy it fresh so an update gets any changes.
-mkdir -p "${AGENT:h}"
-launchctl bootout "gui/$UID/$LABEL" 2>/dev/null || true
-cp launchd/$LABEL.plist "$AGENT"
-
 scripts/build.sh
 
 cat <<'EOF'
@@ -45,7 +40,6 @@ cat <<'EOF'
 Tartip is installed and running: look for ◎ in the menu bar
 (if it's hidden, ⌘-drag it next to the clock). Get started opens on first launch.
 
-Allow once:
-  • Accessibility: System Settings → Privacy & Security → Accessibility → Tartip
-  • Chrome: click Allow when asked whether Tartip may control Google Chrome
+Start a focus session right away. Optional features are available in Settings.
+Permissions are requested only for the features you enable.
 EOF

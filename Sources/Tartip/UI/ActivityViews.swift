@@ -54,14 +54,16 @@ struct ReviewView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
-                PageTitle(title: "Session done", subtitle: "Choose what you worked on and mark the tasks you completed.")
+                PageTitle(title: "Session done", subtitle: Settings.current.has(.tasks) ? "Choose what you worked on and mark the tasks you completed." : "Choose what you worked on.")
                 Spacer(minLength: 16)
                 Tag(text: "\((model.review?.seconds ?? 0) / 60) min", color: Theme.accent, fill: Theme.accentTint)
             }
             .padding(24)
             Divider()
 
-            if size.width >= 700 {
+            if !Settings.current.has(.tasks) {
+                ScrollView { VStack { ForEach(names, id: \.self) { activityButton($0) } }.padding(24) }
+            } else if size.width >= 700 {
                 HStack(alignment: .top, spacing: 0) {
                     VStack(alignment: .leading, spacing: 12) {
                         SectionLabel(text: "Activities")

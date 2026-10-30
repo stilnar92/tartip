@@ -4,12 +4,12 @@ import SwiftUI
 // click a row to start it. Used in the menu bar panel and in the forced "What's next?" window.
 struct TodayList: View {
     @ObservedObject var model: Model
-    @ObservedObject var clock: Clock     // hours and limits change as time passes
+    @ObservedObject var clock: Clock  // hours and limits change as time passes
     // "What's next?" is itself the deliberate choice, so it starts without a warning;
     // the menu bar panel shows one on a block's first start.
     var warnOnStart = true
     @State private var hovered: String?
-    @State private var request: StartRequest?    // waiting for "Start" in the warning
+    @State private var request: StartRequest?  // waiting for "Start" in the warning
 
     var body: some View {
         let limits = model.limits
@@ -25,7 +25,7 @@ struct TodayList: View {
                     ForEach(Array(names.enumerated()), id: \.element) { i, a in
                         VStack(alignment: .leading, spacing: 0) {
                             row(a, limits)
-                            if let activity = Settings.current.activity(named: a) {
+                            if Settings.current.has(.tasks), let activity = Settings.current.activity(named: a) {
                                 DailyTaskPreview(model: model, clock: clock, activity: activity.id)
                                     .padding(.leading, 46).padding(.trailing, 12).padding(.bottom, 10)
                             }
@@ -40,20 +40,24 @@ struct TodayList: View {
             if !names.isEmpty && !names.contains(where: limits.hasTimeLeft) {
                 Label("All daily goals done 🎉", systemImage: "checkmark.seal.fill")
                     .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.accent)
-            } else if model.roundNumber > 1 {
-                Label("Round \(model.roundNumber): nothing else was open, so limits started over",
-                      systemImage: "arrow.counterclockwise")
-                    .font(.system(size: 12)).foregroundStyle(Theme.text2)
-                    .fixedSize(horizontal: false, vertical: true)
+            } else if Settings.current.has(.scheduling) && model.roundNumber > 1 {
+                Label(
+                    "Round \(model.roundNumber): nothing else was open, so limits started over",
+                    systemImage: "arrow.counterclockwise"
+                )
+                .font(.system(size: 12)).foregroundStyle(Theme.text2)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            if !names.isEmpty {
+            if Settings.current.has(.scheduling) && !names.isEmpty {
                 DayStrip(day: model.today)
             }
-            freeTime
-            away
+            if Settings.current.has(.guidance) && Settings.current.dailyFreeMinutes > 0 { freeTime }
+            if Settings.current.has(.away) { away }
         }
-        .alert("Start \(request?.activity ?? "")?", isPresented: Binding(get: { request != nil }, set: { if !$0 { request = nil } }),
-               presenting: request) { r in
+        .alert(
+            "Start \(request?.activity ?? "")?", isPresented: Binding(get: { request != nil }, set: { if !$0 { request = nil } }),
+            presenting: request
+        ) { r in
             Button("Start") {
                 Warnings.acknowledge(block: Settings.current.block(for: r.activity))
                 model.startActivity(r.activity, minutes: r.minutes, pomodoro: r.pomodoro)
@@ -66,7 +70,7 @@ struct TodayList: View {
 
     // A first start (or one after its block changed) asks first; otherwise it starts right away.
     private func tryStart(_ a: String, minutes: Int? = nil, pomodoro: Bool? = nil) {
-        if warnOnStart && Warnings.needsStartConfirm(block: Settings.current.block(for: a)) {
+        if Settings.current.has(.blocking) && warnOnStart && Warnings.needsStartConfirm(block: Settings.current.block(for: a)) {
             request = StartRequest(activity: a, minutes: minutes, pomodoro: pomodoro)
         } else {
             model.startActivity(a, minutes: minutes, pomodoro: pomodoro)
@@ -84,7 +88,10 @@ struct TodayList: View {
         HStack(spacing: 6) {
             ForEach(Settings.current.sessionLengths, id: \.self) { n in
                 let sel = !model.pomodoro && model.minutes == n
-                Button { model.pomodoro = false; model.minutes = n } label: {
+                Button {
+                    model.pomodoro = false
+                    model.minutes = n
+                } label: {
                     Text(minutesLabel(n))
                         .font(.system(size: 12, weight: sel ? .semibold : .medium))
                         .frame(maxWidth: .infinity).padding(.vertical, 6)
@@ -92,13 +99,18 @@ struct TodayList: View {
                 }
                 .buttonStyle(.plain)
             }
-            Button { model.pomodoro.toggle() } label: {
-                Text("🍅").font(.system(size: 12))
-                    .frame(maxWidth: .infinity).padding(.vertical, 6)
-                    .pill(selected: model.pomodoro)
+            if Settings.current.has(.pomodoro) {
+                Button {
+                    model.pomodoro.toggle()
+                } label: {
+                    Text("🍅").font(.system(size: 12))
+                        .frame(maxWidth: .infinity).padding(.vertical, 6)
+                        .pill(selected: model.pomodoro)
+                }
+                .buttonStyle(.plain)
+                .help("Pomodoro \(Settings.current.pomodoroWork)/\(Settings.current.pomodoroBreak) min × \(Settings.current.pomodoroRounds)")
             }
-            .buttonStyle(.plain)
-            .help("Pomodoro \(Settings.current.pomodoroWork)/\(Settings.current.pomodoroBreak) min × \(Settings.current.pomodoroRounds)")
+
         }
     }
 
@@ -110,7 +122,9 @@ struct TodayList: View {
         let closed = limits.opensLabel(a)
         let canStart = !done && closed == nil && model.phase.canStart
         let hover = hovered == a && canStart
-        return Button { tryStart(a) } label: {
+        return Button {
+            tryStart(a)
+        } label: {
             HStack(spacing: 10) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
@@ -126,12 +140,15 @@ struct TodayList: View {
                     .strikethrough(done, color: Theme.text2)
                     .lineLimit(1)
                 Spacer(minLength: 6)
-                if hover {
-                    Label("Start \(formatDuration(limits.sessionSeconds(a, requested: (model.pomodoro ? Settings.current.pomodoroPhases().reduce(0) { $0 + $1.minutes } : max(Settings.current.minMinutes, model.minutes)) * 60)))", systemImage: "play.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 9).padding(.vertical, 4)
-                        .background(Capsule().fill(Theme.accent))
+                if hover || (!Settings.current.has(.scheduling) && canStart) {
+                    Label(
+                        "Start \(formatDuration(limits.sessionSeconds(a, requested: (model.pomodoro ? Settings.current.pomodoroPhases().reduce(0) { $0 + $1.minutes } : max(Settings.current.minMinutes, model.minutes)) * 60)))",
+                        systemImage: "play.fill"
+                    )
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 9).padding(.vertical, 4)
+                    .background(Capsule().fill(Theme.accent))
                 } else if let closed {
                     Tag(text: closed)
                 } else if done {
@@ -152,14 +169,16 @@ struct TodayList: View {
             ForEach(Settings.current.sessionLengths, id: \.self) { n in
                 Button("Start for \(formatDuration(limits.sessionSeconds(a, requested: n * 60)))") { tryStart(a, minutes: n, pomodoro: false) }
             }
-            Button("Start Pomodoro") { tryStart(a, pomodoro: true) }
+            if Settings.current.has(.pomodoro) { Button("Start Pomodoro") { tryStart(a, pomodoro: true) } }
         }
     }
 
     // Leaving the computer: no length, it lasts until you unlock. Not free time: nothing is
     // spent from the budget, and the computer can't be used meanwhile.
     private var away: some View {
-        Button { model.stepAway() } label: {
+        Button {
+            model.stepAway()
+        } label: {
             HStack(spacing: 8) {
                 Image(systemName: "figure.walk").font(.system(size: 14)).foregroundStyle(Theme.accent).frame(width: 20)
                 VStack(alignment: .leading, spacing: 1) {
@@ -188,7 +207,9 @@ struct TodayList: View {
             }
             Spacer()
             ForEach(Settings.current.freeTimeLengths.filter { $0 <= 60 }, id: \.self) { n in
-                Button { model.startRest(minutes: n) } label: {
+                Button {
+                    model.startRest(minutes: n)
+                } label: {
                     Text(minutesLabel(n))
                         .font(.system(size: 11, weight: .medium))
                         .padding(.horizontal, 8).padding(.vertical, 5)
