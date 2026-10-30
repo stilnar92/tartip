@@ -109,15 +109,24 @@ final class Model: ObservableObject {
 
     // Sessions since `from`, plus the running one (under its planned activity).
     func recordsSince(_ from: Date) -> [SessionRecord] {
+        recordsSince(from, upTo: now)
+    }
+
+    // Sessions in [from, upTo), plus the running one if it falls in range.
+    func recordsSince(_ from: Date, upTo: Date) -> [SessionRecord] {
         var recs = records
         if let s = session, let planned = s.planned {
             recs.append(SessionRecord(start: s.shiftedStart, end: min(now, s.end), mode: s.block, planned: planned))
         }
-        return Tartip.records(recs, since: from)
+        return Tartip.records(recs, from: from, to: upTo)
     }
 
     func secondsByActivity(since from: Date) -> [String: Int] {
         Tartip.secondsByActivity(recordsSince(from))
+    }
+
+    func secondsByActivity(since from: Date, upTo: Date) -> [String: Int] {
+        Tartip.secondsByActivity(recordsSince(from, upTo: upTo))
     }
 
     var limits: Limits {

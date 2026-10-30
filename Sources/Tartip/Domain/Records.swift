@@ -41,6 +41,16 @@ func records(_ all: [SessionRecord], since from: Date) -> [SessionRecord] {
     }
 }
 
+// Same, but also clipped to end before `to` (e.g. a single past day).
+func records(_ all: [SessionRecord], from: Date, to: Date) -> [SessionRecord] {
+    records(all, since: from).compactMap { r in
+        guard r.start < to else { return nil }
+        var clipped = r
+        clipped.end = min(r.end, to)
+        return clipped
+    }
+}
+
 // Seconds per activity: what was actually done, or what was planned until it's reviewed.
 // A session that covered several activities is split evenly; the first gets the remainder.
 func secondsByActivity(_ records: [SessionRecord]) -> [String: Int] {
