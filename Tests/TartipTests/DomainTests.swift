@@ -118,6 +118,14 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(s.pomodoroRounds == AppSettings().pomodoroRounds)
     }
 
+    @Test func forcedBreakDefaultsAreOnlyActiveWhenEnabled() {
+        let s = AppSettings()
+        #expect(s.forceBreakAfterHours == 2)
+        #expect(s.forceBreakCooldownMinutes == 1)
+        #expect(!s.has(.forcedBreak))         // the threshold alone doesn't turn it on
+        #expect(!AppSettings.fresh.has(.forcedBreak))
+    }
+
     @Test func modeConfigWithoutKeys() throws {
         let c = try JSONDecoder().decode(ModeConfig.self, from: Data("{}".utf8))
         #expect(c == ModeConfig())
@@ -194,6 +202,22 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         let old = try JSONDecoder().decode(StoredState.self, from: JSONEncoder().encode(s))   // saved before rounds
         #expect(old.round == nil)
         s.round = Round(day: "2026-03-01", number: 2, since: at(11))
+        #expect(try JSONDecoder().decode(StoredState.self, from: JSONEncoder().encode(s)) == s)
+    }
+
+    @Test func forcedBreakPhaseSurvivesEncoding() throws {
+        var s = StoredState()
+        s.phase = .forcedBreak(until: at(10, 1))
+        let back = try JSONDecoder().decode(StoredState.self, from: JSONEncoder().encode(s))
+        #expect(back == s)
+        #expect(back.phase.forcedBreakUntil == at(10, 1))
+    }
+
+    @Test func activeSinceSurvivesAndOldStateLoadsWithout() throws {
+        var s = StoredState()
+        let old = try JSONDecoder().decode(StoredState.self, from: JSONEncoder().encode(s))   // saved before activeSince
+        #expect(old.activeSince == nil)
+        s.activeSince = at(9)
         #expect(try JSONDecoder().decode(StoredState.self, from: JSONEncoder().encode(s)) == s)
     }
 

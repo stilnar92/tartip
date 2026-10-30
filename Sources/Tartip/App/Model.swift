@@ -391,7 +391,7 @@ final class Model: ObservableObject {
         case .idle, .picking:
             guard Settings.current.has(.away) else { return }
             paused = nil
-        case .away:
+        case .away, .forcedBreak:       // already away, or on a break that can't be skipped by leaving
             if lock { lockScreen() }
             return
         case .freeTime, .reviewing:     // the shortcut still locks; nothing pauses
@@ -433,6 +433,49 @@ final class Model: ObservableObject {
         lastPhaseIndex = s.current(at: now)?.index
         state.phase = .session(s)
         log("back after \(minutesLabel(away / 60)): \(s.planned ?? s.block) until \(Fmt.clock.string(from: s.end))")
+    }
+
+    // MARK: forced breaks (too long at the computer: step away, no other choice until the cooldown ends)
+
+    // The only thing you can do on a forced break: lock the screen again.
+    func stepAwayForBreak() {
+        guard phase.forcedBreakUntil != nil else { return }
+        lockScreen()
+    }
+
+    // Resets whenever you're not continuously at the computer, so only unbroken stretches count.
+    private func updateActivePresence() {
+        guard Settings.current.has(.forcedBreak), Settings.current.forceBreakAfterHours > 0 else {
+            state.activeSince = nil
+            return
+        }
+        switch phase {
+        case .away, .forcedBreak, .reviewing:
+            state.activeSince = nil
+        default:
+            if !userPresent() { state.activeSince = nil }
+            else if state.activeSince == nil { state.activeSince = now }
+        }
+    }
+
+    // Too long continuously at the computer: end whatever's running and force a break.
+    // Not while away, already on a break, or a question is waiting for an answer (reviewing).
+    private func enterForcedBreakIfDue() {
+        guard Settings.current.has(.forcedBreak), Settings.current.forceBreakAfterHours > 0,
+              let since = state.activeSince,
+              now.timeIntervalSince(since) >= Double(Settings.current.forceBreakAfterHours) * 3600
+        else { return }
+        switch phase {
+        case .away, .forcedBreak, .reviewing: return
+        case .session(let s): finish(s, ended: "forcedBreak")
+        case .idle, .picking, .freeTime: break
+        }
+        state.pickingSince = nil
+        state.activeSince = nil
+        let until = now.addingTimeInterval(Double(Settings.current.forceBreakCooldownMinutes) * 60)
+        state.phase = .forcedBreak(until: until)
+        log("break forced after \(Settings.current.forceBreakAfterHours)h at the computer")
+        lockScreen()
     }
 
     // MARK: free time (nothing blocked, from the daily budget, only taken on purpose)
@@ -480,6 +523,8 @@ final class Model: ObservableObject {
         // Until first-run setup is done nothing is pushed: no night lock, no "What's next?".
         if night && !Setup.isPending { enterNightIfNeeded() }
         blocker.tick(now)
+        updateActivePresence()
+        enterForcedBreakIfDue()
 
         switch phase {
         case .session(let s):
@@ -518,6 +563,10 @@ final class Model: ObservableObject {
         case .away(let since, _):
             // The unlock went unheard (or the lock didn't happen): if you're at it, you're back.
             if now.timeIntervalSince(since) > 5 && !screenLocked() { comeBack() }
+        case .forcedBreak(let until):
+            // Coming back early changes nothing: only the cooldown running out ends the break.
+            if now >= until { state.phase = .idle; log("break done, back to it") }
+            else if !screenLocked() { lockScreen() }
         case .idle:
             // Nothing running and it's not night: you always decide what's next, right away.
             // The picker can't be closed; nothing is blocked until you pick.

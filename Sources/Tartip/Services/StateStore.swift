@@ -18,6 +18,7 @@ struct StoredState: Codable, Equatable {
     var nightUntil: Date?              // the night lock already sent
     var pickingSince: Date?            // when "What's next?" opened, for auto-start
     var round: Round?                  // today's limits started over (see roundIsUsedUp)
+    var activeSince: Date?             // continuously present since; nil when away or not present
 }
 
 // Limits count sessions from `since` on, on `day` only.

@@ -74,6 +74,7 @@ enum AppPhase: Codable, Equatable {
     case freeTime(start: Date, end: Date)   // nothing blocked, from the daily budget
     case reviewing(SessionRecord)           // "What did you actually do?"
     case away(since: Date, paused: Session?) // left the computer: screen locked, nothing counts
+    case forcedBreak(until: Date)           // too long at the computer: step away, can't be skipped
 
     var session: Session? {
         if case .session(let s) = self { return s }
@@ -87,6 +88,11 @@ enum AppPhase: Codable, Equatable {
 
     var awaySince: Date? {
         if case .away(let since, _) = self { return since }
+        return nil
+    }
+
+    var forcedBreakUntil: Date? {
+        if case .forcedBreak(let until) = self { return until }
         return nil
     }
 
