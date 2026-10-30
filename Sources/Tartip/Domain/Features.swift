@@ -4,7 +4,7 @@ import Foundation
 // old capabilities; fresh installs explicitly persist an empty selection.
 enum Feature: String, Codable, CaseIterable, Identifiable {
     case blocking, workspace, tasks, pomodoro, scheduling, review, guidance, night
-    case settingsLock, statistics, login, relaunch, notifications, away
+    case settingsLock, statistics, login, relaunch, notifications, away, forcedBreak
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -22,6 +22,7 @@ enum Feature: String, Codable, CaseIterable, Identifiable {
         case .relaunch: "Relaunch after quitting"
         case .notifications: "Notifications"
         case .away: "Step away"
+        case .forcedBreak: "Forced breaks"
         }
     }
     var detail: String {
@@ -40,6 +41,7 @@ enum Feature: String, Codable, CaseIterable, Identifiable {
         case .relaunch: "Keep Tartip running after a quit. Requires Launch at login."
         case .notifications: "Play sounds and show session notifications."
         case .away: "Lock the screen and keep the Mac awake while away."
+        case .forcedBreak: "End the session and require a step away after a long stretch at the computer, with no way to skip it."
         }
     }
 }
@@ -57,7 +59,8 @@ struct Features: Codable, Equatable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(enabled.map(\.rawValue).sorted(), forKey: .enabled)
     }
-    static let legacy = Features(enabled: Set(Feature.allCases))
+    // Forced breaks are disruptive and opt-in only: new, not something a legacy install wakes up with.
+    static let legacy = Features(enabled: Set(Feature.allCases).subtracting([.forcedBreak]))
     func contains(_ feature: Feature) -> Bool {
         enabled.contains(feature) && (feature != .relaunch || enabled.contains(.login))
     }

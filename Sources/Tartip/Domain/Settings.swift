@@ -104,6 +104,11 @@ struct AppSettings: Codable, Equatable {
     // Away from the computer: a session waits this long, then ends as of when you left.
     var maxAwayMinutes = 60
 
+    // Forced breaks: after this long continuously at the computer, the session ends and a
+    // break is required. 0 = never. The break only lifts once the cooldown runs out.
+    var forceBreakAfterHours = 2
+    var forceBreakCooldownMinutes = 1
+
     // Night: block stays on, nothing is asked. Minutes since midnight.
     var nightEnabled = true
     var nightFrom = 0

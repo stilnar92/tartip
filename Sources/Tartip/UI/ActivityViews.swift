@@ -30,6 +30,42 @@ struct ActivityPickerView: View {
     }
 }
 
+// Too long at the computer: a countdown and a single, unavoidable choice. Coming back early
+// changes nothing — only the cooldown running out lifts it.
+struct ForcedBreakView: View {
+    @ObservedObject var model: Model
+    @ObservedObject var clock: Clock
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "figure.walk.motion").font(.system(size: 40)).foregroundStyle(Theme.accent)
+            VStack(spacing: 6) {
+                Text("Time for a break").font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.text)
+                Text("You've been at the computer a long while. Step away until this clears.")
+                    .font(.system(size: 13)).foregroundStyle(Theme.text2)
+                    .multilineTextAlignment(.center)
+            }
+            if let until = model.phase.forcedBreakUntil {
+                Text(countdown(to: until, from: clock.now))
+                    .font(.system(size: 52, weight: .semibold)).monospacedDigit()
+                    .foregroundStyle(Theme.text)
+                    .contentTransition(.numericText(countsDown: true))
+            }
+            Button {
+                model.stepAwayForBreak()
+            } label: {
+                Label("Step away", systemImage: "figure.walk")
+                    .font(.system(size: 14, weight: .semibold))
+                    .padding(.horizontal, 28).padding(.vertical, 11)
+                    .pill(selected: true)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(32)
+        .frame(width: 420)
+    }
+}
+
 // Activity selection and completion remain separate, with edits staged until Save.
 struct ReviewView: View {
     @ObservedObject var model: Model

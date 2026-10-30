@@ -48,6 +48,7 @@ final class WindowCoordinator {
             let size = CGSize(width: min(fullScreen ? 1080 : 880, max(280, available.width - 64)),
                               height: min(fullScreen ? 820 : 680, max(300, available.height - 80)))
             prompt.show(ReviewView(model: model, size: size), fullScreen: fullScreen)
+        case .forcedBreak: prompt.show(ForcedBreakView(model: model, clock: model.clock), fullScreen: true)
         case .idle, .session, .freeTime, .away: prompt.hide()
         }
     }

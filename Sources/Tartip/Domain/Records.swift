@@ -16,7 +16,7 @@ struct SessionRecord: Codable, Equatable {
     var plannedMinutes: Int?        // the length it was started with, breaks included
     var rounds: Int?                // Pomodoro work rounds, when more than one
     var paused: Int?                // seconds away from the computer in the middle of it
-    var ended: String?              // "done", "stopped" (the block stays on) or "away" (gone too long)
+    var ended: String?              // "done", "stopped" (the block stays on), "away" (gone too long) or "forcedBreak"
     var auto: Bool?                 // started by itself after "What's next?" went unanswered
     var pickSeconds: Int?           // from "What's next?" opening to the start
 

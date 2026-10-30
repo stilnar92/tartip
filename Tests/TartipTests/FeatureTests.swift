@@ -17,7 +17,9 @@ import Testing
 
     @Test func legacyPartialSettingsRetainBehavior() throws {
         let old = try #require(AppSettings.merged(over: Data(#"{"defaultMinutes":45,"nightEnabled":false,"autoStartAfterMinutes":0}"#.utf8)))
-        #expect(Feature.allCases.allSatisfy { old.has($0) })
+        // Forced breaks are disruptive and opt-in only: a legacy install doesn't wake up with one.
+        #expect(Feature.allCases.filter { $0 != .forcedBreak }.allSatisfy { old.has($0) })
+        #expect(!old.has(.forcedBreak))
         #expect(old.defaultMinutes == 45)
         #expect(!old.nightEnabled)
         #expect(old.autoStartAfterMinutes == 0)
