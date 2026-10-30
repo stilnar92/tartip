@@ -7,6 +7,8 @@ import ScriptingBridge
 protocol Blocker: AnyObject {
     // On until `end`. A lock can be extended, never shortened.
     func lock(_ block: String, until end: Date)
+    // Off right away, e.g. for a pomodoro break. Call lock again to resume it.
+    func unlock(_ block: String)
     // Called every second: enforces what's locked and drops what has run out.
     func tick(_ now: Date)
 }
@@ -92,6 +94,13 @@ final class NativeBlocker: ObservableObject, Blocker {
         log("block \(block) until \(Fmt.clock.string(from: end))\(rules[block] == nil ? " (not in blocks.json, nothing to block)" : "")")
         sweepApps()
         lastWebCheck = .distantPast
+    }
+
+    func unlock(_ block: String) {
+        guard locks[block] != nil else { return }
+        locks[block] = nil
+        UserDefaults.standard.set(locks, forKey: "locks")
+        log("unblock \(block) (break)")
     }
 
     private var active: [ActiveBlock] {
