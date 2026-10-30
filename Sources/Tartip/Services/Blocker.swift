@@ -217,15 +217,22 @@ final class NativeBlocker: ObservableObject, Blocker {
         .c{text-align:center;max-width:520px;padding:24px}
         h1{font-size:30px;margin:0 0 8px}
         p{color:#77736b;margin:6px 0;word-break:break-all}
+        a#u{display:inline-block;margin-top:18px;padding:14px 22px;border-radius:14px;
+            background:#2E78F5;color:#fff;font-weight:600;font-size:15px;text-decoration:none;
+            word-break:break-all}
+        a#u:active{opacity:.85}
         </style></head><body><div class="c">
         <h1>🎯 Not now</h1>
-        <p id="b"></p><p id="u"></p>
+        <p id="b"></p><a id="u"></a>
         </div><script>
         const q = new URLSearchParams(location.search);
         const until = new Date(Number(q.get("until")) * 1000);
         document.getElementById("b").textContent = (q.get("block") || "Tartip") + " is on until " +
           until.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) + ".";
-        document.getElementById("u").textContent = q.get("url") || "";
+        const url = q.get("url") || "";
+        const link = document.getElementById("u");
+        link.textContent = url;
+        link.href = url;
         </script></body></html>
         """
         do {
