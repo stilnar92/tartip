@@ -226,7 +226,6 @@ struct ContentView: View {
             }
 
             VStack(spacing: 10) {
-                Button("Stop session") { model.stop() }.buttonStyle(.bordered)
                 if Settings.current.has(.away) {
                     Button {
                         model.stepAway()
