@@ -478,12 +478,33 @@ final class Model: ObservableObject {
         lockScreen()
     }
 
-    // MARK: free time (nothing blocked, from the daily budget, only taken on purpose)
+    // MARK: free time (nothing blocked, only taken on purpose)
+    //
+    // Two tiers: up to `alwaysFreeMinutes` is always available after a session, outside the
+    // daily budget. A longer stretch (up to `maxRestMinutes`) draws from the daily budget and
+    // can only be picked once every `extendedFreeIntervalHours`.
 
     var freeLeft: Int { max(0, Settings.current.dailyFreeSeconds - freeUsedToday - freeTimeElapsed) }
 
     // Free time can't be taken twice in a row: a session has to run in between.
-    var canRest: Bool { Settings.current.has(.guidance) && freeLeft >= 60 && !state.restTaken }
+    var canRest: Bool { Settings.current.has(.guidance) && !state.restTaken }
+
+    // Whether a stretch longer than `alwaysFreeMinutes` can be picked right now.
+    var canExtendFree: Bool {
+        Settings.current.freeTimeLengths.isEmpty == false && freeLeft >= 60 && isExtendedFreeDue
+    }
+
+    private var isExtendedFreeDue: Bool {
+        guard let last = state.lastExtendedFreeAt else { return true }
+        return now.timeIntervalSince(last) >= Double(Settings.current.extendedFreeIntervalHours) * 3600
+    }
+
+    // When the hourly allowance for a longer stretch becomes available again; nil if it is now.
+    var extendedFreeAvailableAt: Date? {
+        guard let last = state.lastExtendedFreeAt else { return nil }
+        let at = last.addingTimeInterval(Double(Settings.current.extendedFreeIntervalHours) * 3600)
+        return at > now ? at : nil
+    }
 
     private var freeUsedToday: Int { state.freeUsed.day == dayKey(now) ? state.freeUsed.free : 0 }
 
@@ -495,8 +516,15 @@ final class Model: ObservableObject {
 
     func startRest(minutes: Int) {
         guard !Setup.isPending, !Settings.current.isNight(at: now), phase.canStart, canRest else { return }
-        let secs = min(min(minutes, Settings.current.maxRestMinutes) * 60, freeLeft)   // one stretch is capped (Settings)
         let start = Date()
+        let secs: Int
+        if minutes <= Settings.current.alwaysFreeMinutes {
+            secs = minutes * 60   // always available: doesn't touch the daily budget
+        } else {
+            guard canExtendFree else { return }
+            secs = min(min(minutes, Settings.current.maxRestMinutes) * 60, freeLeft)   // one stretch is capped (Settings)
+            state.lastExtendedFreeAt = start
+        }
         state.restTaken = true
         state.phase = .freeTime(start: start, end: start.addingTimeInterval(Double(secs)))
         log("rest  \(secs / 60)m (\(freeLeft / 60)m left today)")
@@ -508,8 +536,10 @@ final class Model: ObservableObject {
         let piece = Event(t: start, type: "free", seconds: used, minutes: Int(end.timeIntervalSince(start)) / 60)
         record(piece)
         events.append(piece)
-        let today = dayKey(now)
-        state.freeUsed = DayStats(day: today, free: (state.freeUsed.day == today ? state.freeUsed.free : 0) + used)
+        if state.lastExtendedFreeAt == start {   // the always-free tier doesn't touch the daily budget
+            let today = dayKey(now)
+            state.freeUsed = DayStats(day: today, free: (state.freeUsed.day == today ? state.freeUsed.free : 0) + used)
+        }
         state.phase = .idle
     }
 

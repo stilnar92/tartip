@@ -51,7 +51,7 @@ struct TodayList: View {
             if Settings.current.has(.scheduling) && !names.isEmpty {
                 DayStrip(day: model.today)
             }
-            if Settings.current.has(.guidance) && Settings.current.dailyFreeMinutes > 0 { freeTime }
+            if Settings.current.has(.guidance) && (Settings.current.alwaysFreeMinutes > 0 || Settings.current.dailyFreeMinutes > 0) { freeTime }
             if Settings.current.has(.away) { away }
         }
         .alert(
@@ -195,33 +195,48 @@ struct TodayList: View {
         .card(radius: 12)
     }
 
-    // 🍿 Free time: nothing blocked, from the daily budget, never twice in a row.
+    // 🍿 Free time: nothing blocked, never twice in a row. A few minutes are always available
+    // after a session; a longer stretch draws from the daily budget and comes around hourly.
     private var freeTime: some View {
         HStack(spacing: 8) {
             Text("🍿").font(.system(size: 15))
             VStack(alignment: .leading, spacing: 1) {
                 Text("Free time").font(.system(size: 14)).foregroundStyle(model.canRest ? Theme.text : Theme.text2)
                     .help("Nothing blocked")
-                Text(model.restTaken ? "after a session" : "\(model.freeLeft / 60)m left")
-                    .font(.system(size: 11)).foregroundStyle(Theme.text2)
+                Text(freeTimeStatus).font(.system(size: 11)).foregroundStyle(Theme.text2)
             }
             Spacer()
+            if Settings.current.alwaysFreeMinutes > 0 {
+                freePill(Settings.current.alwaysFreeMinutes, enabled: model.canRest)
+            }
             ForEach(Settings.current.freeTimeLengths.filter { $0 <= 60 }, id: \.self) { n in
-                Button {
-                    model.startRest(minutes: n)
-                } label: {
-                    Text(minutesLabel(n))
-                        .font(.system(size: 11, weight: .medium))
-                        .padding(.horizontal, 8).padding(.vertical, 5)
-                        .pill()
-                }
-                .buttonStyle(.plain)
-                .disabled(!model.canRest || model.freeLeft < n * 60)
-                .opacity(model.canRest && model.freeLeft >= n * 60 ? 1 : 0.35)
+                freePill(n, enabled: model.canRest && model.canExtendFree && model.freeLeft >= n * 60)
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 9)
         .card(radius: 12)
+    }
+
+    private var freeTimeStatus: String {
+        if model.restTaken { return "after a session" }
+        if !model.canExtendFree, let at = model.extendedFreeAvailableAt {
+            return "longer again at \(Fmt.clock.string(from: at))"
+        }
+        return "\(model.freeLeft / 60)m left"
+    }
+
+    private func freePill(_ minutes: Int, enabled: Bool) -> some View {
+        Button {
+            model.startRest(minutes: minutes)
+        } label: {
+            Text(minutesLabel(minutes))
+                .font(.system(size: 11, weight: .medium))
+                .padding(.horizontal, 8).padding(.vertical, 5)
+                .pill()
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.35)
     }
 }
 

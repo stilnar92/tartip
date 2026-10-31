@@ -253,6 +253,17 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(lengths(cap: 40) == [15, 30, 40])
         #expect(lengths(cap: 60) == [15, 30, 45, 60])
     }
+
+    @Test func alwaysFreeMinutesAreExcludedFromTheExtendedList() {
+        var s = AppSettings()
+        s.alwaysFreeMinutes = 20
+        s.maxRestMinutes = 60
+        #expect(s.freeTimeLengths == [30, 45, 60])   // 15 is covered by the always-free tier
+
+        s.alwaysFreeMinutes = 60
+        s.maxRestMinutes = 60
+        #expect(s.freeTimeLengths == [])             // the cap itself is no longer "extended"
+    }
 }
 
 @Suite struct ActivityIdentityTests {

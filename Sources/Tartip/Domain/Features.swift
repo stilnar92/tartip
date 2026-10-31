@@ -74,6 +74,7 @@ extension AppSettings {
         s.nightEnabled = false
         s.autoStartAfterMinutes = 0
         s.dailyFreeMinutes = 0
+        s.alwaysFreeMinutes = 0
         s.activities = [ActivitySetting(name: "Focus")]
         return s
     }

@@ -14,6 +14,7 @@ struct StoredState: Codable, Equatable {
     var pomodoro = false
     var restTaken = false              // free time can't be taken twice in a row
     var freeUsed = DayStats(day: "")
+    var lastExtendedFreeAt: Date? = nil // when a longer (> alwaysFreeMinutes) stretch was last taken
     var opened: OpenedWorkspace?       // what the last start opened, to clean up on the next
     var nightUntil: Date?              // the night lock already sent
     var pickingSince: Date?            // when "What's next?" opened, for auto-start

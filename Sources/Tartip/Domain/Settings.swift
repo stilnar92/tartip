@@ -84,7 +84,9 @@ struct AppSettings: Codable, Equatable {
     var features = Features.legacy
     // Free time
     var dailyFreeMinutes = 60
-    var maxRestMinutes = 60          // longest single stretch of free time
+    var maxRestMinutes = 60          // longest single extended stretch of free time (see alwaysFreeMinutes)
+    var alwaysFreeMinutes = 5        // always available after a session, outside the daily budget
+    var extendedFreeIntervalHours = 1  // a longer (> alwaysFreeMinutes) stretch can be picked at most this often
 
     // Session length
     var durationOptions = [15, 20, 30, 45, 60]
@@ -130,11 +132,12 @@ extension AppSettings {
     var dailyFreeSeconds: Int { dailyFreeMinutes * 60 }
     var sessionLengths: [Int] { durationOptions.filter { $0 >= minMinutes }.sorted() }
     var defaultSessionMinutes: Int { max(defaultMinutes, minMinutes) }
-    // Free time lengths offered, never longer than one stretch may be.
-    // The cap itself is always one of them, so a cap under 15 minutes still leaves a choice.
+    // Extended free time lengths offered (beyond the always-free minutes), never longer than
+    // one stretch may be. The cap itself is always one of them, so a cap under 15 minutes
+    // still leaves a choice.
     var freeTimeLengths: [Int] {
-        let under = [15, 30, 45, 60, 90, 120].filter { $0 < maxRestMinutes }
-        return maxRestMinutes > 0 ? under + [maxRestMinutes] : under
+        let under = [15, 30, 45, 60, 90, 120].filter { $0 > alwaysFreeMinutes && $0 < maxRestMinutes }
+        return maxRestMinutes > alwaysFreeMinutes ? under + [maxRestMinutes] : under
     }
 
     func pomodoroPhases() -> [Phase] {

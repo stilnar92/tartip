@@ -73,6 +73,8 @@ func loosenings(from o: AppSettings, to n: AppSettings) -> [String] {
 
     if n.dailyFreeMinutes > o.dailyFreeMinutes { out.append("more free time") }
     if n.maxRestMinutes > o.maxRestMinutes { out.append("a longer free time stretch") }
+    if n.alwaysFreeMinutes > o.alwaysFreeMinutes { out.append("more always-available free time") }
+    if n.extendedFreeIntervalHours < o.extendedFreeIntervalHours { out.append("a longer break offered more often") }
 
     let night = { (s: AppSettings) in s.nightEnabled ? span(s.nightFrom, s.nightTo) : 0 }
     if night(n) < night(o) { out.append(n.nightEnabled ? "a shorter night" : "turning night off") }

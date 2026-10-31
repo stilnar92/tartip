@@ -295,9 +295,18 @@ struct SettingsView: View {
 
     private var freeTimeSection: some View {
         group("Free time", "Nothing blocked: movies, YouTube, anything. Only when you take it on purpose; idle time doesn't count.") {
-            row("Per day") { minuteStepper($settings.value.dailyFreeMinutes, 0...240, step: 5) }
-            row("Longest break at once") { minuteStepper($settings.value.maxRestMinutes, 5...120, step: 5) }
-            Text("Free time is taken in pieces; this caps one piece. It never goes past what's left for the day.")
+            row("Always available, after a session") { minuteStepper($settings.value.alwaysFreeMinutes, 0...30, step: 1) }
+            Text("Doesn't count against the daily budget below.")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+            row("Longer break, per day") { minuteStepper($settings.value.dailyFreeMinutes, 0...240, step: 5) }
+            row("Longest stretch at once") { minuteStepper($settings.value.maxRestMinutes, 5...120, step: 5) }
+            row("How often a longer break can be picked") {
+                HStack(spacing: 6) {
+                    Text(settings.value.extendedFreeIntervalHours == 1 ? "1h" : "\(settings.value.extendedFreeIntervalHours)h").monospacedDigit()
+                    Stepper("", value: $settings.value.extendedFreeIntervalHours, in: 1...12).labelsHidden()
+                }
+            }
+            Text("Free time is taken in pieces; \"longest stretch\" caps one piece. It never goes past what's left for the day.")
                 .font(.system(size: 11)).foregroundStyle(.secondary)
         }
     }
