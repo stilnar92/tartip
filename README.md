@@ -120,3 +120,7 @@ Settings and history live in `~/modes`, outside the app. Daily task checklists a
 - This is self-control, not security: anyone with admin rights can unload the launch agent or change the settings.
 
 Working on the code? See [DEVELOPMENT.md](DEVELOPMENT.md).
+
+## Contact
+
+Telegram: [@horesen](https://t.me/horesen) · Email: stilnar92@gmail.com
