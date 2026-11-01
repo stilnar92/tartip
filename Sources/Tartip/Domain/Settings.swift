@@ -149,11 +149,12 @@ extension AppSettings {
 
     func activity(named name: String) -> ActivitySetting? { activities.first { $0.name == name } }
 
-    // The block an activity locks; "Other" has its own setting.
+    // The block an activity locks. "Other" has its own setting, but only when there's no real
+    // activity by that name — an activity the user made named "Other" is just an activity.
     func block(for activity: String) -> String {
+        if let b = self.activity(named: activity)?.block, !b.isEmpty { return b }
         if activity == otherActivity { return otherBlock }
-        guard let b = self.activity(named: activity)?.block, !b.isEmpty else { return activity }
-        return b
+        return activity
     }
 
     // Saved values are laid over the defaults, so new settings get their default.

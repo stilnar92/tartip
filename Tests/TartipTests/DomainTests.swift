@@ -288,6 +288,15 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(s.block(for: "Arabic lessons") == "Arabic")
         #expect(s.block(for: otherActivity) == s.otherBlock)
     }
+
+    // A real activity named "Other" is just an activity: its own block applies, not otherBlock.
+    @Test func anActivityNamedOtherUsesItsOwnBlock() {
+        var s = AppSettings()
+        s.otherBlock = "Focus_Mode"
+        s.activities = [ActivitySetting(name: otherActivity)]
+        #expect(s.block(for: otherActivity) == otherActivity)
+        #expect(s.block(for: otherActivity) != s.otherBlock)
+    }
 }
 
 @Suite struct FormatTests {

@@ -31,7 +31,7 @@ Start begins the session immediately; it does not open another compulsory picker
 
 The basic panel shows the activity, duration, Start/Stop, and today's focused time. Session completion saves elapsed time and returns to idle. No compulsory review or task completion is inferred. Preserve the current policy for very short sessions unless separately changed and documented.
 
-The basic settings page contains activities, default duration, and an Optional features entry. Advanced controls and navigation appear when their corresponding capability is enabled. Basic session recording remains available even when the detailed statistics screen is hidden.
+The basic settings page contains activities, default duration, and a Features entry. Advanced controls and navigation appear when their corresponding capability is enabled. Basic session recording remains available even when the detailed statistics screen is hidden.
 
 ## Optional capabilities
 

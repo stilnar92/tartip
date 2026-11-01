@@ -52,7 +52,7 @@ struct SettingsView: View {
 
     private var rulesPage: some View {
         VStack(alignment: .leading, spacing: 22) {
-            PageTitle(title: "Optional features", subtitle: "Build your own setup. Disabled features keep their saved configuration.")
+            PageTitle(title: "Features", subtitle: "Build your own setup. Disabled features keep their saved configuration.")
             lockBanner
             featureCatalog
             if settings.value.has(.guidance) {
@@ -61,7 +61,6 @@ struct SettingsView: View {
             }
             if settings.value.has(.review) { Toggle("Review full screen", isOn: $settings.value.reviewFullScreen) }
             if settings.value.has(.night) { nightSection }
-            if settings.value.has(.forcedBreak) { forcedBreakSection }
             DisclosureGroup("Timer options") { durationSection }
             if settings.value.has(.settingsLock) { lockSection }
             group("Shortcuts", "Work from any app.") {
@@ -94,6 +93,21 @@ struct SettingsView: View {
                     .toggleStyle(.switch)
                     .disabled(feature == .relaunch && !settings.value.has(.login))
                     Text(feature.detail).font(.system(size: 11)).foregroundStyle(.secondary)
+                    // Right where it's switched on: its own section, further down, is easy to miss.
+                    if feature == .forcedBreak && settings.value.has(.forcedBreak) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            row("After") {
+                                HStack(spacing: 6) {
+                                    Text(settings.value.forceBreakAfterHours == 0 ? "never" : "\(settings.value.forceBreakAfterHours)h").monospacedDigit()
+                                    Stepper("", value: $settings.value.forceBreakAfterHours, in: 0...8).labelsHidden()
+                                }
+                            }
+                            if settings.value.forceBreakAfterHours > 0 {
+                                row("Cooldown") { minuteStepper($settings.value.forceBreakCooldownMinutes, 1...30, step: 1) }
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
                 }
             }
         }
@@ -275,20 +289,6 @@ struct SettingsView: View {
                         .padding(10).card(radius: 9)
                 }
 
-            }
-        }
-    }
-
-    private var forcedBreakSection: some View {
-        group("Forced breaks", "Ends whatever's running and locks the screen. Only the cooldown ends it — stepping back in early doesn't.") {
-            row("After") {
-                HStack(spacing: 6) {
-                    Text(settings.value.forceBreakAfterHours == 0 ? "never" : "\(settings.value.forceBreakAfterHours)h").monospacedDigit()
-                    Stepper("", value: $settings.value.forceBreakAfterHours, in: 0...8).labelsHidden()
-                }
-            }
-            if settings.value.forceBreakAfterHours > 0 {
-                row("Cooldown") { minuteStepper($settings.value.forceBreakCooldownMinutes, 1...30, step: 1) }
             }
         }
     }

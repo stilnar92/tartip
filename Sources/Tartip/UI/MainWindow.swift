@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum MainTab: String, CaseIterable {
-    case setup = "Get started", tasks = "Tasks", activities = "Activities", rules = "Optional features", stats = "Stats"
+    case setup = "Get started", tasks = "Tasks", activities = "Activities", rules = "Features", stats = "Stats"
 
     // Until first-run setup is done Get started is the only page: there's nothing to see
     // in Stats yet, and Activities and Rules would compete with it. Afterwards it's gone.
