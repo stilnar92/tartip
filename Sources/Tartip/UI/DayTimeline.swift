@@ -1,10 +1,11 @@
 import SwiftUI
 
-// Today in two calendar columns on one time axis. Available: the day cut where an activity's
-// hours start or end, each period shaded with the activities you can pick then (any-time ones
-// are listed once above; red where nothing at all can start). Actual: the sessions that ran.
+// Today in one calendar column on one time axis, full width: what you can still pick, by
+// period (any-time ones listed once above; red where nothing at all can start). A switch
+// swaps it for Actual (the sessions that ran) to compare against the plan.
 struct DayTimeline: View {
     let day: Model.DayView
+    @State private var showActual = false
 
     private let hourHeight: CGFloat = 56   // a 15-minute session still gets its label
     private let labelWidth: CGFloat = 40
@@ -19,20 +20,30 @@ struct DayTimeline: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
-                Color.clear.frame(width: labelWidth, height: 1)
-                title("Available", day.anyTime.isEmpty ? "what you can pick, by period" : "plus the any-time ones")
-                title("Actual", "the sessions you ran")
+                title(showActual ? "Actual" : "Available",
+                      showActual ? "the sessions you ran" : (day.anyTime.isEmpty ? "what you can pick, by period" : "plus the any-time ones"))
+                Spacer()
+                Picker("", selection: $showActual) {
+                    Text("Available").tag(false)
+                    Text("Actual").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 180)
             }
             HStack(alignment: .top, spacing: 8) {
                 hourLabels
-                column { w in
-                    ForEach(Array(day.periods.enumerated()), id: \.offset) { i, p in
-                        period(p, shade: i % 2 == 0).frame(width: w, height: max(2, y(p.end) - y(p.start) - 3)).offset(y: y(p.start) + 1.5)
+                if showActual {
+                    column { w in
+                        ForEach(Array(day.actual.enumerated()), id: \.offset) { _, s in
+                            session(s).frame(width: w, height: max(2, y(s.end) - y(s.start) - 2)).offset(y: y(s.start) + 1)
+                        }
                     }
-                }
-                column { w in
-                    ForEach(Array(day.actual.enumerated()), id: \.offset) { _, s in
-                        session(s).frame(width: w, height: max(2, y(s.end) - y(s.start) - 2)).offset(y: y(s.start) + 1)
+                } else {
+                    column { w in
+                        ForEach(Array(day.periods.enumerated()), id: \.offset) { i, p in
+                            period(p, shade: i % 2 == 0).frame(width: w, height: max(2, y(p.end) - y(p.start) - 3)).offset(y: y(p.start) + 1.5)
+                        }
                     }
                 }
             }

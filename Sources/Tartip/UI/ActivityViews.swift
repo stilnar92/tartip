@@ -83,6 +83,7 @@ struct ReviewView: View {
             all.insert(planned, at: 0)
         }
         if !all.contains(otherActivity) { all.append(otherActivity) }
+        all.append(notPlannedActivity)
         return all
     }
     private var selectedNames: [String] { names.filter { checked.contains($0) } }
@@ -103,7 +104,7 @@ struct ReviewView: View {
                 HStack(alignment: .top, spacing: 0) {
                     VStack(alignment: .leading, spacing: 12) {
                         SectionLabel(text: "Activities")
-                        Text("Select one or more").font(.system(size: 12)).foregroundStyle(Theme.text2)
+                        Text("Click one, or check several to split the time").font(.system(size: 12)).foregroundStyle(Theme.text2)
                         ScrollView {
                             VStack(spacing: 4) {
                                 ForEach(names, id: \.self) { activityButton($0) }
@@ -118,7 +119,7 @@ struct ReviewView: View {
                 .frame(maxHeight: .infinity)
             } else {
                 VStack(alignment: .leading, spacing: 12) {
-                    SectionLabel(text: "Activities · select one or more")
+                    SectionLabel(text: "Activities · click one, or check several to split")
                     ScrollView {
                         FlowLayout {
                             ForEach(names, id: \.self) { activityButton($0, compact: true) }
@@ -152,35 +153,46 @@ struct ReviewView: View {
         .frame(width: size.width, height: size.height)
     }
 
+    // The checkbox toggles this one in/out of a multi-selection; the rest of the row picks it
+    // alone, so one click is enough for the common case and splitting time is still one click away.
     private func activityButton(_ name: String, compact: Bool = false) -> some View {
         let on = checked.contains(name)
-        return Button {
-            var selection = checked
-            if let index = selection.firstIndex(of: name) { selection.remove(at: index) }
-            else { selection.append(name) }
-            picked = selection
-        } label: {
-            HStack(spacing: 8) {
+        return HStack(spacing: 8) {
+            Button {
+                var selection = checked
+                if let index = selection.firstIndex(of: name) { selection.remove(at: index) }
+                else { selection.append(name) }
+                picked = selection
+            } label: {
                 Image(systemName: on ? "checkmark.square.fill" : "square")
                     .foregroundStyle(on ? Theme.accent : Theme.text2)
-                Image(systemName: ActivityStyle.of(name).icon)
-                    .foregroundStyle(ActivityStyle.of(name).color).frame(width: 18)
-                Text(name).foregroundStyle(Theme.text)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !compact {
-                    Spacer(minLength: 0)
-                    if name == model.review?.planned {
-                        Image(systemName: "timer").foregroundStyle(Theme.text2).help("Planned activity")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(on ? "Remove" : "Add") \(name) to the selection")
+
+            Button {
+                picked = [name]
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: ActivityStyle.of(name).icon)
+                        .foregroundStyle(ActivityStyle.of(name).color).frame(width: 18)
+                    Text(name).foregroundStyle(Theme.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !compact {
+                        Spacer(minLength: 0)
+                        if name == model.review?.planned {
+                            Image(systemName: "timer").foregroundStyle(Theme.text2).help("Planned activity")
+                        }
                     }
                 }
+                .contentShape(Rectangle())
             }
-            .font(.system(size: 13, weight: on ? .medium : .regular))
-            .padding(.horizontal, 10).padding(.vertical, 10)
-            .background(RoundedRectangle(cornerRadius: 9).fill(on ? Theme.accentTint : .clear))
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .accessibilityLabel("Select only \(name)")
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(on ? "Deselect" : "Select") activity: \(name)")
+        .font(.system(size: 13, weight: on ? .medium : .regular))
+        .padding(.horizontal, 10).padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 9).fill(on ? Theme.accentTint : .clear))
     }
 
     private var taskPane: some View {

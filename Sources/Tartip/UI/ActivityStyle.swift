@@ -48,6 +48,7 @@ struct ActivityStyle {
         if n == "rest" { return ActivityStyle(icon: "cup.and.saucer.fill", color: .brown) }
         if starts("interview") { return ActivityStyle(icon: "person.2.wave.2.fill", color: .indigo) }
         if n == otherActivity.lowercased() { return ActivityStyle(icon: "ellipsis.circle.fill", color: .gray) }
+        if n == notPlannedActivity.lowercased() { return ActivityStyle(icon: "questionmark.circle.fill", color: .gray) }
         return ActivityStyle(icon: "circle.fill", color: .pink)
     }
 }

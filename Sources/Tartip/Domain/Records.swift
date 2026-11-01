@@ -1,6 +1,9 @@
 import Foundation
 
 let otherActivity = "Other"
+// Purely a review label: picking it records the time as not matching any real activity,
+// without starting or restricting anything. Never a real ActivitySetting.
+let notPlannedActivity = "Not planned"
 
 // One line per session in sessions.jsonl.
 struct SessionRecord: Codable, Equatable {

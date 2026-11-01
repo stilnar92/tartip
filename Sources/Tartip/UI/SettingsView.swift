@@ -445,53 +445,20 @@ struct SettingsView: View {
         let nightLen = s.has(.night) && s.nightEnabled ? (s.nightTo - s.nightFrom + 1440) % 1440 : 0
         let awake = 1440 - nightLen
         let planned = active + rest + free
-        let unplanned = max(0, awake - planned)
-        let noLimit = day.filter { limit($0) == 0 }.map(\.name)
-        let parts: [(String, Int, Color)] = [
-            ("Active", active, .indigo), ("Rest", rest, .brown),
-            ("Free time", free, .orange), ("Unplanned", unplanned, .gray),
-        ]
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Today").font(.system(size: 13, weight: .semibold))
                 Text(Fmt.dayTitle.string(from: Date())).font(.system(size: 12)).foregroundStyle(.secondary)
                 Spacer()
-                Text("\(minutesLabel(planned)) planned of \(minutesLabel(awake)) awake")
-                    .font(.system(size: 11)).foregroundStyle(planned > awake ? .red : .secondary)
+                if planned > awake {
+                    Text("More planned than your waking day").font(.system(size: 11)).foregroundStyle(.red)
+                }
             }
             if day.isEmpty && !s.activities.isEmpty {
                 Text("Nothing planned: a day off, \"What's next?\" won't ask.")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }
-            // One bar for the whole waking day.
-            GeometryReader { g in
-                HStack(spacing: 2) {
-                    ForEach(parts.filter { $0.1 > 0 }, id: \.0) { _, mins, color in
-                        RoundedRectangle(cornerRadius: 3).fill(color.gradient)
-                            .frame(width: max(4, (g.size.width - 6) * CGFloat(mins) / CGFloat(max(awake, planned))))
-                    }
-                }
-            }
-            .frame(height: 10)
-            HStack(spacing: 0) {
-                ForEach(parts, id: \.0) { name, mins, color in
-                    VStack(spacing: 2) {
-                        Text(mins > 0 ? minutesLabel(mins) : "–")
-                            .font(.system(size: 15, weight: .bold)).monospacedDigit().foregroundStyle(color)
-                        Text(name).font(.system(size: 10)).foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-            if !noLimit.isEmpty {
-                Text("No limit (not counted): \(noLimit.joined(separator: ", "))")
-                    .font(.system(size: 10)).foregroundStyle(.secondary)
-            }
-            if planned > awake {
-                Text("That's more than your waking day.").font(.system(size: 11)).foregroundStyle(.red)
-            }
-            Divider().opacity(0.5)
             if let model {
                 DayTimeline(day: model.today)
                 Text("Not a schedule: within a period you pick any of these. Red: nothing can start then.")
