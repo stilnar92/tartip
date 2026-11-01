@@ -1,11 +1,13 @@
 import SwiftUI
 
-// Today in one calendar column on one time axis, full width: what you can still pick, by
-// period (any-time ones listed once above; red where nothing at all can start). A switch
-// swaps it for Actual (the sessions that ran) to compare against the plan.
+// Today on one time axis. Available: what you can still pick, by period (any-time ones listed
+// once above; red where nothing at all can start). Actual: the sessions that ran, marked by
+// their own real times, not Available's. Compare shows both side by side.
 struct DayTimeline: View {
     let day: Model.DayView
-    @State private var showActual = false
+
+    private enum Mode: String, CaseIterable, Identifiable { case available, actual, compare; var id: Self { self } }
+    @State private var mode: Mode = .available
 
     private let hourHeight: CGFloat = 56   // a 15-minute session still gets its label
     private let labelWidth: CGFloat = 40
@@ -20,32 +22,51 @@ struct DayTimeline: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
-                title(showActual ? "Actual" : "Available",
-                      showActual ? "the sessions you ran" : (day.anyTime.isEmpty ? "what you can pick, by period" : "plus the any-time ones"))
+                if mode == .compare {
+                    Color.clear.frame(width: labelWidth, height: 1)
+                    title("Available", day.anyTime.isEmpty ? "what you can pick" : "plus the any-time ones")
+                    title("Actual", "by their real time")
+                } else {
+                    title(mode == .actual ? "Actual" : "Available",
+                          mode == .actual ? "the sessions you ran, by their real time"
+                          : (day.anyTime.isEmpty ? "what you can pick, by period" : "plus the any-time ones"))
+                }
                 Spacer()
-                Picker("", selection: $showActual) {
-                    Text("Available").tag(false)
-                    Text("Actual").tag(true)
+                Picker("", selection: $mode) {
+                    Text("Available").tag(Mode.available)
+                    Text("Actual").tag(Mode.actual)
+                    Text("Compare").tag(Mode.compare)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 180)
+                .frame(width: 240)
             }
             HStack(alignment: .top, spacing: 8) {
-                hourLabels
-                if showActual {
-                    column { w in
-                        ForEach(Array(day.actual.enumerated()), id: \.offset) { _, s in
-                            session(s).frame(width: w, height: max(2, y(s.end) - y(s.start) - 2)).offset(y: y(s.start) + 1)
-                        }
-                    }
+                hourLabels(mode == .actual ? actualMarks : availableMarks)
+                if mode == .available {
+                    availableColumn
+                } else if mode == .actual {
+                    actualColumn
                 } else {
-                    column { w in
-                        ForEach(Array(day.periods.enumerated()), id: \.offset) { i, p in
-                            period(p, shade: i % 2 == 0).frame(width: w, height: max(2, y(p.end) - y(p.start) - 3)).offset(y: y(p.start) + 1.5)
-                        }
-                    }
+                    availableColumn
+                    actualColumn
                 }
+            }
+        }
+    }
+
+    private var availableColumn: some View {
+        column(availableMarks) { w in
+            ForEach(Array(day.periods.enumerated()), id: \.offset) { i, p in
+                period(p, shade: i % 2 == 0).frame(width: w, height: max(2, y(p.end) - y(p.start) - 3)).offset(y: y(p.start) + 1.5)
+            }
+        }
+    }
+
+    private var actualColumn: some View {
+        column(mode == .compare ? availableMarks : actualMarks) { w in
+            ForEach(Array(day.actual.enumerated()), id: \.offset) { _, s in
+                session(s).frame(width: w, height: max(2, y(s.end) - y(s.start) - 2)).offset(y: y(s.start) + 1)
             }
         }
     }
@@ -58,12 +79,25 @@ struct DayTimeline: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // The axis marks where periods start and end: that's when what you can pick changes.
-    private var hourMarks: [Int] { Array(Set(day.periods.flatMap { [$0.start, $0.end] } + [day.from, day.to])).sorted() }
+    // Available's marks: where periods start and end, that's when what you can pick changes.
+    private var availableMarks: [Int] { Array(Set(day.periods.flatMap { [$0.start, $0.end] } + [day.from, day.to])).sorted() }
+    // Actual's marks: the real start and end of every session that ran, not Available's periods.
+    private var actualMarks: [Int] { Array(Set(day.actual.flatMap { [$0.start, $0.end] } + [day.from, day.to])).sorted() }
 
-    private var hourLabels: some View {
+    // Marks whose labels would overlap (too close in time to fit two lines of text) drop all
+    // but the first; the grid lines themselves still show at every real mark.
+    private func spacedOut(_ marks: [Int]) -> [Int] {
+        var out: [Int] = []
+        for m in marks {
+            if let last = out.last, y(m) - y(last) < 14 { continue }
+            out.append(m)
+        }
+        return out
+    }
+
+    private func hourLabels(_ marks: [Int]) -> some View {
         ZStack(alignment: .topLeading) {
-            ForEach(hourMarks, id: \.self) { m in
+            ForEach(spacedOut(marks), id: \.self) { m in
                 Text(clockLabel(m % 1440)).font(.system(size: 10)).monospacedDigit().foregroundStyle(.secondary)
                     .frame(width: labelWidth, alignment: .trailing)
                     .offset(y: y(m) - 6)
@@ -72,10 +106,10 @@ struct DayTimeline: View {
         .frame(width: labelWidth, height: y(day.to), alignment: .topLeading)
     }
 
-    private func column<Content: View>(@ViewBuilder _ content: @escaping (CGFloat) -> Content) -> some View {
+    private func column<Content: View>(_ marks: [Int], @ViewBuilder _ content: @escaping (CGFloat) -> Content) -> some View {
         GeometryReader { g in
             ZStack(alignment: .topLeading) {
-                ForEach(hourMarks, id: \.self) { m in
+                ForEach(marks, id: \.self) { m in
                     Rectangle().fill(Theme.separator).frame(width: g.size.width, height: 1).offset(y: y(m))
                 }
                 content(g.size.width)
