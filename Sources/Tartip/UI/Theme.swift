@@ -40,6 +40,11 @@ extension View {
         )
     }
 
+    // No background, shadow or edge at all: for a single card that fills the whole panel (the
+    // menu bar's session/free time/away/night/setup states), where the panel's own background
+    // already is the card's background, so adding another fill would just double it.
+    func flatCard() -> some View { self }
+
     // Grey pill; selected = light blue with blue text (Craft's tabs).
     func pill(selected: Bool = false) -> some View {
         self.foregroundStyle(selected ? Theme.accent : Theme.text)

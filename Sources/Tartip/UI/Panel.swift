@@ -21,9 +21,21 @@ struct ContentView: View {
     let openMain: (MainTab) -> Void
     @State private var showLink = false
 
+    // Nothing but the idle list gets the separate "Today" header: every other state carries
+    // its own icon, title and Tasks/Settings inside its own card (see statusCard).
+    private var showsDayHeader: Bool {
+        model.freeTimeEnd == nil && model.session == nil && !Setup.isPending
+            && model.phase.awaySince == nil && !Settings.current.isNight(at: model.now)
+    }
+
+    // Every state but the idle list is a single full-width card and nothing else: matching
+    // the panel's own background to the card's removes the seam between them, instead of a
+    // white card floating on a visibly different grey behind it.
+    private var showsSingleCard: Bool { !showsDayHeader }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            header
+            if showsDayHeader { header }
             if let end = model.freeTimeEnd {
                 freeTimeCard(end)
             } else if let s = model.session, let cur = s.current(at: model.now) {
@@ -50,7 +62,7 @@ struct ContentView: View {
         }
         .padding(16)
         .frame(width: 360)
-        .background(model.session == nil ? Theme.bg : Theme.card)
+        .background(showsSingleCard ? Theme.card : Theme.bg)
         .environment(\.colorScheme, .light)
         .animation(.snappy(duration: 0.2), value: model.session == nil)
         .animation(.snappy(duration: 0.2), value: model.freeTimeEnd == nil)
@@ -59,37 +71,44 @@ struct ContentView: View {
 
     // MARK: header
 
-    // Same row in every state: a title on the left (the running activity, or "Today"/"Night"),
-    // Tasks and Settings as icon buttons on the right — so the panel looks the same whether
-    // something is running or not.
+    // Only before the idle list: "Today" + date, and the day in three tags. Every other state
+    // carries its own icon, title and these same Tasks/Settings buttons inside its own card.
     private var header: some View {
         let sessions = model.recordsSince(Calendar.current.startOfDay(for: model.now)).count
-        let running = model.session.map { s in (s.planned ?? s.block.replacingOccurrences(of: "_", with: " "), ActivityStyle.of(s.planned ?? s.block).icon) }
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 10) {
-                if let (name, icon) = running {
-                    Image(systemName: icon).font(.system(size: 18, weight: .medium)).foregroundStyle(ActivityStyle.of(name).color)
-                    Text(name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
-                } else {
-                    Text(Settings.current.isNight(at: model.now) ? "Night" : "Today")
-                        .font(Theme.title).foregroundStyle(Theme.text)
-                    Text(Fmt.dayTitle.string(from: model.now)).font(.system(size: 13)).foregroundStyle(Theme.text2)
-                }
+                Text("Today").font(Theme.title).foregroundStyle(Theme.text)
+                Text(Fmt.dayTitle.string(from: model.now)).font(.system(size: 13)).foregroundStyle(Theme.text2)
                 Spacer()
-                if !Setup.isPending && Settings.current.has(.tasks) { headerIcon("checklist", "Today's tasks") { openMain(.tasks) } }
+                headerIcon("checklist", "Today's tasks") { openMain(.tasks) }
                 headerIcon("gearshape", "Settings") { openMain(.activities) }
             }
-            if running == nil {
-                HStack(spacing: 6) {
-                    Tag(text: "⏱ \(formatDuration(model.focusedToday))", color: Theme.accent, fill: Theme.accentTint)
-                    Tag(text: "\(sessions) sessions")
-                    if Settings.current.has(.guidance) && Settings.current.dailyFreeMinutes > 0 {
-                        Tag(
-                            text: "🍿 \(model.freeLeft / 60)m", color: model.freeLeft > 0 ? Theme.text2 : Theme.red,
-                            fill: model.freeLeft > 0 ? Theme.pill : Theme.redTint)
-                    }
+            HStack(spacing: 6) {
+                Tag(text: "⏱ \(formatDuration(model.focusedToday))", color: Theme.accent, fill: Theme.accentTint)
+                Tag(text: "\(sessions) sessions")
+                if Settings.current.has(.guidance) && Settings.current.dailyFreeMinutes > 0 {
+                    Tag(
+                        text: "🍿 \(model.freeLeft / 60)m", color: model.freeLeft > 0 ? Theme.text2 : Theme.red,
+                        fill: model.freeLeft > 0 ? Theme.pill : Theme.redTint)
                 }
             }
+        }
+    }
+
+    // Icon+title row shared by every card (session, free time, away, night): the activity or
+    // state's icon and name on the left, Tasks and Settings on the right. `icon` is an SF
+    // Symbol name, except 🍿 (no matching symbol), passed through as a literal emoji.
+    private func cardHeader(_ icon: String, _ color: Color, _ title: String) -> some View {
+        HStack(spacing: 10) {
+            if icon == "🍿" {
+                Text(icon).font(.system(size: 18))
+            } else {
+                Image(systemName: icon).font(.system(size: 18, weight: .medium)).foregroundStyle(color)
+            }
+            Text(title).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+            Spacer()
+            if !Setup.isPending && Settings.current.has(.tasks) { headerIcon("checklist", "Today's tasks") { openMain(.tasks) } }
+            headerIcon("gearshape", "Settings") { openMain(.activities) }
         }
     }
 
@@ -135,9 +154,9 @@ struct ContentView: View {
 
     // MARK: session
 
-    // During a session only what matters, compact: what you're doing and the time left on one
-    // line, today's progress on this activity as a bar, and Step away as the main button
-    // (you often need it).
+    // The template every "something is happening, here's a timer and one action" card follows:
+    // icon+title+Tasks/Settings, a big countdown, an "ends at"-style subtitle, a progress bar,
+    // a summary line, and one pill button — only those pieces change between states.
     private func sessionCard(_ s: Session, _ cur: (index: Int, end: Date)) -> some View {
         let p = s.phases[cur.index]
         let name = s.planned ?? s.block.replacingOccurrences(of: "_", with: " ")
@@ -147,27 +166,23 @@ struct ContentView: View {
         let progress = total > 0 ? 1 - left / total : 1
         let f = Fmt.clock
         let color = p.isBreak ? Color.green : st.color
+        let roundLabel = s.workRounds > 1 || p.isBreak ? (p.isBreak ? "Break" : "Focus · round \(s.round(of: cur.index))/\(s.workRounds)") : nil
+        let endsLabel = s.workRounds > 1 || p.isBreak
+            ? "\(p.isBreak ? "Break" : "Focus") ends \(f.string(from: cur.end)) · session ends \(f.string(from: s.end))"
+            : "ends at \(f.string(from: s.end))"
 
-        return VStack(spacing: 20) {
+        return VStack(spacing: 16) {
+            cardHeader(p.isBreak ? "cup.and.saucer.fill" : st.icon, color, name)
             Button {
                 if Settings.current.has(.tasks) { openMain(.tasks) }
             } label: {
                 VStack(spacing: 6) {
-                    if s.workRounds > 1 || p.isBreak {
-                        Text(p.isBreak ? "Break" : "Focus · round \(s.round(of: cur.index))/\(s.workRounds)")
-                            .font(.system(size: 12, weight: .medium)).foregroundStyle(color)
-                    }
+                    if let roundLabel { Text(roundLabel).font(.system(size: 12, weight: .medium)).foregroundStyle(color) }
                     Text(countdown(to: cur.end, from: model.now))
                         .font(.system(size: 48, weight: .medium, design: .rounded)).monospacedDigit()
                         .foregroundStyle(Theme.text)
                         .contentTransition(.numericText(countsDown: true))
-                    Text(
-                        s.workRounds > 1 || p.isBreak
-                            ? "\(p.isBreak ? "Break" : "Focus") ends \(f.string(from: cur.end)) · session ends \(f.string(from: s.end))"
-                            : "ends at \(f.string(from: s.end))"
-                    )
-                    .font(.system(size: 12)).foregroundStyle(Theme.text2)
-                    .multilineTextAlignment(.center)
+                    Text(endsLabel).font(.system(size: 12)).foregroundStyle(Theme.text2).multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
@@ -183,24 +198,21 @@ struct ContentView: View {
                 dailySummary(name)
             }
 
-            VStack(spacing: 10) {
-                if Settings.current.has(.away) {
-                    Button {
-                        model.stepAway()
-                    } label: {
-                        Label("Step away", systemImage: "figure.walk")
-                            .font(.system(size: 13, weight: .semibold))
-                            .padding(.horizontal, 24).padding(.vertical, 10)
-                            .pill(selected: true)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Locks the screen and pauses the timer. ⌃⌥⌘L")
+            if Settings.current.has(.away) {
+                Button {
+                    model.stepAway()
+                } label: {
+                    Label("Step away", systemImage: "figure.walk")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(maxWidth: .infinity).padding(.vertical, 10)
+                        .pill(selected: true)
                 }
-
+                .buttonStyle(.plain)
+                .help("Locks the screen and pauses the timer. ⌃⌥⌘L")
             }
-            .frame(maxWidth: .infinity)
         }
-        .padding(8)
+        .padding(16)
+        .flatCard()
     }
 
     private func bar(_ fraction: Double, _ color: Color, height: CGFloat) -> some View {
@@ -226,91 +238,77 @@ struct ContentView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    // MARK: free time
+    // MARK: shared status card
+    //
+    // Same template as sessionCard, for every "nothing to pick, just wait or confirm" state
+    // (free time, away, night, first-run setup): icon+title+Tasks/Settings, a big countdown,
+    // a subtitle, and one pill button. Only those pieces change between states.
+    private func statusCard(
+        _ icon: String, _ color: Color, _ title: String, _ subtitle: String,
+        readout: String, buttonTitle: String? = nil, action: (() -> Void)? = nil
+    ) -> some View {
+        VStack(spacing: 16) {
+            cardHeader(icon, color, title)
+            VStack(spacing: 6) {
+                Text(readout)
+                    .font(.system(size: 48, weight: .medium, design: .rounded)).monospacedDigit()
+                    .foregroundStyle(Theme.text)
+                    .contentTransition(.numericText(countsDown: true))
+                Text(subtitle).font(.system(size: 12)).foregroundStyle(Theme.text2).multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
+            if let buttonTitle, let action {
+                Button(action: action) {
+                    Text(buttonTitle).font(.system(size: 13, weight: .semibold))
+                        .frame(maxWidth: .infinity).padding(.vertical, 10)
+                        .pill(selected: true)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(16)
+        .flatCard()
+    }
+
+    // MARK: free time, away, night, setup
 
     // Only seen if the screen didn't lock: then "I'm back" is right here.
     private func awayCard(_ since: Date) -> some View {
-        VStack(spacing: 10) {
-            Image(systemName: "figure.walk").font(.system(size: 30)).foregroundStyle(Theme.accent)
-            Text("Away since \(Fmt.clock.string(from: since))").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
-            if let until = model.stepAwayUntil, until > model.now {
-                Text("At least \(minutesLabel(Int(until.timeIntervalSince(model.now)) / 60 + 1)) left").font(.system(size: 12)).foregroundStyle(Theme.text2)
-            } else {
-                Text("The timer is paused and your tasks keep running.").font(.system(size: 12)).foregroundStyle(Theme.text2)
-            }
-            Button("I'm back") { model.comeBack() }.controlSize(.large)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
-        .card(radius: 18)
+        let subtitle = model.stepAwayUntil.flatMap { $0 > model.now ? "At least \(minutesLabel(Int($0.timeIntervalSince(model.now)) / 60 + 1)) left" : nil }
+            ?? "Your tasks keep running"
+        return statusCard(
+            "figure.walk", Theme.accent, "Away", subtitle,
+            readout: Fmt.clock.string(from: since),
+            buttonTitle: "I'm back", action: model.comeBack
+        )
     }
 
     private func freeTimeCard(_ until: Date) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                Text("🍿").font(.system(size: 24))
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Free time").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
-                    Text("Nothing blocked · \(model.freeLeft / 60)m left today").font(.system(size: 12)).foregroundStyle(Theme.text2)
-                }
-                Spacer()
-            }
-            Text(countdown(to: until, from: model.now))
-                .font(.system(size: 52, weight: .semibold)).monospacedDigit()
-                .foregroundStyle(Theme.text)
-                .contentTransition(.numericText(countsDown: true))
-                .frame(maxWidth: .infinity)
-            Button {
-                model.endRest()
-            } label: {
-                Text("Back to work").font(.system(size: 13, weight: .semibold))
-                    .frame(maxWidth: .infinity).padding(.vertical, 9)
-                    .pill(selected: true)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(16)
-        .card(radius: 16)
+        statusCard(
+            "🍿", Theme.accent, "Free time", "Nothing blocked · \(model.freeLeft / 60)m left today",
+            readout: countdown(to: until, from: model.now),
+            buttonTitle: "Back to work", action: model.endRest
+        )
     }
 
     // MARK: first-run setup
 
     // Nothing can start before setup: the panel only leads to Get started.
     private var setupCard: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 30))
-                .foregroundStyle(Theme.accent)
-            Text("Let's set you up").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
-            Text("Choose an activity and a duration. Add optional tools later.")
-                .font(.system(size: 12)).foregroundStyle(Theme.text2).multilineTextAlignment(.center)
-            Button {
-                openMain(.setup)
-            } label: {
-                Text("Get started").font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
-                    .padding(.horizontal, 18).padding(.vertical, 8)
-                    .background(Capsule().fill(Theme.accent))
-            }
-            .buttonStyle(.plain)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(20)
-        .card(radius: 16)
+        statusCard(
+            "sparkles", Theme.accent, "Let's set you up", "Choose an activity and a duration. Add optional tools later.",
+            readout: "👋",
+            buttonTitle: "Get started", action: { openMain(.setup) }
+        )
     }
 
     // MARK: night
 
     private var nightCard: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "moon.stars.fill")
-                .font(.system(size: 34))
-                .foregroundStyle(.purple)
-            Text("Time to sleep").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
-            Text("Night mode is on until \(clockLabel(Settings.current.nightTo)). Nothing to do until morning.")
-                .font(.system(size: 12)).foregroundStyle(Theme.text2).multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(20)
-        .card(radius: 16)
+        statusCard(
+            "moon.stars.fill", .purple, "Time to sleep", "Nothing to do until morning",
+            readout: clockLabel(Settings.current.nightTo)
+        )
     }
 }
