@@ -20,6 +20,8 @@ struct StoredState: Codable, Equatable {
     var pickingSince: Date?            // when "What's next?" opened, for auto-start
     var round: Round?                  // today's limits started over (see roundIsUsedUp)
     var activeSince: Date?             // continuously present since; nil when away or not present
+    var catchUpDebts: [CatchUpDebt] = []  // missed important-activity windows, owed or settled (see CatchUp.swift)
+    var stepAwayUntil: Date?           // set only by a manual Step away with a minimum; re-locks early returns
 }
 
 // Limits count sessions from `since` on, on `day` only.

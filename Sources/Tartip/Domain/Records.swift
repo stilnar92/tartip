@@ -22,6 +22,7 @@ struct SessionRecord: Codable, Equatable {
     var ended: String?              // "done", "stopped" (the block stays on), "away" (gone too long) or "forcedBreak"
     var auto: Bool?                 // started by itself after "What's next?" went unanswered
     var pickSeconds: Int?           // from "What's next?" opening to the start
+    var settles: UUID?              // a CatchUpDebt.id this session was started to pay off, if any
 
     var seconds: Int { max(0, Int(end.timeIntervalSince(start))) }
     // History uses whole-second ISO dates; persisted state retains fractions.

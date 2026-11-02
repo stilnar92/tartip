@@ -23,7 +23,7 @@ struct ContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if model.session == nil { header }
+            header
             if let end = model.freeTimeEnd {
                 freeTimeCard(end)
             } else if let s = model.session, let cur = s.current(at: model.now) {
@@ -43,7 +43,6 @@ struct ContentView: View {
                     .font(.system(size: 12)).foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if !Setup.isPending && model.session == nil { toolbar }
             if !Settings.current.has(.relaunch) {
                 Button("Quit Tartip") { NSApplication.shared.terminate(nil) }
                     .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.text2)
@@ -60,40 +59,49 @@ struct ContentView: View {
 
     // MARK: header
 
-    // "Today" + date, then the day in three tags.
+    // Same row in every state: a title on the left (the running activity, or "Today"/"Night"),
+    // Tasks and Settings as icon buttons on the right — so the panel looks the same whether
+    // something is running or not.
     private var header: some View {
         let sessions = model.recordsSince(Calendar.current.startOfDay(for: model.now)).count
+        let running = model.session.map { s in (s.planned ?? s.block.replacingOccurrences(of: "_", with: " "), ActivityStyle.of(s.planned ?? s.block).icon) }
         return VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(Settings.current.isNight(at: model.now) ? "Night" : "Today")
-                    .font(Theme.title).foregroundStyle(Theme.text)
-                Text(Fmt.dayTitle.string(from: model.now)).font(.system(size: 13)).foregroundStyle(Theme.text2)
+            HStack(alignment: .center, spacing: 10) {
+                if let (name, icon) = running {
+                    Image(systemName: icon).font(.system(size: 18, weight: .medium)).foregroundStyle(ActivityStyle.of(name).color)
+                    Text(name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                } else {
+                    Text(Settings.current.isNight(at: model.now) ? "Night" : "Today")
+                        .font(Theme.title).foregroundStyle(Theme.text)
+                    Text(Fmt.dayTitle.string(from: model.now)).font(.system(size: 13)).foregroundStyle(Theme.text2)
+                }
                 Spacer()
-                if !Setup.isPending && Settings.current.has(.tasks) {
-                    Button {
-                        openMain(.tasks)
-                    } label: {
-                        Label("Tasks", systemImage: "checklist")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Theme.text2)
-                            .padding(.vertical, 4)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("Open today's task plan")
-                }
+                if !Setup.isPending && Settings.current.has(.tasks) { headerIcon("checklist", "Today's tasks") { openMain(.tasks) } }
+                headerIcon("gearshape", "Settings") { openMain(.activities) }
             }
-            HStack(spacing: 6) {
-                Tag(text: "⏱ \(formatDuration(model.focusedToday))", color: Theme.accent, fill: Theme.accentTint)
-                Tag(text: "\(sessions) sessions")
-                if Settings.current.has(.guidance) && Settings.current.dailyFreeMinutes > 0 {
-                    Tag(
-                        text: "🍿 \(model.freeLeft / 60)m", color: model.freeLeft > 0 ? Theme.text2 : Theme.red,
-                        fill: model.freeLeft > 0 ? Theme.pill : Theme.redTint)
+            if running == nil {
+                HStack(spacing: 6) {
+                    Tag(text: "⏱ \(formatDuration(model.focusedToday))", color: Theme.accent, fill: Theme.accentTint)
+                    Tag(text: "\(sessions) sessions")
+                    if Settings.current.has(.guidance) && Settings.current.dailyFreeMinutes > 0 {
+                        Tag(
+                            text: "🍿 \(model.freeLeft / 60)m", color: model.freeLeft > 0 ? Theme.text2 : Theme.red,
+                            fill: model.freeLeft > 0 ? Theme.pill : Theme.redTint)
+                    }
                 }
-
             }
         }
+    }
+
+    private func headerIcon(_ icon: String, _ help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 16)).foregroundStyle(Theme.text2)
+                .frame(width: 32, height: 32).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(help)
+        .help(help)
     }
 
     // MARK: idle extras
@@ -124,26 +132,6 @@ struct ContentView: View {
         }
     }
 
-    // Floating white pill with icon buttons, like Craft's toolbar.
-    private var toolbar: some View {
-        HStack(spacing: 2) {
-            tool("gearshape", "Settings") { openMain(.activities) }
-        }
-        .padding(4)
-        .background(Capsule().fill(Theme.card).shadow(color: .black.opacity(0.08), radius: 8, y: 2))
-        .frame(maxWidth: .infinity)
-    }
-
-    private func tool(_ icon: String, _ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: icon)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Theme.text)
-                .padding(.horizontal, 7).padding(.vertical, 7)
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-    }
 
     // MARK: session
 
@@ -161,36 +149,6 @@ struct ContentView: View {
         let color = p.isBreak ? Color.green : st.color
 
         return VStack(spacing: 20) {
-            HStack(spacing: 10) {
-                Image(systemName: p.isBreak ? "cup.and.saucer.fill" : st.icon)
-                    .font(.system(size: 18, weight: .medium)).foregroundStyle(color)
-                Text(name)
-                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
-                    .lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
-                if Settings.current.has(.tasks) {
-                    Button {
-                        openMain(.tasks)
-                    } label: {
-                        Image(systemName: "checklist")
-                            .font(.system(size: 16)).foregroundStyle(Theme.text2)
-                            .frame(width: 32, height: 32).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Today's tasks")
-                    .help("Today's tasks")
-                }
-                Button {
-                    openMain(.activities)
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 16)).foregroundStyle(Theme.text2)
-                        .frame(width: 32, height: 32).contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Settings")
-                .help("Settings")
-            }
-
             Button {
                 if Settings.current.has(.tasks) { openMain(.tasks) }
             } label: {
@@ -275,7 +233,11 @@ struct ContentView: View {
         VStack(spacing: 10) {
             Image(systemName: "figure.walk").font(.system(size: 30)).foregroundStyle(Theme.accent)
             Text("Away since \(Fmt.clock.string(from: since))").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
-            Text("The timer is paused and your tasks keep running.").font(.system(size: 12)).foregroundStyle(Theme.text2)
+            if let until = model.stepAwayUntil, until > model.now {
+                Text("At least \(minutesLabel(Int(until.timeIntervalSince(model.now)) / 60 + 1)) left").font(.system(size: 12)).foregroundStyle(Theme.text2)
+            } else {
+                Text("The timer is paused and your tasks keep running.").font(.system(size: 12)).foregroundStyle(Theme.text2)
+            }
             Button("I'm back") { model.comeBack() }.controlSize(.large)
         }
         .frame(maxWidth: .infinity)

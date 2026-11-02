@@ -108,6 +108,20 @@ struct SettingsView: View {
                         }
                         .padding(.top, 4)
                     }
+                    if feature == .away && settings.value.has(.away) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            row("Minimum length") {
+                                HStack(spacing: 6) {
+                                    Text(settings.value.stepAwayMinutes == 0 ? "none" : "\(settings.value.stepAwayMinutes) min").monospacedDigit()
+                                    Stepper("", value: $settings.value.stepAwayMinutes, in: 0...120, step: 5).labelsHidden()
+                                }
+                            }
+                            Text("Unlocking sooner locks it again until this much time has actually passed.")
+                                .font(.system(size: 11)).foregroundStyle(.secondary)
+                            row("Ends a paused session after") { minuteStepper($settings.value.maxAwayMinutes, 5...240, step: 5) }
+                        }
+                        .padding(.top, 4)
+                    }
                 }
             }
         }
@@ -205,6 +219,15 @@ struct SettingsView: View {
                         if item.fromMinute != nil && item.toMinute != nil {
                             row("Can be picked from") { clockStepper(Binding(get: { a.wrappedValue.fromMinute ?? 720 }, set: { a.wrappedValue.fromMinute = $0 })) }
                             row("Until") { clockStepper(Binding(get: { a.wrappedValue.toMinute ?? 1200 }, set: { a.wrappedValue.toMinute = $0 })) }
+                            if settings.value.has(.catchUp) {
+                                row("Catch-up if missed") {
+                                    HStack(spacing: 6) {
+                                        Text(item.catchUpMinutes == 0 ? "off" : "\(item.catchUpMinutes) min").monospacedDigit()
+                                        Stepper("", value: a.catchUpMinutes, in: 0...120, step: 5).labelsHidden().controlSize(.small)
+                                    }
+                                }
+                                .help("If these hours close with none of it done, the next pick is forced to this many minutes of it.")
+                            }
                         }
                         Divider()
                     }

@@ -14,6 +14,7 @@ struct TodayList: View {
     var body: some View {
         let limits = model.limits
         return VStack(alignment: .leading, spacing: 12) {
+            if Settings.current.has(.scheduling) { catchUpBanner(limits) }
             lengthBar
             let names = model.todayActivities
             if names.isEmpty && !model.activities.isEmpty {
@@ -120,7 +121,13 @@ struct TodayList: View {
         let left = limits.secondsLeftToday(a)
         let done = left == 0
         let closed = limits.opensLabel(a)
-        let canStart = !done && closed == nil && model.phase.canStart
+        // A debt owed by a different activity forces it: everything else is disabled here too,
+        // not just at the actual start (startActivity already refuses it regardless).
+        let owedElsewhere = limits.owedDebt.map { $0.activity != a } ?? false
+        let owedHere = limits.owedDebt?.activity == a
+        // A debt overrides the activity's own limit/hours (same rule as Limits.canStart):
+        // the catch-up is owed regardless of whether today's budget or window would allow it.
+        let canStart = owedHere || (!done && closed == nil && model.phase.canStart && !owedElsewhere)
         let hover = hovered == a && canStart
         return Button {
             tryStart(a)
@@ -140,7 +147,15 @@ struct TodayList: View {
                     .strikethrough(done, color: Theme.text2)
                     .lineLimit(1)
                 Spacer(minLength: 6)
-                if hover || (!Settings.current.has(.scheduling) && canStart) {
+                if owedHere {
+                    Label("Catch-up \(formatDuration((limits.owedDebt?.catchUpMinutes ?? 0) * 60))", systemImage: "exclamationmark.circle.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 9).padding(.vertical, 4)
+                        .background(Capsule().fill(Theme.red))
+                } else if owedElsewhere {
+                    Tag(text: "do \(limits.owedDebt?.activity ?? "") first")
+                } else if hover || (!Settings.current.has(.scheduling) && canStart) {
                     Label(
                         "Start \(formatDuration(limits.sessionSeconds(a, requested: (model.pomodoro ? Settings.current.pomodoroPhases().reduce(0) { $0 + $1.minutes } : max(Settings.current.minMinutes, model.minutes)) * 60)))",
                         systemImage: "play.fill"
@@ -164,12 +179,32 @@ struct TodayList: View {
         .buttonStyle(.plain)
         .disabled(!canStart)
         .onHover { hovered = $0 ? a : (hovered == a ? nil : hovered) }
-        // Right-click: start with a specific length.
+        // Right-click: start with a specific length. Not while owed: the catch-up length is fixed.
         .contextMenu {
-            ForEach(Settings.current.sessionLengths, id: \.self) { n in
-                Button("Start for \(formatDuration(limits.sessionSeconds(a, requested: n * 60)))") { tryStart(a, minutes: n, pomodoro: false) }
+            if !owedHere {
+                ForEach(Settings.current.sessionLengths, id: \.self) { n in
+                    Button("Start for \(formatDuration(limits.sessionSeconds(a, requested: n * 60)))") { tryStart(a, minutes: n, pomodoro: false) }
+                }
+                if Settings.current.has(.pomodoro) { Button("Start Pomodoro") { tryStart(a, pomodoro: true) } }
             }
-            if Settings.current.has(.pomodoro) { Button("Start Pomodoro") { tryStart(a, pomodoro: true) } }
+        }
+    }
+
+    // A clearer heads-up than the row tags alone: the forced activity, plus how many more
+    // are queued behind it (they only become owed, and visible as their own forced row, once
+    // this one is settled).
+    @ViewBuilder private func catchUpBanner(_ limits: Limits) -> some View {
+        if let debt = limits.owedDebt {
+            let queued = limits.debts.filter { $0.settledAt == nil && !$0.expired && $0.id != debt.id }.count
+            Label(
+                "Catch-up owed: \(debt.activity)" + (queued > 0 ? " (+\(queued) more queued)" : ""),
+                systemImage: "exclamationmark.triangle.fill"
+            )
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(Theme.red)
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.redTint))
         }
     }
 

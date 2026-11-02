@@ -5,15 +5,20 @@ struct Limits {
     let settings: AppSettings
     let now: Date
     let calendar: Calendar
+    let debts: [CatchUpDebt]
     private let used: [String: Int]
 
     // today: today's part of every session, the running one included.
-    init(settings: AppSettings, today: [SessionRecord], now: Date, calendar: Calendar = .current) {
+    init(settings: AppSettings, today: [SessionRecord], now: Date, calendar: Calendar = .current, debts: [CatchUpDebt] = []) {
         self.settings = settings
         self.now = now
         self.calendar = calendar
+        self.debts = debts
         used = secondsByActivity(today)
     }
+
+    // The oldest unsettled catch-up owed right now, if any; see CatchUp.swift.
+    var owedDebt: CatchUpDebt? { settings.has(.catchUp) ? Tartip.owedDebt(debts, order: settings.activities.map(\.name)) : nil }
 
     func usedToday(_ activity: String) -> Int { used[activity] ?? 0 }
 
@@ -52,7 +57,12 @@ struct Limits {
     // Planned for today's weekday (activities without days are planned every day).
     func isToday(_ activity: String) -> Bool { !settings.has(.scheduling) || (setting(activity)?.isPlanned(on: now, calendar: calendar) ?? true) }
 
-    func canStart(_ activity: String) -> Bool { isToday(activity) && isOpen(activity) && hasTimeLeft(activity) }
+    // A debt owed by an activity still in the list forces it as the only choice. One deleted
+    // from Settings since is orphaned (moot, not settled): fall through to the normal rule.
+    func canStart(_ activity: String) -> Bool {
+        if let debt = owedDebt, settings.activity(named: debt.activity) != nil { return activity == debt.activity }
+        return isToday(activity) && isOpen(activity) && hasTimeLeft(activity)
+    }
 
     // Time for a new round: no work can start now, but some that's planned and open is used up.
     // Never at night, when nothing is asked anyway.

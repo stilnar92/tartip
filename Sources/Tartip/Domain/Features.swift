@@ -4,7 +4,7 @@ import Foundation
 // old capabilities; fresh installs explicitly persist an empty selection.
 enum Feature: String, Codable, CaseIterable, Identifiable {
     case blocking, workspace, tasks, pomodoro, scheduling, review, guidance, night
-    case settingsLock, statistics, login, relaunch, notifications, away, forcedBreak
+    case settingsLock, statistics, login, relaunch, notifications, away, forcedBreak, catchUp
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -23,6 +23,7 @@ enum Feature: String, Codable, CaseIterable, Identifiable {
         case .notifications: "Notifications"
         case .away: "Step away"
         case .forcedBreak: "Forced breaks"
+        case .catchUp: "Catch-up on missed activities"
         }
     }
     var detail: String {
@@ -42,6 +43,7 @@ enum Feature: String, Codable, CaseIterable, Identifiable {
         case .notifications: "Play sounds and show session notifications."
         case .away: "Lock the screen and keep the Mac awake while away."
         case .forcedBreak: "End the session and require a step away after a long stretch at the computer, with no way to skip it."
+        case .catchUp: "If an important activity's hours close with none of it done, force a short catch-up session for it before anything else. Set its catch-up length in Activities → Edit."
         }
     }
 }
@@ -59,8 +61,9 @@ struct Features: Codable, Equatable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(enabled.map(\.rawValue).sorted(), forKey: .enabled)
     }
-    // Forced breaks are disruptive and opt-in only: new, not something a legacy install wakes up with.
-    static let legacy = Features(enabled: Set(Feature.allCases).subtracting([.forcedBreak]))
+    // Forced breaks and catch-up are disruptive and opt-in only: new, not something a legacy
+    // install wakes up with.
+    static let legacy = Features(enabled: Set(Feature.allCases).subtracting([.forcedBreak, .catchUp]))
     func contains(_ feature: Feature) -> Bool {
         enabled.contains(feature) && (feature != .relaunch || enabled.contains(.login))
     }

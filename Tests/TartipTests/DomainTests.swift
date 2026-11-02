@@ -133,6 +133,13 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(!AppSettings.fresh.has(.forcedBreak))
     }
 
+    // Old settings files never had stepAwayMinutes: they must load with 0 (no minimum),
+    // matching Step away's behavior before this setting existed.
+    @Test func stepAwayMinutesDefaultsToNoMinimum() throws {
+        let s = try #require(AppSettings.merged(over: Data(#"{"dailyFreeMinutes": 90}"#.utf8)))
+        #expect(s.stepAwayMinutes == 0)
+    }
+
     @Test func modeConfigWithoutKeys() throws {
         let c = try JSONDecoder().decode(ModeConfig.self, from: Data("{}".utf8))
         #expect(c == ModeConfig())
@@ -225,6 +232,14 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         let old = try JSONDecoder().decode(StoredState.self, from: JSONEncoder().encode(s))   // saved before activeSince
         #expect(old.activeSince == nil)
         s.activeSince = at(9)
+        #expect(try JSONDecoder().decode(StoredState.self, from: JSONEncoder().encode(s)) == s)
+    }
+
+    @Test func stepAwayUntilSurvivesAndOldStateLoadsWithout() throws {
+        var s = StoredState()
+        let old = try JSONDecoder().decode(StoredState.self, from: JSONEncoder().encode(s))   // saved before stepAwayUntil
+        #expect(old.stepAwayUntil == nil)
+        s.stepAwayUntil = at(9, 35)
         #expect(try JSONDecoder().decode(StoredState.self, from: JSONEncoder().encode(s)) == s)
     }
 

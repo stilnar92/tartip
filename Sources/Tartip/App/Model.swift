@@ -92,6 +92,7 @@ final class Model: ObservableObject {
     var session: Session? { phase.session }
     var review: SessionRecord? { phase.review }
     var freeTimeEnd: Date? { phase.freeTimeEnd }
+    var stepAwayUntil: Date? { state.stepAwayUntil }
     var restTaken: Bool { state.restTaken }
     var activities: [String] { Settings.current.activities.map(\.name).filter { !$0.isEmpty } }
     // The ones planned for today's weekday: what the Today list and "What's next?" offer.
@@ -130,7 +131,7 @@ final class Model: ObservableObject {
     }
 
     var limits: Limits {
-        Limits(settings: Settings.current, today: recordsSince(roundStart), now: now)
+        Limits(settings: Settings.current, today: recordsSince(roundStart), now: now, debts: state.catchUpDebts)
     }
 
     // Today's round: 1 until the limits first start over.
@@ -191,6 +192,29 @@ final class Model: ObservableObject {
         state.round = Round(day: dayKey(now), number: roundNumber + 1, since: now)
         log("round \(roundNumber): limits start over")
         record(Event(t: now, type: "round", number: roundNumber))
+    }
+
+    // Missed windows (today's and yesterday's) become debts, exactly once each (dedup by
+    // activity+day+windowEnd), so this is safe to call redundantly from init and every tick —
+    // including the first tick after a relaunch, which is what catches a window that closed
+    // while the app wasn't running at all. Debts past their one day of grace are force-expired.
+    private func recomputeDebts() {
+        let horizon = Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now
+        let missed = missedWindows(Settings.current, records: recordsSince(horizon), now: now)
+        for m in missed {
+            let known = state.catchUpDebts.contains { $0.activity == m.activity && $0.day == m.day && $0.windowEnd == m.windowEnd }
+            guard !known, let minutes = Settings.current.activity(named: m.activity)?.catchUpMinutes, minutes > 0 else { continue }
+            state.catchUpDebts.append(CatchUpDebt(activity: m.activity, day: m.day, windowEnd: m.windowEnd, catchUpMinutes: minutes))
+            log("catchup owed: \(m.activity) (missed \(m.day))")
+        }
+        let today = dayKey(now)
+        let yesterday = dayKey(horizon)
+        for i in state.catchUpDebts.indices {
+            let d = state.catchUpDebts[i]
+            guard d.settledAt == nil, !d.expired, d.day != today, d.day != yesterday else { continue }
+            state.catchUpDebts[i].expired = true
+            log("catchup expired: \(d.activity) (missed \(d.day))")
+        }
     }
 
     // Time in sessions today, by the clock, counting the running one.
@@ -256,8 +280,14 @@ final class Model: ObservableObject {
     // MARK: sessions
 
     // One click on a row in the Today list: start it now with the chosen length (or Pomodoro).
+    // A debt owed by this activity overrides the chosen length: catch-up sessions are always
+    // its fixed, short catchUpMinutes, never the full original window.
     func startActivity(_ activity: String, minutes chosen: Int? = nil, pomodoro usePomodoro: Bool? = nil) {
         guard !Setup.isPending, !Settings.current.isNight(at: now), activities.contains(activity), phase.canStart, limits.canStart(activity) else { return }
+        if let debt = limits.owedDebt, debt.activity == activity {
+            startNow(activity, phases: [Phase(isBreak: false, minutes: debt.catchUpMinutes)], settles: debt.id)
+            return
+        }
         if let chosen { minutes = chosen }
         if let usePomodoro { pomodoro = usePomodoro }
         if minutes < Settings.current.minMinutes { minutes = Settings.current.minMinutes }
@@ -271,22 +301,28 @@ final class Model: ObservableObject {
     }
     var autoStartActivity: String? { limits.autoPick(from: todayActivities) }
 
-    // "What's next?" went unanswered: start an activity for the auto-start length.
-    // The length chosen in the panel isn't changed.
+    // "What's next?" went unanswered: start an activity for the auto-start length, or (if one
+    // is owed) a debt's own fixed catch-up length — autoPick already restricts the choice to
+    // the owed activity via Limits.canStart, so only the length needs the debt check here.
     private func autoStart() {
         guard let activity = autoStartActivity else { return }
         log("auto  \(activity) after \(Settings.current.autoStartAfterMinutes)m unanswered")
+        if let debt = limits.owedDebt, debt.activity == activity {
+            startNow(activity, phases: [Phase(isBreak: false, minutes: debt.catchUpMinutes)], auto: true, settles: debt.id)
+            return
+        }
         startNow(activity, phases: [Phase(isBreak: false, minutes: max(Settings.current.minMinutes, Settings.current.autoStartMinutes))],
                  auto: true)
     }
 
-    private func startNow(_ activity: String, phases: [Phase], auto: Bool = false) {
+    private func startNow(_ activity: String, phases: [Phase], auto: Bool = false, settles: UUID? = nil) {
         let extra = Settings.current.has(.workspace) ? oneTimeLink.trimmingCharacters(in: .whitespaces) : ""
         oneTimeLink = ""
         var s = Session(block: Settings.current.block(for: activity), phases: phases, start: Date(), planned: activity)
         s.policy = SessionPolicy(settings: Settings.current)
         s.maxDurationSeconds = limits.sessionSeconds(activity, requested: s.totalMinutes * 60)
         s.auto = auto ? true : nil
+        s.settles = settles
         s.pickSeconds = pickSeconds
         start(s, extraURLs: extra.isEmpty ? [] : [extra])
     }
@@ -368,6 +404,12 @@ final class Model: ObservableObject {
         let completed = dailyTasks.complete(day: dayKey(r.began ?? r.start), activities: Settings.current.activities,
                                             actual: actual, selected: Settings.current.has(.tasks) ? selectedTasks : [], otherWork: Settings.current.has(.tasks) ? otherWork : [:])
         r.completedTasks = completed.isEmpty ? nil : completed
+        // Only a session started specifically to pay this debt settles it (stamped in startNow):
+        // logging time for the activity some other, coincidental way never clears it.
+        if let id = r.settles, let i = state.catchUpDebts.firstIndex(where: { $0.id == id }) {
+            state.catchUpDebts[i].settledAt = now
+            log("catchup done: \(state.catchUpDebts[i].activity)")
+        }
         state.pendingRecords = (state.pendingRecords ?? []) + [r]
         state.phase = .idle
         flushPendingRecords()
@@ -376,9 +418,11 @@ final class Model: ObservableObject {
 
     // MARK: away from the computer (no length: until you're back)
 
-    // "Step away": the screen locks, the Mac keeps running, a session pauses. Unlocking ends it.
+    // "Step away": the screen locks, the Mac keeps running, a session pauses. Unlocking ends it,
+    // unless a minimum is set: then an early return just re-locks until it's actually elapsed.
     func stepAway() {
         guard Settings.current.has(.away) else { return }
+        if Settings.current.stepAwayMinutes > 0 { state.stepAwayUntil = now.addingTimeInterval(Double(Settings.current.stepAwayMinutes * 60)) }
         wentAway(lock: true)
     }
 
@@ -408,6 +452,12 @@ final class Model: ObservableObject {
     // Back at the computer: a paused session goes on where it stopped, with its block moved
     // by the time away. Away longer than the limit ends it instead, as of when you left.
     func comeBack() {
+        guard case .away = phase else { return }
+        // A Step away with a minimum: back early just re-locks, staying away until it elapses.
+        if let until = state.stepAwayUntil {
+            if now < until { lockScreen(); return }
+            state.stepAwayUntil = nil
+        }
         guard case .away(let since, let paused) = phase else { return }
         keepAwake.off()
         let away = max(0, Int(now.timeIntervalSince(since)))
@@ -549,6 +599,7 @@ final class Model: ObservableObject {
         clock.now = Date()
         flushPendingRecords()
         if !Settings.current.has(.away) { keepAwake.off() }
+        if Settings.current.has(.scheduling) && Settings.current.has(.catchUp) { recomputeDebts() }
         let night = Settings.current.isNight(at: now)
         // Until first-run setup is done nothing is pushed: no night lock, no "What's next?".
         if night && !Setup.isPending { enterNightIfNeeded() }

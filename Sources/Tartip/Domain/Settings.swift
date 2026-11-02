@@ -13,6 +13,8 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
     var days: [Int] = []           // weekdays it's planned for (Calendar: 1 = Sunday … 7 = Saturday); empty = every day
     var dayMinutes: [Int: Int] = [:]   // a different daily limit on some weekdays (0 = no limit); absent = dailyMinutes.
                                        // "Off on a day" is only ever `days`, never a limit.
+    var catchUpMinutes = 0          // > 0 marks this activity "important": if its hours close with
+                                     // none of it done, the next pick is forced to this many minutes of it.
     var opens = ModeConfig()       // apps and links opened when it starts
     var icon: String? = nil        // SF Symbol; nil = picked from the name
     var color: String? = nil       // one of ActivityStyle.colors; nil = picked from the name
@@ -52,6 +54,7 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
         toMinute = try c.decodeIfPresent(Int.self, forKey: .toMinute)
         days = try c.decodeIfPresent([Int].self, forKey: .days) ?? []
         dayMinutes = try c.decodeIfPresent([Int: Int].self, forKey: .dayMinutes) ?? [:]
+        catchUpMinutes = try c.decodeIfPresent(Int.self, forKey: .catchUpMinutes) ?? 0
         opens = try c.decodeIfPresent(ModeConfig.self, forKey: .opens) ?? ModeConfig()
         icon = try c.decodeIfPresent(String.self, forKey: .icon)
         color = try c.decodeIfPresent(String.self, forKey: .color)
@@ -105,6 +108,10 @@ struct AppSettings: Codable, Equatable {
 
     // Away from the computer: a session waits this long, then ends as of when you left.
     var maxAwayMinutes = 60
+
+    // Step away locks the screen for at least this long: unlocking sooner locks it again,
+    // until this much has actually elapsed since it started. 0 = no minimum (today's behavior).
+    var stepAwayMinutes = 0
 
     // Forced breaks: after this long continuously at the computer, the session ends and a
     // break is required. 0 = never. The break only lifts once the cooldown runs out.
