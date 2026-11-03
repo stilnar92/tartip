@@ -59,6 +59,10 @@ func loosenings(from o: AppSettings, to n: AppSettings) -> [String] {
         guard let f = from, let t = to, f != t else { return 1440 }
         return (t - f + 1440) % 1440
     }
+    // Total minutes covered by all of an activity's windows; empty (any time) is the most time.
+    let windowsSpan = { (windows: [TimeWindow]) -> Int in
+        windows.isEmpty ? 1440 : windows.reduce(0) { $0 + (($1.to - $1.from + 1440) % 1440) }
+    }
 
     for a in o.activities {
         guard let b = n.activities.first(where: { $0.id == a.id }) else { out.append("removing \(a.name)"); continue }
@@ -67,7 +71,7 @@ func loosenings(from o: AppSettings, to n: AppSettings) -> [String] {
         if oldDays.contains(where: { cap(b.limit(onWeekday: $0)) < cap(a.limit(onWeekday: $0)) }) {
             out.append("a lower limit for \(a.name)")
         }
-        if span(b.fromMinute, b.toMinute) < span(a.fromMinute, a.toMinute) { out.append("shorter hours for \(a.name)") }
+        if windowsSpan(b.windows) < windowsSpan(a.windows) { out.append("shorter hours for \(a.name)") }
         if b.block != a.block { out.append("\(a.name) locking another block") }
     }
 

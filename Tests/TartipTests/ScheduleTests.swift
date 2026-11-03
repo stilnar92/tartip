@@ -69,4 +69,29 @@ private let monday = day(2), saturday = day(7)
         let back = try JSONDecoder().decode(ActivitySetting.self, from: JSONEncoder().encode(a))
         #expect(back.dayMinutes == [7: 45] && back.limit(onWeekday: 7) == 45 && back.limit(onWeekday: 2) == 120)
     }
+
+    // days and multiple windows are orthogonal: an off day has no periods at all for it,
+    // regardless of how many windows it has on its planned days.
+    @Test func multipleWindowsRespectDays() {
+        var weekdayOnly = ActivitySetting(name: "Work", windows: [TimeWindow(from: 10 * 60, to: 12 * 60), TimeWindow(from: 16 * 60, to: 18 * 60)])
+        weekdayOnly.days = [2, 3, 4, 5, 6]   // Mon-Fri
+        var s = AppSettings()
+        s.activities = [weekdayOnly]
+        #expect(availability(s, weekday: 2, from: 0, to: 1440).contains { $0.available == ["Work"] })
+        #expect(availability(s, weekday: 7, from: 0, to: 1440).allSatisfy { $0.available.isEmpty })   // Saturday
+    }
+
+    // Editing one window can't cross into a same-day neighbour: it clamps at the boundary,
+    // touching exactly (no gap) is allowed.
+    @Test func windowEditsClampAtNeighboringWindows() {
+        let windows = [TimeWindow(from: 10 * 60, to: 12 * 60), TimeWindow(from: 16 * 60, to: 18 * 60)]
+        // Pushing window 0's `to` past window 1's `from` clamps to exactly window 1's `from`.
+        #expect(clampedWindowEdge(windows, editing: 0, movingFrom: false, to: 17 * 60) == 16 * 60)
+        // Pushing window 1's `from` before window 0's `to` clamps to exactly window 0's `to`.
+        #expect(clampedWindowEdge(windows, editing: 1, movingFrom: true, to: 11 * 60) == 12 * 60)
+        // Touching exactly at the boundary is fine, left alone.
+        #expect(clampedWindowEdge(windows, editing: 0, movingFrom: false, to: 16 * 60) == 16 * 60)
+        // A value already clear of any neighbour passes through unchanged.
+        #expect(clampedWindowEdge(windows, editing: 0, movingFrom: false, to: 11 * 60) == 11 * 60)
+    }
 }

@@ -16,6 +16,15 @@ struct DayTimeline: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if !day.overcommitted.isEmpty {
+                Label(
+                    "Won't fit in today's hours: " + day.overcommitted.joined(separator: ", "),
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.red)
+                .fixedSize(horizontal: false, vertical: true)
+                .help("These activities' daily limits can't all fit in the hours they share today, even spread across their own other windows.")
+            }
             if !day.anyTime.isEmpty {
                 (Text("Any time  ").foregroundColor(Theme.text2) + names(day.anyTime))
                     .font(.system(size: 11, weight: .medium))

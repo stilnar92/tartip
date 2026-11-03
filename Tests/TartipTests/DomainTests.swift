@@ -140,6 +140,26 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(s.stepAwayMinutes == 0)
     }
 
+    // Settings saved before multiple windows existed have fromMinute/toMinute, not windows:
+    // that single pair must fold into one window with no user action.
+    @Test func legacySingleWindowMigratesIntoWindowsArray() throws {
+        let json = #"{"name": "Work", "fromMinute": 600, "toMinute": 720}"#
+        let a = try JSONDecoder().decode(ActivitySetting.self, from: Data(json.utf8))
+        #expect(a.windows == [TimeWindow(id: a.windows[0].id, from: 600, to: 720)])
+    }
+
+    @Test func noHoursAtAllMigratesToAnyTime() throws {
+        let json = #"{"name": "Work"}"#
+        let a = try JSONDecoder().decode(ActivitySetting.self, from: Data(json.utf8))
+        #expect(a.windows.isEmpty)
+    }
+
+    @Test func multiWindowActivityRoundTripsThroughEncoding() throws {
+        let a = ActivitySetting(name: "Work", windows: [TimeWindow(from: 600, to: 720), TimeWindow(from: 960, to: 1080)])
+        let back = try JSONDecoder().decode(ActivitySetting.self, from: JSONEncoder().encode(a))
+        #expect(back.windows == a.windows)
+    }
+
     @Test func modeConfigWithoutKeys() throws {
         let c = try JSONDecoder().decode(ModeConfig.self, from: Data("{}".utf8))
         #expect(c == ModeConfig())
@@ -167,6 +187,20 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(!limits.isOpen("Work"))
         #expect(limits.opensLabel("Work") == "from 12:00")
         #expect(limits.isOpen("English"))
+    }
+
+    @Test func multipleWindowsOpenInEachAndClosedInTheGap() {
+        var s = AppSettings()
+        s.activities = [ActivitySetting(name: "Work", windows: [TimeWindow(from: 10 * 60, to: 12 * 60), TimeWindow(from: 16 * 60, to: 18 * 60)])]
+        #expect(Limits(settings: s, today: [], now: at(11), calendar: cal).isOpen("Work"))
+        #expect(Limits(settings: s, today: [], now: at(17), calendar: cal).isOpen("Work"))
+        let gap = Limits(settings: s, today: [], now: at(14), calendar: cal)
+        #expect(!gap.isOpen("Work"))
+        #expect(gap.opensLabel("Work") == "from 16:00")   // soonest upcoming window, not always the first
+        // After both windows close for the day, the soonest (wrapping to tomorrow) is the first one again.
+        let afterBoth = Limits(settings: s, today: [], now: at(19), calendar: cal)
+        #expect(!afterBoth.isOpen("Work"))
+        #expect(afterBoth.opensLabel("Work") == "from 10:00")
     }
 
     @Test func autoPickPrefersTheActivityFurthestBehind() {

@@ -3,13 +3,39 @@
 
 import Foundation
 
+// One stretch of the day an activity can be picked in, minutes since midnight. `to` may be
+// <= `from`, meaning it crosses midnight (same rule as inWindow).
+struct TimeWindow: Codable, Hashable, Identifiable {
+    var id = UUID()
+    var from: Int
+    var to: Int
+}
+
+// Clamp `windows[i]`'s `from` or `to` so editing one window can't cross into a same-day
+// neighbour: no two windows for one activity are allowed to overlap. Neighbours that touch
+// exactly at a boundary (one's `to` equals another's `from`) are fine, left alone. Windows
+// that cross midnight (this one, or the neighbour being clamped against) are excluded from
+// clamping — reasoning about a neighbour across midnight adds real complexity for no clear
+// benefit here.
+func clampedWindowEdge(_ windows: [TimeWindow], editing i: Int, movingFrom: Bool, to value: Int) -> Int {
+    guard windows.indices.contains(i), windows[i].from < windows[i].to else { return value }
+    let w = windows[i]
+    let others = windows.enumerated().filter { $0.offset != i }.map(\.element).filter { $0.from < $0.to }
+    if movingFrom {
+        let floor = others.filter { $0.to <= w.to }.map(\.to).max() ?? 0
+        return max(value, floor)
+    } else {
+        let ceiling = others.filter { $0.from >= w.from }.map(\.from).min() ?? 1440
+        return min(value, ceiling)
+    }
+}
+
 struct ActivitySetting: Codable, Hashable, Identifiable {
     var id = UUID()
     var name: String
     var block: String              // block it locks (blocks.json): the name at first, kept when the name changes
     var dailyMinutes = 0           // 0 = no daily limit
-    var fromMinute: Int? = nil     // hours it can be picked, minutes since midnight;
-    var toMinute: Int? = nil       // nil = any time. May cross midnight.
+    var windows: [TimeWindow] = [] // hours it can be picked; empty = any time. May cross midnight.
     var days: [Int] = []           // weekdays it's planned for (Calendar: 1 = Sunday … 7 = Saturday); empty = every day
     var dayMinutes: [Int: Int] = [:]   // a different daily limit on some weekdays (0 = no limit); absent = dailyMinutes.
                                        // "Off on a day" is only ever `days`, never a limit.
@@ -19,12 +45,20 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
     var icon: String? = nil        // SF Symbol; nil = picked from the name
     var color: String? = nil       // one of ActivityStyle.colors; nil = picked from the name
 
+    var hasSchedule: Bool { !windows.isEmpty }
+
     init(name: String, dailyMinutes: Int = 0, fromMinute: Int? = nil, toMinute: Int? = nil) {
         self.name = name
         self.block = name
         self.dailyMinutes = dailyMinutes
-        self.fromMinute = fromMinute
-        self.toMinute = toMinute
+        if let f = fromMinute, let t = toMinute, f != t { windows = [TimeWindow(from: f, to: t)] }
+    }
+
+    init(name: String, dailyMinutes: Int = 0, windows: [TimeWindow]) {
+        self.name = name
+        self.block = name
+        self.dailyMinutes = dailyMinutes
+        self.windows = windows
     }
 
     init(template t: ActivityTemplate) {
@@ -43,21 +77,46 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
         isPlanned(onWeekday: calendar.component(.weekday, from: d))
     }
 
-    // Settings saved before a field existed still load.
+    private enum CodingKeys: String, CodingKey {
+        case id, name, block, dailyMinutes, windows, fromMinute, toMinute, days, dayMinutes, catchUpMinutes, opens, icon, color
+    }
+
+    // Settings saved before a field existed still load. Settings saved before multiple windows
+    // existed have fromMinute/toMinute instead of windows: fold that single pair into one window.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try c.decode(String.self, forKey: .name)
         block = try c.decodeIfPresent(String.self, forKey: .block) ?? name
         dailyMinutes = try c.decodeIfPresent(Int.self, forKey: .dailyMinutes) ?? 0
-        fromMinute = try c.decodeIfPresent(Int.self, forKey: .fromMinute)
-        toMinute = try c.decodeIfPresent(Int.self, forKey: .toMinute)
+        if let w = try c.decodeIfPresent([TimeWindow].self, forKey: .windows) {
+            windows = w
+        } else {
+            let f = try c.decodeIfPresent(Int.self, forKey: .fromMinute)
+            let t = try c.decodeIfPresent(Int.self, forKey: .toMinute)
+            windows = (f != nil && t != nil && f != t) ? [TimeWindow(from: f!, to: t!)] : []
+        }
         days = try c.decodeIfPresent([Int].self, forKey: .days) ?? []
         dayMinutes = try c.decodeIfPresent([Int: Int].self, forKey: .dayMinutes) ?? [:]
         catchUpMinutes = try c.decodeIfPresent(Int.self, forKey: .catchUpMinutes) ?? 0
         opens = try c.decodeIfPresent(ModeConfig.self, forKey: .opens) ?? ModeConfig()
         icon = try c.decodeIfPresent(String.self, forKey: .icon)
         color = try c.decodeIfPresent(String.self, forKey: .color)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(block, forKey: .block)
+        try c.encode(dailyMinutes, forKey: .dailyMinutes)
+        try c.encode(windows, forKey: .windows)
+        try c.encode(days, forKey: .days)
+        try c.encode(dayMinutes, forKey: .dayMinutes)
+        try c.encode(catchUpMinutes, forKey: .catchUpMinutes)
+        try c.encode(opens, forKey: .opens)
+        try c.encodeIfPresent(icon, forKey: .icon)
+        try c.encodeIfPresent(color, forKey: .color)
     }
 }
 

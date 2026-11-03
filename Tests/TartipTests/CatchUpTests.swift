@@ -16,6 +16,13 @@ private func english(_ catchUp: Int = 20) -> ActivitySetting {
     a.catchUpMinutes = catchUp
     return a
 }
+
+// Two windows the same day: 09:00-11:00 and 16:00-18:00.
+private func twoWindowEnglish(_ catchUp: Int = 20) -> ActivitySetting {
+    var a = ActivitySetting(name: "English", windows: [TimeWindow(from: 9 * 60, to: 11 * 60), TimeWindow(from: 16 * 60, to: 18 * 60)])
+    a.catchUpMinutes = catchUp
+    return a
+}
 private func record(_ activity: String, _ start: Date, _ end: Date, actual: [String]? = nil) -> SessionRecord {
     SessionRecord(start: start, end: end, mode: activity, planned: activity, actual: actual ?? [])
 }
@@ -72,6 +79,42 @@ private func todays(_ missed: [(activity: String, day: String, windowEnd: Date)]
         a.days = [7, 1]   // weekends only; Monday (day 2) is a weekday, so it must not appear.
         let s = AppSettings(activities: [a])
         #expect(todays(missedWindows(s, records: [], now: day(2, 11, 1), calendar: cal)).isEmpty)
+    }
+
+    // Doing the activity in ANY window clears the whole day: missing is judged per activity
+    // per day, not per window.
+    @Test func doingOneOfTwoWindowsClearsTheWholeDay() {
+        let s = AppSettings(activities: [twoWindowEnglish()])
+        let r = record("English", day(2, 9, 30), day(2, 10), actual: ["English"])   // only the morning window
+        #expect(todays(missedWindows(s, records: [r], now: day(2, 18, 1), calendar: cal)).isEmpty)
+    }
+
+    // Missing both windows produces exactly one debt for the day, keyed to the LAST window's end.
+    @Test func missingBothWindowsProducesOneDebtAtTheLastWindowsEnd() {
+        let s = AppSettings(activities: [twoWindowEnglish()])
+        let missed = todays(missedWindows(s, records: [], now: day(2, 18, 1), calendar: cal))
+        #expect(missed.count == 1)
+        #expect(missed[0].windowEnd == day(2, 18))
+    }
+
+    // The day's debt isn't created until the LAST window has closed, even if the first already has.
+    @Test func noDebtUntilTheLastWindowOfTheDayCloses() {
+        let s = AppSettings(activities: [twoWindowEnglish()])
+        // 11:30: the morning window (09-11) is closed and missed, but the evening one (16-18) is still ahead.
+        #expect(todays(missedWindows(s, records: [], now: day(2, 11, 30), calendar: cal)).isEmpty)
+    }
+
+    // Editing an activity's hours mid-day (e.g. adding/moving a window) after a debt already
+    // exists must update that debt's windowEnd in place, never open a second debt for the same
+    // (activity, day) — this is the identity recomputeDebts relies on to stay idempotent.
+    @Test func sameActivityAndDayNeverGetsTwoDebts() {
+        let existing = CatchUpDebt(activity: "Interview", day: "2026-11-02", windowEnd: day(2, 12), catchUpMinutes: 90)
+        var debts = [existing]
+        // Settings changed mid-day: missedWindows now reports a later windowEnd for the same (activity, day).
+        let i = debts.firstIndex { $0.activity == "Interview" && $0.day == "2026-11-02" }!
+        if debts[i].settledAt == nil { debts[i].windowEnd = day(2, 15, 30) }
+        #expect(debts.count == 1)
+        #expect(debts[0].windowEnd == day(2, 15, 30))
     }
 
     // Oldest unsettled debt wins; a tie on windowEnd is broken by the activities' list order.

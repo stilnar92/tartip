@@ -148,6 +148,7 @@ final class Model: ObservableObject {
         var periods: [Period]      // the whole waking day, with the activities that have hours
         var actual: [PlanSlot]     // from waking up until now
         var now: Int?              // nil outside the waking day
+        var overcommitted: [String] // planned today, asking for more daily minutes than their hours can actually fit
     }
 
     var today: DayView {
@@ -176,14 +177,16 @@ final class Model: ObservableObject {
         }
         let weekday = Calendar.current.component(.weekday, from: now)
         let anyTime = s.activities.filter { a in
-            !a.name.isEmpty && a.isPlanned(onWeekday: weekday) && (a.fromMinute == nil || a.toMinute == nil || a.fromMinute == a.toMinute)
+            !a.name.isEmpty && a.isPlanned(onWeekday: weekday) && !a.hasSchedule
         }.map(\.name)
         let periods = merged(availability(s, weekday: weekday, from: w.from, to: w.to).map {
             Period(start: $0.start, end: $0.end, available: $0.available.filter { !anyTime.contains($0) })
         })
+        let overcommitted = Set(overcommittedActivities(s, weekday: weekday) + overcommittedPeriods(s, weekday: weekday)).sorted()
         return DayView(from: w.from, to: w.to, anyTime: anyTime, periods: periods,
                        actual: pastDay(done + aways + frees, from: w.from, until: min(nowM, w.to)),
-                       now: nowM >= w.from && nowM < w.to ? nowM : nil)
+                       now: nowM >= w.from && nowM < w.to ? nowM : nil,
+                       overcommitted: overcommitted)
     }
 
     // Nothing can start but some work is open and used up: its limits count from zero again.
@@ -194,16 +197,22 @@ final class Model: ObservableObject {
         record(Event(t: now, type: "round", number: roundNumber))
     }
 
-    // Missed windows (today's and yesterday's) become debts, exactly once each (dedup by
-    // activity+day+windowEnd), so this is safe to call redundantly from init and every tick —
-    // including the first tick after a relaunch, which is what catches a window that closed
-    // while the app wasn't running at all. Debts past their one day of grace are force-expired.
+    // Missed windows (today's and yesterday's) become debts, exactly once each per (activity,
+    // day) — identity that stays stable even if the activity's hours are edited mid-day, so
+    // this is safe to call redundantly from init and every tick, including the first tick
+    // after a relaunch, which is what catches a window that closed while the app wasn't
+    // running at all. An edit that moves the day's last window just updates windowEnd in
+    // place on the existing debt, rather than opening a second one for the same day.
+    // Debts past their one day of grace are force-expired.
     private func recomputeDebts() {
         let horizon = Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now
         let missed = missedWindows(Settings.current, records: recordsSince(horizon), now: now)
         for m in missed {
-            let known = state.catchUpDebts.contains { $0.activity == m.activity && $0.day == m.day && $0.windowEnd == m.windowEnd }
-            guard !known, let minutes = Settings.current.activity(named: m.activity)?.catchUpMinutes, minutes > 0 else { continue }
+            if let i = state.catchUpDebts.firstIndex(where: { $0.activity == m.activity && $0.day == m.day }) {
+                if state.catchUpDebts[i].settledAt == nil { state.catchUpDebts[i].windowEnd = m.windowEnd }
+                continue
+            }
+            guard let minutes = Settings.current.activity(named: m.activity)?.catchUpMinutes, minutes > 0 else { continue }
             state.catchUpDebts.append(CatchUpDebt(activity: m.activity, day: m.day, windowEnd: m.windowEnd, catchUpMinutes: minutes))
             log("catchup owed: \(m.activity) (missed \(m.day))")
         }

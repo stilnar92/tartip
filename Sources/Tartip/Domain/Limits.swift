@@ -44,14 +44,16 @@ struct Limits {
 
     // Activity hours: outside them the activity is greyed out in the picker.
     func isOpen(_ activity: String) -> Bool {
-        guard settings.has(.scheduling), let a = setting(activity), let from = a.fromMinute, let to = a.toMinute, from != to else { return true }
-        return inWindow(minuteOfDay(now, calendar: calendar), from, to)
+        guard settings.has(.scheduling), let a = setting(activity), a.hasSchedule else { return true }
+        return a.windows.contains { inWindow(minuteOfDay(now, calendar: calendar), $0.from, $0.to) }
     }
 
-    // "from 12:00" for an activity that's closed right now.
+    // "from 12:00" for an activity that's closed right now: whichever window opens soonest.
     func opensLabel(_ activity: String) -> String? {
-        guard !isOpen(activity), let from = setting(activity)?.fromMinute else { return nil }
-        return "from \(clockLabel(from))"
+        guard !isOpen(activity), let windows = setting(activity)?.windows, !windows.isEmpty else { return nil }
+        let m = minuteOfDay(now, calendar: calendar)
+        guard let next = windows.min(by: { ($0.from - m + 1440) % 1440 < ($1.from - m + 1440) % 1440 }) else { return nil }
+        return "from \(clockLabel(next.from))"
     }
 
     // Planned for today's weekday (activities without days are planned every day).

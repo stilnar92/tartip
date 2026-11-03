@@ -21,6 +21,12 @@ private func act(_ name: String, _ minutes: Int, _ from: Int? = nil, _ to: Int? 
     return a
 }
 
+private func multiAct(_ name: String, _ minutes: Int, _ spans: [(Int, Int)], days: [Int] = []) -> ActivitySetting {
+    var a = ActivitySetting(name: name, dailyMinutes: minutes, windows: spans.map { TimeWindow(from: $0.0 * 60, to: $0.1 * 60) })
+    a.days = days
+    return a
+}
+
 private func settings(_ acts: [ActivitySetting]) -> AppSettings {
     var s = AppSettings()
     s.activities = acts
@@ -72,6 +78,85 @@ private func hm(_ h: Int, _ m: Int = 0) -> Int { h * 60 + m }
         let s = settings([act("Arabic", 60, days: [4])])   // Wednesdays only
         #expect(availability(s, weekday: monday, from: hm(10), to: hm(11)) == [Period(start: hm(10), end: hm(11), available: [])])
         #expect(availability(s, weekday: 4, from: hm(10), to: hm(11)).first?.available == ["Arabic"])
+    }
+
+    @Test func twoSeparateWindowsStaySeparate() {
+        let s = settings([multiAct("Work", 60, [(10, 12), (16, 18)])])
+        #expect(availability(s, weekday: monday, from: hm(9, 30), to: hm(21)) == [
+            Period(start: hm(9, 30), end: hm(10), available: []),
+            Period(start: hm(10), end: hm(12), available: ["Work"]),
+            Period(start: hm(12), end: hm(16), available: []),
+            Period(start: hm(16), end: hm(18), available: ["Work"]),
+            Period(start: hm(18), end: hm(21), available: []),
+        ])
+    }
+
+    @Test func adjacentWindowsStillMerge() {
+        let s = settings([multiAct("Work", 60, [(12, 14), (14, 16)])])
+        #expect(availability(s, weekday: monday, from: hm(9, 30), to: hm(21)) == [
+            Period(start: hm(9, 30), end: hm(12), available: []),
+            Period(start: hm(12), end: hm(16), available: ["Work"]),
+            Period(start: hm(16), end: hm(21), available: []),
+        ])
+    }
+
+    @Test func oneSameDayWindowAndOneCrossingMidnight() {
+        let s = settings([multiAct("Mixed", 60, [(10, 12), (23, 1)])])
+        #expect(availability(s, weekday: monday, from: hm(9), to: hm(26)) == [
+            Period(start: hm(9), end: hm(10), available: []),
+            Period(start: hm(10), end: hm(12), available: ["Mixed"]),
+            Period(start: hm(12), end: hm(23), available: []),
+            Period(start: hm(23), end: hm(25), available: ["Mixed"]),
+            Period(start: hm(25), end: hm(26), available: []),
+        ])
+    }
+
+    @Test func overcommittedFlagsALimitBiggerThanItsOwnWindows() {
+        // A 2h daily limit squeezed into a single 1h window is overcommitted.
+        let tooTight = multiAct("Work", 120, [(10, 11)])
+        // A 90m daily limit spread across two 1h windows (2h total) fits fine.
+        let fits = multiAct("Arabic", 90, [(9, 10), (16, 17)])
+        // No daily limit at all is never overcommitted, regardless of its windows.
+        let noLimit = multiAct("English", 0, [(10, 11)])
+        let s = settings([tooTight, fits, noLimit])
+        #expect(overcommittedActivities(s, weekday: monday) == ["Work"])
+    }
+
+    // Four activities sharing one 3h window (15-18), needing 1h + 1h30m + 1h + 30m = 4h total:
+    // each fits its own windows alone, but together they can't all fit this one shared window.
+    @Test func overcommittedPeriodCatchesSeveralActivitiesSharingOneWindow() {
+        let work = multiAct("Work", 60, [(15, 18)])
+        let aiEducation = multiAct("AI education", 90, [(15, 18)])
+        let project = multiAct("Project", 60, [(15, 18)])
+        let english = multiAct("English", 30, [(15, 18)])
+        let s = settings([work, aiEducation, project, english])
+        #expect(overcommittedPeriods(s, weekday: monday) == ["AI education", "English", "Project", "Work"])
+    }
+
+    // An activity that could in principle make up the shortfall in ANOTHER window of its own
+    // is not flagged — only a genuinely unavoidable overcommit counts.
+    @Test func overcommittedPeriodAllowsMakingUpTimeInAnotherWindow() {
+        // Work wants 2h total: 1h in the shared 15-18 slot, and it also has its own 18-19 slot
+        // to make up the rest, so the shared slot alone doesn't force an impossible day.
+        var work = multiAct("Work", 120, [(15, 18), (18, 19)])
+        let other = multiAct("Other", 60, [(15, 18)])
+        // Together, Work(effectively needs only 1h here since it can get the other 1h at 18-19)
+        // + Other(1h) = 2h, which fits the 3h window — no overcommit.
+        let s = settings([work, other])
+        #expect(overcommittedPeriods(s, weekday: monday).isEmpty)
+        // But if Work's only window is the shared one, it can't make up anything elsewhere.
+        work.windows = [TimeWindow(from: 15 * 60, to: 18 * 60)]
+        var onlyShared = settings([work, other])
+        onlyShared.activities[1].dailyMinutes = 150   // 1h + 2h30m = 3h30m > 3h window, no escape for either
+        #expect(!overcommittedPeriods(onlyShared, weekday: monday).isEmpty)
+    }
+
+    @Test func overcommittedIgnoresUnplannedDaysAndAnyTimeActivities() {
+        var weekendOnly = multiAct("Project", 120, [(10, 11)])
+        weekendOnly.days = [7, 1]   // weekends only; Monday must not flag it.
+        let anyTime = act("Interview", 999)   // no windows at all: can't be overcommitted.
+        let s = settings([weekendOnly, anyTime])
+        #expect(overcommittedActivities(s, weekday: monday).isEmpty)
     }
 
     @Test func hoursCanCrossMidnight() {

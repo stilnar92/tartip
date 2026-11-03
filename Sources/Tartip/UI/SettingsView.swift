@@ -163,8 +163,8 @@ struct SettingsView: View {
                     if !item.days.isEmpty {
                         Text(daysLabel(item.days)).font(.system(size: 11)).foregroundStyle(.secondary)
                     }
-                    if let from = item.fromMinute, let to = item.toMinute {
-                        Text("\(clockLabel(from))–\(clockLabel(to))")
+                    if !item.windows.isEmpty {
+                        Text(item.windows.map { "\(clockLabel($0.from))–\(clockLabel($0.to))" }.joined(separator: ", "))
                             .font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
                     }
                     Spacer()
@@ -209,16 +209,35 @@ struct SettingsView: View {
                         Toggle(
                             "Any time",
                             isOn: Binding(
-                                get: { a.wrappedValue.fromMinute == nil || a.wrappedValue.toMinute == nil },
-                                set: { any in
-                                    a.wrappedValue.fromMinute = any ? nil : 12 * 60
-                                    a.wrappedValue.toMinute = any ? nil : 20 * 60
-                                })
+                                get: { a.wrappedValue.windows.isEmpty },
+                                set: { any in a.wrappedValue.windows = any ? [] : [TimeWindow(from: 12 * 60, to: 20 * 60)] }
+                            )
                         )
                         .toggleStyle(.switch).controlSize(.small)
-                        if item.fromMinute != nil && item.toMinute != nil {
-                            row("Can be picked from") { clockStepper(Binding(get: { a.wrappedValue.fromMinute ?? 720 }, set: { a.wrappedValue.fromMinute = $0 })) }
-                            row("Until") { clockStepper(Binding(get: { a.wrappedValue.toMinute ?? 1200 }, set: { a.wrappedValue.toMinute = $0 })) }
+                        if !item.windows.isEmpty {
+                            ForEach(Array(item.windows.enumerated()), id: \.element.id) { i, _ in
+                                HStack(spacing: 6) {
+                                    clockStepper(windowBound(a, i, \.from))
+                                    Text("–").foregroundStyle(.secondary)
+                                    clockStepper(windowBound(a, i, \.to))
+                                    Spacer()
+                                    if item.windows.count > 1 {
+                                        Button(role: .destructive) {
+                                            a.wrappedValue.windows.remove(at: i)
+                                        } label: {
+                                            Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .help("Remove this window")
+                                    }
+                                }
+                            }
+                            Button {
+                                addWindow(a)
+                            } label: {
+                                Label("Add window", systemImage: "plus.circle.fill").font(.system(size: 12))
+                            }
+                            .buttonStyle(.plain)
                             if settings.value.has(.catchUp) {
                                 row("Catch-up if missed") {
                                     HStack(spacing: 6) {
@@ -226,7 +245,7 @@ struct SettingsView: View {
                                         Stepper("", value: a.catchUpMinutes, in: 0...120, step: 5).labelsHidden().controlSize(.small)
                                     }
                                 }
-                                .help("If these hours close with none of it done, the next pick is forced to this many minutes of it.")
+                                .help("If these hours close with none of it done in any window, the next pick is forced to this many minutes of it.")
                             }
                         }
                         Divider()
@@ -515,6 +534,25 @@ struct SettingsView: View {
             Text(minutesLabel(value.wrappedValue)).monospacedDigit()
             Stepper("", value: value, in: range, step: step).labelsHidden()
         }
+    }
+
+    // A binding into one window's from/to that can't be dragged past a same-day neighbour.
+    private func windowBound(_ a: Binding<ActivitySetting>, _ i: Int, _ kp: WritableKeyPath<TimeWindow, Int>) -> Binding<Int> {
+        Binding(
+            get: { a.wrappedValue.windows.indices.contains(i) ? a.wrappedValue.windows[i][keyPath: kp] : 0 },
+            set: { new in
+                guard a.wrappedValue.windows.indices.contains(i) else { return }
+                a.wrappedValue.windows[i][keyPath: kp] = clampedWindowEdge(a.wrappedValue.windows, editing: i, movingFrom: kp == \TimeWindow.from, to: new)
+            }
+        )
+    }
+
+    // A new window right after the last one, wrapping to the start of the day if that would run past 24:00.
+    private func addWindow(_ a: Binding<ActivitySetting>) {
+        let lastEnd = a.wrappedValue.windows.map(\.to).max() ?? 12 * 60
+        let start = lastEnd % 1440
+        let end = min(start + 120, 1440)
+        a.wrappedValue.windows.append(TimeWindow(from: start, to: end))
     }
 
     // Half-hour steps, wrapping around midnight.
