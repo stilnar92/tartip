@@ -189,7 +189,8 @@ struct ContentView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(!Settings.current.has(.tasks))
+            // Not .disabled: that greys the timer out. Without tasks it's just not clickable.
+            .allowsHitTesting(Settings.current.has(.tasks))
             .accessibilityLabel(Settings.current.has(.tasks) ? "Open tasks for \(name)" : "Session timer")
 
             VStack(spacing: 12) {
