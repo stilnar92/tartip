@@ -33,7 +33,7 @@ This is the one record of time spent: limits and Stats count from it.
 | `plannedMinutes` | The length it was started with, Pomodoro breaks included. |
 | `rounds` | Pomodoro work rounds, when more than one. |
 | `paused` | Seconds away from the computer in the middle of it. |
-| `ended` | `done` (time ran out), `stopped` (Stop session; the block stays on until its time anyway), `away` (away longer than the limit in Rules; ends as of when you left). |
+| `ended` | `done` (time ran out), `stopped` (ended early with End session), `away` (away longer than the limit in Rules; ends as of when you left). |
 | `auto` | `true`: started by itself after "What's next?" went unanswered. |
 | `pickSeconds` | Seconds from "What's next?" opening to the start. Missing when started from the panel, or when you stepped away in between. |
 
@@ -42,7 +42,9 @@ Sessions under a minute aren't recorded.
 ## away.jsonl: one line per stretch away from the computer
 
 `start`, `end`. Locking the screen and sleep count too, so stretches overnight are sleep.
-Not an activity: never counted in limits.
+Not an activity: never counted in limits. With "Ask what you did when back" on (Rules → Step
+away), also what you said: `did` (picked from your off-computer list) and `note` (typed).
+Missing: not asked.
 
 ## events.jsonl: things that aren't sessions
 

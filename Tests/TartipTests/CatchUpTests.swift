@@ -11,6 +11,8 @@ private let cal: Calendar = {
 private func day(_ d: Int, _ h: Int = 12, _ m: Int = 0) -> Date {
     cal.date(from: DateComponents(year: 2026, month: 3, day: d, hour: h, minute: m))!
 }
+// `catchUp` is the minimum minutes English needs across the whole day; falling short by any
+// amount creates a debt for exactly the shortfall.
 private func english(_ catchUp: Int = 20) -> ActivitySetting {
     var a = ActivitySetting(name: "English", fromMinute: 9 * 60, toMinute: 11 * 60)
     a.catchUpMinutes = catchUp
@@ -29,7 +31,7 @@ private func record(_ activity: String, _ start: Date, _ end: Date, actual: [Str
 
 // missedWindows looks back one calendar day, so isolate assertions to "today's" (day 2) entry
 // unless a test is specifically about the lookback.
-private func todays(_ missed: [(activity: String, day: String, windowEnd: Date)]) -> [(activity: String, day: String, windowEnd: Date)] {
+private func todays(_ missed: [(activity: String, day: String, windowEnd: Date, shortfall: Int)]) -> [(activity: String, day: String, windowEnd: Date, shortfall: Int)] {
     missed.filter { $0.day == "2026-03-02" }
 }
 
@@ -40,33 +42,43 @@ private func todays(_ missed: [(activity: String, day: String, windowEnd: Date)]
         #expect(todays(missedWindows(s, records: [], now: day(2, 10), calendar: cal)).isEmpty)
     }
 
-    @Test func closedWindowWithNothingDoneIsMissed() {
-        let s = AppSettings(activities: [english()])
+    @Test func closedWindowWithNothingDoneIsMissedForTheFullMinimum() {
+        let s = AppSettings(activities: [english(20)])
         let missed = todays(missedWindows(s, records: [], now: day(2, 11, 1), calendar: cal))
-        #expect(missed.count == 1 && missed[0].activity == "English")
+        #expect(missed.count == 1 && missed[0].activity == "English" && missed[0].shortfall == 20)
     }
 
-    @Test func closedWindowCoveredByActualIsNotMissed() {
-        let s = AppSettings(activities: [english()])
-        let r = record("English", day(2, 9, 30), day(2, 10), actual: ["English"])
+    @Test func closedWindowFullyCoveredByActualIsNotMissed() {
+        let s = AppSettings(activities: [english(20)])
+        let r = record("English", day(2, 9, 30), day(2, 10), actual: ["English"])   // 30 min >= 20 min minimum
         #expect(todays(missedWindows(s, records: [r], now: day(2, 11, 1), calendar: cal)).isEmpty)
     }
 
-    // A session still running across the window's close, or finished but not yet reviewed,
-    // is visible only under `planned` (never `actual`) — must not be flagged missed either way.
-    @Test func stillRunningOrUnreviewedSessionIsNotMissed() {
-        let s = AppSettings(activities: [english()])
-        let running = record("English", day(2, 10, 50), day(2, 11, 20))   // planned=English, actual=[] (unreviewed)
+    // Doing SOME of the minimum, but not all, creates a debt for only the shortfall.
+    @Test func partialTimeCreatesADebtForTheShortfallOnly() {
+        let s = AppSettings(activities: [english(20)])
+        let r = record("English", day(2, 9), day(2, 9, 10), actual: ["English"])   // 10 of the 20 minutes needed
+        let missed = todays(missedWindows(s, records: [r], now: day(2, 11, 1), calendar: cal))
+        #expect(missed.count == 1 && missed[0].shortfall == 10)
+    }
+
+    // A session still running across the window's close, or finished but not yet reviewed, is
+    // visible only under `planned` (never `actual`) — it counts toward the day's sum either way
+    // (secondsByActivity falls back to `planned` when `actual` is empty), so it isn't a shortfall
+    // as long as its length alone already meets the minimum.
+    @Test func stillRunningOrUnreviewedSessionCountsTowardTheMinimum() {
+        let s = AppSettings(activities: [english(20)])
+        let running = record("English", day(2, 10, 50), day(2, 11, 20))   // 30 min, planned=English, actual=[] (unreviewed)
         #expect(todays(missedWindows(s, records: [running], now: day(2, 11, 1), calendar: cal)).isEmpty)
     }
 
-    // A session that ran during the window but was reviewed as a DIFFERENT activity really
-    // did miss the window — this must surface as missed, not be masked by its mere presence.
-    @Test func sessionReviewedAsSomethingElseIsStillMissed() {
-        let s = AppSettings(activities: [english()])
+    // A session that ran during the window but was reviewed as a DIFFERENT activity doesn't
+    // count toward English's sum at all — the full minimum is still owed.
+    @Test func sessionReviewedAsSomethingElseDoesNotCount() {
+        let s = AppSettings(activities: [english(20)])
         let r = record("English", day(2, 9), day(2, 10), actual: ["Reading"])
         let missed = todays(missedWindows(s, records: [r], now: day(2, 11, 1), calendar: cal))
-        #expect(missed.count == 1 && missed[0].activity == "English")
+        #expect(missed.count == 1 && missed[0].activity == "English" && missed[0].shortfall == 20)
     }
 
     @Test func activityWithoutCatchUpMinutesIsNeverTracked() {
@@ -81,20 +93,50 @@ private func todays(_ missed: [(activity: String, day: String, windowEnd: Date)]
         #expect(todays(missedWindows(s, records: [], now: day(2, 11, 1), calendar: cal)).isEmpty)
     }
 
-    // Doing the activity in ANY window clears the whole day: missing is judged per activity
-    // per day, not per window.
-    @Test func doingOneOfTwoWindowsClearsTheWholeDay() {
-        let s = AppSettings(activities: [twoWindowEnglish()])
-        let r = record("English", day(2, 9, 30), day(2, 10), actual: ["English"])   // only the morning window
+    // Reaching the minimum in ANY window clears the whole day: the sum is per activity per day,
+    // not per window.
+    @Test func reachingTheMinimumInOneOfTwoWindowsClearsTheWholeDay() {
+        let s = AppSettings(activities: [twoWindowEnglish(20)])
+        let r = record("English", day(2, 9, 30), day(2, 9, 50), actual: ["English"])   // 20 min, only the morning window
         #expect(todays(missedWindows(s, records: [r], now: day(2, 18, 1), calendar: cal)).isEmpty)
     }
 
-    // Missing both windows produces exactly one debt for the day, keyed to the LAST window's end.
+    // Missing both windows entirely produces exactly one debt for the day, keyed to the LAST
+    // window's end, for the full minimum (nothing was done anywhere).
     @Test func missingBothWindowsProducesOneDebtAtTheLastWindowsEnd() {
-        let s = AppSettings(activities: [twoWindowEnglish()])
+        let s = AppSettings(activities: [twoWindowEnglish(20)])
         let missed = todays(missedWindows(s, records: [], now: day(2, 18, 1), calendar: cal))
         #expect(missed.count == 1)
         #expect(missed[0].windowEnd == day(2, 18))
+        #expect(missed[0].shortfall == 20)
+    }
+
+    // Seconds of timing slack never force a catch-up: a shortfall under a minute is no debt.
+    @Test func shortfallUnderAMinuteIsIgnored() {
+        let s = AppSettings(activities: [english(20)])
+        let r = record("English", day(2, 9), day(2, 9, 19).addingTimeInterval(59), actual: ["English"])   // 19m59s of 20m
+        #expect(todays(missedWindows(s, records: [r], now: day(2, 11, 1), calendar: cal)).isEmpty)
+    }
+
+    // Yesterday is judged on its whole calendar day: a morning session still counts late the
+    // next evening, as long as records reach back to yesterday's midnight.
+    @Test func yesterdaysMorningStillCountsLateTheNextDay() {
+        let s = AppSettings(activities: [english(20)])
+        let morning = record("English", day(1, 9), day(1, 9, 30), actual: ["English"])
+        let yesterday = missedWindows(s, records: [morning], now: day(2, 20), calendar: cal).filter { $0.day == "2026-03-01" }
+        #expect(yesterday.isEmpty)
+    }
+
+    // A session that's running, paused while away, or waiting for its review isn't final yet:
+    // debts must not be judged until it's done.
+    @Test func openSessionsHoldOffTheDebtCheck() {
+        let s = Session(block: "English", phases: [Phase(isBreak: false, minutes: 30)], start: day(2, 19, 39), planned: "English")
+        let r = record("English", day(2, 19, 39), day(2, 20, 9))
+        #expect(AppPhase.session(s).hasOpenSession)
+        #expect(AppPhase.reviewing(r).hasOpenSession)
+        #expect(AppPhase.away(since: day(2, 19, 44), paused: s).hasOpenSession)
+        #expect(!AppPhase.away(since: day(2, 19, 44), paused: nil).hasOpenSession)
+        #expect(!AppPhase.idle.hasOpenSession && !AppPhase.picking.hasOpenSession)
     }
 
     // The day's debt isn't created until the LAST window has closed, even if the first already has.
@@ -161,5 +203,37 @@ private func todays(_ missed: [(activity: String, day: String, windowEnd: Date)]
         let limits = Limits(settings: s, today: [], now: day(2, 12), calendar: cal, debts: [debt])
         #expect(limits.owedDebt == nil)
         #expect(limits.canStart("Work"))
+    }
+
+    // A catch-up that runs its full length settles the debt.
+    @Test func fullCatchUpSettles() {
+        var debt = CatchUpDebt(activity: "English", day: "2026-03-02", windowEnd: day(2, 11), catchUpMinutes: 20)
+        var r = record("English", day(2, 12), day(2, 12, 20))
+        r.ended = "done"
+        pay(&debt, with: r, at: day(2, 12, 20))
+        #expect(debt.settledAt == day(2, 12, 20))
+    }
+
+    // Ended early: the debt shrinks by the minutes done and stays owed, so End session
+    // can't be used to skip a catch-up.
+    @Test func endedEarlyCatchUpPaysOnlyItsMinutes() {
+        var debt = CatchUpDebt(activity: "English", day: "2026-03-02", windowEnd: day(2, 11), catchUpMinutes: 20)
+        var r = record("English", day(2, 12), day(2, 12, 5))
+        r.ended = "stopped"
+        pay(&debt, with: r, at: day(2, 12, 5))
+        #expect(debt.settledAt == nil && debt.catchUpMinutes == 15)
+        var rest = record("English", day(2, 13), day(2, 13, 15))
+        rest.ended = "stopped"
+        pay(&debt, with: rest, at: day(2, 13, 15))
+        #expect(debt.settledAt == day(2, 13, 15))
+    }
+
+    // Ended early and reviewed as something else: none of it was the catch-up.
+    @Test func endedEarlyCatchUpSpentOnOtherWorkPaysNothing() {
+        var debt = CatchUpDebt(activity: "English", day: "2026-03-02", windowEnd: day(2, 11), catchUpMinutes: 20)
+        var r = record("English", day(2, 12), day(2, 12, 10), actual: ["Work"])
+        r.ended = "stopped"
+        pay(&debt, with: r, at: day(2, 12, 10))
+        #expect(debt.settledAt == nil && debt.catchUpMinutes == 20)
     }
 }

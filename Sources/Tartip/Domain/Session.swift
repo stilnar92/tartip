@@ -77,6 +77,7 @@ enum AppPhase: Codable, Equatable {
     case freeTime(start: Date, end: Date)   // nothing blocked, from the daily budget
     case reviewing(SessionRecord)           // "What did you actually do?"
     case away(since: Date, paused: Session?) // left the computer: screen locked, nothing counts
+    case awayReview(since: Date, back: Date, paused: Session?) // back: "What did you do while away?"
     case forcedBreak(until: Date)           // too long at the computer: step away, can't be skipped
 
     var session: Session? {
@@ -94,6 +95,11 @@ enum AppPhase: Codable, Equatable {
         return nil
     }
 
+    var awayStretch: (since: Date, back: Date)? {
+        if case .awayReview(let since, let back, _) = self { return (since, back) }
+        return nil
+    }
+
     var forcedBreakUntil: Date? {
         if case .forcedBreak(let until) = self { return until }
         return nil
@@ -106,4 +112,15 @@ enum AppPhase: Codable, Equatable {
 
     // Something can be started: nothing runs and no question is waiting for an answer.
     var canStart: Bool { self == .idle || self == .picking }
+
+    // A session whose time isn't final yet: running, paused while away, or waiting for its
+    // review (which may still credit it to a different activity). Day totals read now would
+    // count only part of it.
+    var hasOpenSession: Bool {
+        switch self {
+        case .session, .reviewing: true
+        case .away(_, let paused), .awayReview(_, _, let paused): paused != nil
+        case .idle, .picking, .freeTime, .forcedBreak: false
+        }
+    }
 }

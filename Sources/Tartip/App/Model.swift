@@ -163,8 +163,10 @@ final class Model: ObservableObject {
             return PlanSlot(start: start, end: start + max(1, r.seconds / 60),
                             activity: r.actual.first ?? r.planned ?? otherActivity)
         }
-        // Time away, the stretch going on now included.
-        let aways = (awayRecords + (phase.awaySince.map { [AwayRecord(start: $0, end: now)] } ?? []))
+        // Time away, the stretch going on now (or waiting for its answer) included.
+        let current = phase.awaySince.map { AwayRecord(start: $0, end: now) }
+            ?? phase.awayStretch.map { AwayRecord(start: $0.since, end: $0.back) }
+        let aways = (awayRecords + (current.map { [$0] } ?? []))
             .filter { $0.end > dayStart }
             .map { r -> PlanSlot in
                 let start = inDay(minuteOfDay(max(r.start, dayStart)))
@@ -206,15 +208,21 @@ final class Model: ObservableObject {
     // Debts past their one day of grace are force-expired.
     private func recomputeDebts() {
         let horizon = Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now
-        let missed = missedWindows(Settings.current, records: recordsSince(horizon), now: now)
+        // From yesterday's midnight, not 24h back: yesterday is judged as a whole calendar day,
+        // and a rolling window would drop its morning sessions as today goes on.
+        let yesterdayStart = Calendar.current.startOfDay(for: horizon)
+        // Only once no session is open: a running one counts just its elapsed part, which
+        // would lock in a shortfall the rest of that session was about to cover.
+        let missed = phase.hasOpenSession ? [] : missedWindows(Settings.current, records: recordsSince(yesterdayStart), now: now)
         for m in missed {
+            // Already owed: only windowEnd (today's last-window edge) moves if hours were
+            // edited mid-day — the shortfall itself is a snapshot, fixed at creation.
             if let i = state.catchUpDebts.firstIndex(where: { $0.activity == m.activity && $0.day == m.day }) {
                 if state.catchUpDebts[i].settledAt == nil { state.catchUpDebts[i].windowEnd = m.windowEnd }
                 continue
             }
-            guard let minutes = Settings.current.activity(named: m.activity)?.catchUpMinutes, minutes > 0 else { continue }
-            state.catchUpDebts.append(CatchUpDebt(activity: m.activity, day: m.day, windowEnd: m.windowEnd, catchUpMinutes: minutes))
-            log("catchup owed: \(m.activity) (missed \(m.day))")
+            state.catchUpDebts.append(CatchUpDebt(activity: m.activity, day: m.day, windowEnd: m.windowEnd, catchUpMinutes: m.shortfall))
+            log("catchup owed: \(m.activity) \(m.shortfall)m (missed \(m.day))")
         }
         let today = dayKey(now)
         let yesterday = dayKey(horizon)
@@ -290,7 +298,8 @@ final class Model: ObservableObject {
 
     // One click on a row in the Today list: start it now with the chosen length (or Pomodoro).
     // A debt owed by this activity overrides the chosen length: catch-up sessions are always
-    // its fixed, short catchUpMinutes, never the full original window.
+    // the day's shortfall (catchUpMinutes minus whatever was already done), never the full
+    // original window.
     func startActivity(_ activity: String, minutes chosen: Int? = nil, pomodoro usePomodoro: Bool? = nil) {
         guard !Setup.isPending, !Settings.current.isNight(at: now), activities.contains(activity), phase.canStart, limits.canStart(activity) else { return }
         if let debt = limits.owedDebt, debt.activity == activity {
@@ -366,12 +375,13 @@ final class Model: ObservableObject {
         notify("Focus: \(s.block)", "\(actualDuration). Go!")
     }
 
-    func stop() {
+    // "End session": over now, block lifted (whatever comes next brings its own), then the
+    // usual review and "What's next?". Switching to something else midway is recorded as
+    // what you actually did, and you can start the planned activity again afterwards.
+    func endSession() {
         guard let s = session else { return }
-        if s.policy.blocking && Date() < s.end {
-            message = "Locked until \(Fmt.clock.string(from: s.end)). Timer stopped, block stays."
-        }
-        log("off   \(s.block) (app)")
+        if s.policy.blocking { blocker.unlock(s.block) }
+        log("end   \(s.planned ?? s.block) early, after \(minutesLabel(max(0, Int(now.timeIntervalSince(s.shiftedStart))) / 60))")
         finish(s, ended: "stopped")
     }
 
@@ -384,6 +394,7 @@ final class Model: ObservableObject {
             // the saved phase still points at this session. Do not append it twice.
             if records.contains(where: { $0.isSameSession(as: r) }) { state.phase = .idle; return }
             if s.policy.review { state.phase = .reviewing(r); return }
+            payDebt(r)
             state.pendingRecords = (state.pendingRecords ?? []) + [r]
         }
         state.phase = .idle
@@ -413,16 +424,21 @@ final class Model: ObservableObject {
         let completed = dailyTasks.complete(day: dayKey(r.began ?? r.start), activities: Settings.current.activities,
                                             actual: actual, selected: Settings.current.has(.tasks) ? selectedTasks : [], otherWork: Settings.current.has(.tasks) ? otherWork : [:])
         r.completedTasks = completed.isEmpty ? nil : completed
-        // Only a session started specifically to pay this debt settles it (stamped in startNow):
-        // logging time for the activity some other, coincidental way never clears it.
-        if let id = r.settles, let i = state.catchUpDebts.firstIndex(where: { $0.id == id }) {
-            state.catchUpDebts[i].settledAt = now
-            log("catchup done: \(state.catchUpDebts[i].activity)")
-        }
+        payDebt(r)
         state.pendingRecords = (state.pendingRecords ?? []) + [r]
         state.phase = .idle
         flushPendingRecords()
         log("did   \(actual.joined(separator: ", "))\(r.asPlanned ? " (as planned)" : "")")
+    }
+
+    // Only a session started specifically to pay this debt settles it (stamped in startNow):
+    // logging time for the activity some other, coincidental way never clears it. Without the
+    // review this runs as the session finishes, so a debt still gets paid with the review off.
+    private func payDebt(_ r: SessionRecord) {
+        guard let id = r.settles, let i = state.catchUpDebts.firstIndex(where: { $0.id == id }) else { return }
+        pay(&state.catchUpDebts[i], with: r, at: now)
+        let d = state.catchUpDebts[i]
+        log(d.settledAt != nil ? "catchup done: \(d.activity)" : "catchup partly done: \(d.activity), \(d.catchUpMinutes)m left")
     }
 
     // MARK: away from the computer (no length: until you're back)
@@ -447,7 +463,7 @@ final class Model: ObservableObject {
         case .away, .forcedBreak:       // already away, or on a break that can't be skipped by leaving
             if lock { lockScreen() }
             return
-        case .freeTime, .reviewing:     // the shortcut still locks; nothing pauses
+        case .freeTime, .reviewing, .awayReview:   // the shortcut still locks; nothing pauses
             if lock { lockScreen() }
             return
         }
@@ -458,20 +474,41 @@ final class Model: ObservableObject {
         if lock { lockScreen() }
     }
 
-    // Back at the computer: a paused session goes on where it stopped, with its block moved
-    // by the time away. Away longer than the limit ends it instead, as of when you left.
+    // Back at the computer. Asking what you did (Rules → Step away) comes first, and whatever
+    // was paused waits for the answer; otherwise it's straight back to it.
     func comeBack() {
-        guard case .away = phase else { return }
+        guard case .away(let since, let paused) = phase else { return }
         // A Step away with a minimum: back early just re-locks, staying away until it elapses.
         if let until = state.stepAwayUntil {
             if now < until { lockScreen(); return }
             state.stepAwayUntil = nil
         }
-        guard case .away(let since, let paused) = phase else { return }
         keepAwake.off()
         let away = max(0, Int(now.timeIntervalSince(since)))
+        if Settings.current.asksAboutAway(seconds: away) {
+            state.phase = .awayReview(since: since, back: now, paused: paused)
+            log("back after \(minutesLabel(away / 60)): asking what you did")
+            return
+        }
+        returned(since: since, back: now, paused: paused)
+    }
+
+    // "What did you do while away?" answered: from the list, in your own words, or both.
+    func saveAwayReview(did: [String], note: String) {
+        guard case .awayReview(let since, let back, let paused) = phase else { return }
+        let note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !did.isEmpty || !note.isEmpty else { return }
+        log("was   " + (did + (note.isEmpty ? [] : [note])).joined(separator: ", "))
+        returned(since: since, back: back, paused: paused, did: did, note: note)
+    }
+
+    // The stretch away is saved, then a paused session goes on where it stopped, with its block
+    // moved by the time away. Away longer than the limit ends it instead, as of when you left.
+    // Time spent answering what you did counts as away too, so it doesn't eat into the session.
+    private func returned(since: Date, back: Date, paused: Session?, did: [String] = [], note: String = "") {
+        let away = max(0, Int(back.timeIntervalSince(since)))
         if away >= 60 {
-            let r = AwayRecord(start: since, end: now)
+            let r = AwayRecord(start: since, end: back, did: did.isEmpty ? nil : did, note: note.isEmpty ? nil : note)
             appendAway(r)
             awayRecords.append(r)
         }
@@ -485,7 +522,7 @@ final class Model: ObservableObject {
             finish(s, at: since, ended: "away")
             return
         }
-        s.paused += away
+        s.paused += max(0, Int(now.timeIntervalSince(since)))
         if s.policy.blocking, let cur = s.current(at: now), !s.phases[cur.index].isBreak {
             blocker.lock(s.block, until: cur.end)
         }
@@ -509,7 +546,7 @@ final class Model: ObservableObject {
             return
         }
         switch phase {
-        case .away, .forcedBreak, .reviewing:
+        case .away, .forcedBreak, .reviewing, .awayReview:
             state.activeSince = nil
         default:
             if !userPresent() { state.activeSince = nil }
@@ -525,7 +562,7 @@ final class Model: ObservableObject {
               now.timeIntervalSince(since) >= Double(Settings.current.forceBreakAfterHours) * 3600
         else { return }
         switch phase {
-        case .away, .forcedBreak, .reviewing: return
+        case .away, .forcedBreak, .reviewing, .awayReview: return
         case .session(let s): finish(s, ended: "forcedBreak")
         case .idle, .picking, .freeTime: break
         }
@@ -648,7 +685,7 @@ final class Model: ObservableObject {
             if state.pickingSince == nil { state.pickingSince = now }
             startRoundIfStuck()   // the picker opened, then what was left closed or ran out
             if let at = autoStartAt, now >= at { autoStart() }
-        case .reviewing:
+        case .reviewing, .awayReview:
             return
         case .away(let since, _):
             // The unlock went unheard (or the lock didn't happen): if you're at it, you're back.

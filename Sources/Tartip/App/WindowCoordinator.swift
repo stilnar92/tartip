@@ -48,6 +48,7 @@ final class WindowCoordinator {
             let size = CGSize(width: min(fullScreen ? 1080 : 880, max(280, available.width - 64)),
                               height: min(fullScreen ? 820 : 680, max(300, available.height - 80)))
             prompt.show(ReviewView(model: model, size: size), fullScreen: fullScreen)
+        case .awayReview: prompt.show(AwayReviewView(model: model), fullScreen: Settings.current.reviewFullScreen)
         case .forcedBreak: prompt.show(ForcedBreakView(model: model, clock: model.clock), fullScreen: true)
         case .idle, .session, .freeTime, .away: prompt.hide()
         }
@@ -106,9 +107,19 @@ func hideMenuPanel(except keep: NSWindow? = nil) {
 final class PromptWindow {
     private var panel: NSPanel?
     private var isFullScreen = false
+    private var isShowing = false
     private var covers: [NSPanel] = []
+    private var spaceObserver: NSObjectProtocol?
+
+    init() {
+        spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.followSpace() }
+        }
+    }
 
     func show<V: View>(_ view: V, fullScreen: Bool = false) {
+        isShowing = true
         if panel == nil || isFullScreen != fullScreen {
             panel?.orderOut(nil)
             panel = fullScreen ? Self.fullScreenPanel() : Self.floatingPanel()
@@ -140,8 +151,33 @@ final class PromptWindow {
     }
 
     func hide() {
+        isShowing = false
         panel?.orderOut(nil)
         removeCovers()
+    }
+
+    // "Every Space" only covers the Spaces that existed when the panel was made: on a Desktop
+    // added later (Mission Control's +) the prompt was missing, and the screen behind it free.
+    // So each Space switch rebuilds the panel on the Space you landed on, moving the same
+    // content over so the question keeps its state.
+    private func followSpace() {
+        guard isShowing, let old = panel else { return }
+        log("space changed: prompt \(old.isOnActiveSpace ? "here" : "missing"), rebuilt")
+        let p = isFullScreen ? Self.fullScreenPanel() : Self.floatingPanel()
+        let content = old.contentView
+        old.contentView = nil
+        old.orderOut(nil)
+        p.contentView = content
+        if isFullScreen, let screen = NSScreen.main ?? NSScreen.screens.first {
+            p.setFrame(screen.frame, display: true)
+            coverOtherScreens(than: screen)
+        } else {
+            p.setFrame(old.frame, display: true)
+        }
+        panel = p
+        p.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
+        p.makeKey()
     }
 
     private static func floatingPanel() -> NSPanel {

@@ -18,8 +18,8 @@ struct GetStartedView: View {
 
     private let sections = [
         TourSection(title: "Focus session", summary: "Choose what happens while you work and when time is up.", features: [.blocking, .workspace, .pomodoro, .review, .notifications]),
-        TourSection(title: "Plan your day", summary: "Add structure and reminders when you want them.", features: [.tasks, .scheduling, .guidance, .night]),
-        TourSection(title: "Take control", summary: "Set limits around changing rules, stepping away, and starting Tartip.", features: [.settingsLock, .away, .login, .relaunch, .statistics]),
+        TourSection(title: "Plan your day", summary: "Add structure and reminders when you want them.", features: [.tasks, .scheduling, .catchUp, .guidance, .night]),
+        TourSection(title: "Take control", summary: "Set limits around changing rules, stepping away, breaks, and starting Tartip.", features: [.settingsLock, .away, .forcedBreak, .login, .relaunch, .statistics]),
     ]
 
     var body: some View {
@@ -64,7 +64,7 @@ struct GetStartedView: View {
     private var introduction: some View {
         VStack(alignment: .leading, spacing: 18) {
             PageTitle(title: "Make time for what matters", subtitle: "Tartip starts as a simple timer. You decide which extra tools to use.")
-            guideCard(icon: "timer", title: "Start when you’re ready", detail: "Pick an activity and a length. The timer runs quietly until it ends or you stop it.")
+            guideCard(icon: "timer", title: "Start when you’re ready", detail: "Pick an activity and a length. The timer runs quietly until it ends, or you end it early and pick something else.")
             guideCard(icon: "slider.horizontal.3", title: "Add only what helps", detail: "Blocking, plans, reminders and other tools are optional. You can change these choices later in Settings.")
             Text("This short guide takes about a minute. Skip it any time.")
                 .font(.system(size: 12)).foregroundStyle(Theme.text2)

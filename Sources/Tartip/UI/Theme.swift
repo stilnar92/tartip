@@ -21,7 +21,7 @@ enum Theme {
 
 extension View {
     // No blue keyboard-focus ring: when a window opens, macOS puts focus on its first control
-    // (Stop session, Stats…) and outlines it, which in a mouse-driven app reads as a glitch.
+    // (End session, Stats…) and outlines it, which in a mouse-driven app reads as a glitch.
     // Tab still moves focus; only the outline goes.
     @ViewBuilder func noFocusRings() -> some View {
         if #available(macOS 14.0, *) { self.focusEffectDisabled() } else { self }

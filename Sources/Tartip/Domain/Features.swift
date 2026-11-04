@@ -41,9 +41,9 @@ enum Feature: String, Codable, CaseIterable, Identifiable {
         case .login: "Start Tartip when you sign in."
         case .relaunch: "Keep Tartip running after a quit. Requires Launch at login."
         case .notifications: "Play sounds and show session notifications."
-        case .away: "Lock the screen and keep the Mac awake while away."
+        case .away: "Lock the screen and keep the Mac awake while away. Optionally ask what you did when you're back, and see it in Stats."
         case .forcedBreak: "End the session and require a step away after a long stretch at the computer, with no way to skip it."
-        case .catchUp: "If an important activity's hours close with none of it done, force a short catch-up session for it before anything else. Set its catch-up length in Activities → Edit."
+        case .catchUp: "Give an activity with hours a minimum per day. If the day's hours close short of it, the shortfall is forced as a catch-up session before anything else. Set it in Activities → Edit."
         }
     }
 }

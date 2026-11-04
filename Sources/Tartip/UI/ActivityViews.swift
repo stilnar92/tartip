@@ -66,6 +66,69 @@ struct ForcedBreakView: View {
     }
 }
 
+// Back from away: what you did off the computer, picked from your list and/or typed. Required,
+// like the review: the stretch and any paused session wait for the answer. Several picks split
+// the time evenly in Stats.
+struct AwayReviewView: View {
+    @ObservedObject var model: Model
+    @State private var did: [String] = []
+    @State private var note = ""
+
+    private var canSave: Bool { !did.isEmpty || !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    var body: some View {
+        let s = Settings.current
+        let minutes = model.phase.awayStretch.map { Int($0.back.timeIntervalSince($0.since)) / 60 } ?? 0
+        let showsList = s.awayAsk == .list && !s.awayActivities.isEmpty
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top) {
+                PageTitle(title: "Welcome back", subtitle: "What did you do while away?")
+                Spacer(minLength: 16)
+                Tag(text: minutesLabel(minutes), color: Theme.accent, fill: Theme.accentTint)
+            }
+            if showsList {
+                FlowLayout(spacing: 6) {
+                    ForEach(s.awayActivities, id: \.self) { name in
+                        let on = did.contains(name)
+                        Button {
+                            if on { did.removeAll { $0 == name } } else { did.append(name) }
+                        } label: {
+                            Text(name).font(.system(size: 13, weight: on ? .semibold : .regular))
+                                .padding(.horizontal, 12).padding(.vertical, 7)
+                                .pill(selected: on)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            TextField(showsList ? "Something else…" : "What did you do?", text: $note)
+                .textFieldStyle(.plain).font(.system(size: 13))
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .card(radius: 9)
+                .onSubmit(save)
+            HStack {
+                Spacer()
+                Button(action: save) {
+                    Text("Save")
+                        .font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
+                        .padding(.horizontal, 28).padding(.vertical, 11)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.accent))
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSave).opacity(canSave ? 1 : 0.4)
+                .keyboardShortcut(.return, modifiers: .command)
+            }
+        }
+        .padding(24)
+        .frame(width: 420)
+    }
+
+    private func save() {
+        guard canSave else { return }
+        model.saveAwayReview(did: did, note: note)
+    }
+}
+
 // Activity selection and completion remain separate, with edits staged until Save.
 struct ReviewView: View {
     @ObservedObject var model: Model

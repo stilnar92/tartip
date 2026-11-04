@@ -100,7 +100,7 @@ final class NativeBlocker: ObservableObject, Blocker {
         guard locks[block] != nil else { return }
         locks[block] = nil
         UserDefaults.standard.set(locks, forKey: "locks")
-        log("unblock \(block) (break)")
+        log("unblock \(block) (early)")
     }
 
     private var active: [ActiveBlock] {

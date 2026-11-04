@@ -33,6 +33,11 @@ func loadRecords() -> [SessionRecord] {
 struct AwayRecord: Codable, Equatable {
     var start: Date
     var end: Date
+    var did: [String]? = nil    // picked from the off-computer list when you came back
+    var note: String? = nil     // typed when you came back
+
+    // What you said you did, list picks first; empty when you weren't asked.
+    var reasons: [String] { (did ?? []) + (note.map { [$0] } ?? []) }
 }
 
 func appendAway(_ r: AwayRecord) {

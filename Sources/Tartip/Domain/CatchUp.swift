@@ -1,31 +1,38 @@
 import Foundation
 
-// An activity's scheduled window closed with none of it actually done. "Important" means
-// catchUpMinutes > 0; activities without it are never tracked here.
+// An activity's scheduled windows closed for the day without catchUpMinutes worth of it done.
+// catchUpMinutes does double duty: it's both the minimum minutes a day needs to clear the day
+// (no debt), and — when the day falls short — the forced catch-up is only the SHORTFALL
+// (catchUpMinutes minus whatever was actually done), never more than catchUpMinutes itself.
+// "Important" means catchUpMinutes > 0; activities without it are never tracked here.
 // Persisted (like Round) so a debt survives a restart and the day it was missed on, not just
 // recomputed from scratch: recomputing alone can't tell "settled by a dedicated catch-up"
 // from "happened to log time some other way" (see settledBy on Session/SessionRecord).
 struct CatchUpDebt: Codable, Equatable, Identifiable {
     var id = UUID()
     var activity: String
-    var day: String          // dayKey of the calendar day the missed window fell on; identity key with activity
-    var windowEnd: Date      // the `to` instant that closed it unmet, as of the last recompute —
+    var day: String          // dayKey of the calendar day the shortfall fell on; identity key with activity
+    var windowEnd: Date      // when the day's last window closed, as of the last recompute —
                              // NOT part of the debt's identity: editing the activity's hours mid-day
                              // (adding/moving a window) updates this in place rather than opening a
                              // second debt for the same (activity, day).
-    var catchUpMinutes: Int  // snapshotted at detection time, so editing the setting later doesn't change it
+    var catchUpMinutes: Int  // the shortfall at detection time (catchUpMinutes setting minus minutes
+                             // already done that day), snapshotted so editing the setting or doing
+                             // more of the activity afterward doesn't change an open debt
     var settledAt: Date?
     var expired = false      // past its day of grace, unsettled; kept (not removed) so it still shows in Stats
 }
 
-// A day's worth of scheduled windows, fully closed by `now` with nothing done in ANY of them.
-// One activity can have several windows in a day (e.g. Work 10-12 and 16-18): missing is
-// judged per day, not per window — doing it in any one window clears the whole day.
-// `records` must include a running session under `planned` (Model.recordsSince already does),
-// so a session still in progress, or finished but awaiting its review, is never counted as missed.
+// A day's worth of scheduled windows, fully closed by `now`, with less than catchUpMinutes
+// worth of the activity actually done across the WHOLE day (summed from the post-session
+// review, full session lengths — not clipped to window edges). One activity can have several
+// windows in a day (e.g. Work 10-12 and 16-18): the minimum is judged per day, not per window.
+// `records` must cover yesterday and today from yesterday's midnight. Call it only when no
+// session is open (AppPhase.hasOpenSession): a running session counts just its elapsed part.
+// A shortfall under a minute is ignored, so seconds of timing slack never force a catch-up.
 func missedWindows(_ s: AppSettings, records: [SessionRecord], now: Date,
-                   calendar: Calendar = .current) -> [(activity: String, day: String, windowEnd: Date)] {
-    var out: [(activity: String, day: String, windowEnd: Date)] = []
+                   calendar: Calendar = .current) -> [(activity: String, day: String, windowEnd: Date, shortfall: Int)] {
+    var out: [(activity: String, day: String, windowEnd: Date, shortfall: Int)] = []
     for a in s.activities where a.catchUpMinutes > 0 {
         guard !a.windows.isEmpty else { continue }
         // Yesterday and today only: anything that closed before that is already past its grace (see expiry below).
@@ -39,14 +46,26 @@ func missedWindows(_ s: AppSettings, records: [SessionRecord], now: Date,
                 return (start, end)
             }
             guard let lastEnd = spans.map(\.end).max(), lastEnd <= now else { continue }   // today's last window not closed yet
-            let covered = spans.contains { span in
-                Tartip.records(records, from: span.start, to: span.end)
-                    .contains { ($0.actual.isEmpty ? [$0.planned ?? otherActivity] : $0.actual).contains(a.name) }
-            }
-            if !covered { out.append((a.name, dayKey(dayStart), lastEnd)) }
+            let dayEnd = dayStart.addingTimeInterval(86_400)
+            let doneSeconds = secondsByActivity(Tartip.records(records, from: dayStart, to: dayEnd))[a.name] ?? 0
+            let shortfall = (a.catchUpMinutes * 60 - doneSeconds) / 60
+            if shortfall > 0 { out.append((a.name, dayKey(dayStart), lastEnd, shortfall)) }
         }
     }
     return out
+}
+
+// A session started to pay this debt is over. Run to its end, it settles the debt. Cut short
+// (End session, away too long, a forced break), only the time the review gives the activity
+// counts: the debt shrinks by that and stays owed until nothing is left, so ending a catch-up
+// after a minute doesn't clear it.
+func pay(_ debt: inout CatchUpDebt, with r: SessionRecord, at now: Date) {
+    guard debt.settledAt == nil else { return }
+    if r.ended != "done" {
+        debt.catchUpMinutes -= (secondsByActivity([r])[debt.activity] ?? 0) / 60
+        guard debt.catchUpMinutes <= 0 else { return }
+    }
+    debt.settledAt = now
 }
 
 // The oldest unsettled, unexpired debt; ties (same windowEnd) broken by the activities' list order.

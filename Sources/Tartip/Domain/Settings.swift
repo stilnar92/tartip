@@ -142,6 +142,19 @@ struct ModeConfig: Codable, Hashable, Sendable {
     var isEmpty: Bool { apps.isEmpty && urls.isEmpty && files.isEmpty }
 }
 
+// How "What did you do while away?" asks: not at all, in your own words, or your off-computer
+// list with your own words as well.
+enum AwayAsk: String, Codable, CaseIterable {
+    case off, text, list
+    var title: String {
+        switch self {
+        case .off: "Don't ask"
+        case .text: "Free text"
+        case .list: "List + free text"
+        }
+    }
+}
+
 struct AppSettings: Codable, Equatable {
     var features = Features.legacy
     // Free time
@@ -171,6 +184,12 @@ struct AppSettings: Codable, Equatable {
     // Step away locks the screen for at least this long: unlocking sooner locks it again,
     // until this much has actually elapsed since it started. 0 = no minimum (today's behavior).
     var stepAwayMinutes = 0
+
+    // Back from away: ask what you did, off the computer. Off by default; only stretches of at
+    // least awayAskAfterMinutes are asked about (see asksAboutAway).
+    var awayAsk = AwayAsk.off
+    var awayAskAfterMinutes = 5
+    var awayActivities = ["Meal", "Walk", "Workout", "Errands", "Rest"]   // the list, with .list
 
     // Forced breaks: after this long continuously at the computer, the session ends and a
     // break is required. 0 = never. The break only lifts once the cooldown runs out.
@@ -230,6 +249,12 @@ extension AppSettings {
               let mergedData = try? JSONSerialization.data(withJSONObject: base.merging(saved) { _, new in new })
         else { return nil }
         return try? JSONDecoder().decode(AppSettings.self, from: mergedData)
+    }
+
+    // Back from this many seconds away: ask what you did? Only past the minimum, and never for
+    // a stretch longer than longestAway — that's sleep, which Stats doesn't count as away either.
+    func asksAboutAway(seconds: Int) -> Bool {
+        has(.away) && awayAsk != .off && seconds >= max(1, awayAskAfterMinutes) * 60 && Double(seconds) <= longestAway
     }
 
     // Night window, which may cross midnight (e.g. 22:00–06:00).

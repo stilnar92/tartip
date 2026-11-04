@@ -2,23 +2,32 @@ import SwiftUI
 
 // MARK: - Stats window
 
+// One day (stepped back up to maxDaysBack), or the last 7, 30 or 90 days up to now.
+enum StatsRange: CaseIterable {
+    case day, week, month, quarter
+    static let maxDaysBack = 89   // today and the 89 days before it: 90 days
+    var days: Int {
+        switch self {
+        case .day: 1
+        case .week: 7
+        case .month: 30
+        case .quarter: 90
+        }
+    }
+    var title: String { self == .day ? "Day" : "\(days) days" }
+}
+
 struct StatsView: View {
     @ObservedObject var model: Model
-    @State private var range = 0   // 0 = today, 1 = yesterday, 2 = 7 days, 3 = 30 days
+    @State private var range = StatsRange.day
+    @State private var daysBack = 0   // Day: 0 = today, up to StatsRange.maxDaysBack
 
     var body: some View {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        let yesterday = cal.date(byAdding: .day, value: -1, to: today) ?? today
-        let from: Date = {
-            switch range {
-            case 0: return today
-            case 1: return yesterday
-            case 2: return cal.date(byAdding: .day, value: -6, to: today) ?? today
-            default: return cal.date(byAdding: .day, value: -29, to: today) ?? today
-            }
-        }()
-        let to = range == 1 ? today : Date()
+        let from = cal.date(byAdding: .day, value: range == .day ? -daysBack : 1 - range.days, to: today) ?? today
+        let to = range == .day && daysBack > 0 ? (cal.date(byAdding: .day, value: 1, to: from) ?? today) : Date()
+        let isToday = range == .day && daysBack == 0
         let recs = model.recordsSince(from, upTo: to)
         var byActivity = model.secondsByActivity(since: from, upTo: to)
         for a in model.activities where byActivity[a] == nil { byActivity[a] = 0 }
@@ -33,19 +42,22 @@ struct StatsView: View {
         let reviewed = recs.filter { !$0.actual.isEmpty && $0.planned != nil }
         let kept = reviewed.filter(\.asPlanned).count
         let more = insights(recs, events: model.events.filter { $0.type != "free" } + model.freePieces, away: model.awayRecords, from: from, to: to)
+        // Stretches away you said something about sit among the sessions, by time.
+        let aways = model.awayRecords.filter { !$0.reasons.isEmpty && $0.start >= from && $0.start < to }
+        let timeline: [(t: Date, session: SessionRecord?, away: AwayRecord?)] =
+            (recs.map { ($0.start, $0, nil) } + aways.map { ($0.start, nil, $0) }).sorted { $0.t > $1.t }
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack {
                 PageTitle(title: "Stats")
                 Spacer()
                 Picker("", selection: $range) {
-                    Text("Today").tag(0)
-                    Text("Yesterday").tag(1)
-                    Text("7 days").tag(2)
-                    Text("30 days").tag(3)
+                    ForEach(StatsRange.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented).labelsHidden().frame(width: 280)
             }
+
+            if range == .day { dayStepper(from) }
 
             HStack(spacing: 0) {
                 summary(formatDuration(total), "Focused")
@@ -87,7 +99,7 @@ struct StatsView: View {
                         .frame(height: 10)
                         // Today: show progress against the daily limit, e.g. "45m / 1h".
                         let limit = limits.limitMinutes(name)
-                        Text((secs > 0 ? formatDuration(secs) : "–") + (range == 0 && limit > 0 ? " / \(limitLabel(limit))" : "")).font(.system(size: 12, weight: .semibold))
+                        Text((secs > 0 ? formatDuration(secs) : "–") + (isToday && limit > 0 ? " / \(limitLabel(limit))" : "")).font(.system(size: 12, weight: .semibold))
                             .monospacedDigit().frame(width: 92, alignment: .trailing)
                     }
                 }
@@ -105,12 +117,27 @@ struct StatsView: View {
                 }
             }
 
-            if !recs.isEmpty {
+            if !more.awayReasons.isEmpty {
+                SectionLabel(text: "Time away went to")
+                    .help("What you said you did when you came back. Several answers split a stretch evenly.")
+                FlowLayout(spacing: 6) {
+                    ForEach(more.awayReasons, id: \.name) { r in
+                        Text("\(r.name)  \(formatDuration(r.seconds))").font(.system(size: 11)).monospacedDigit()
+                            .foregroundStyle(r.name == notSaidAway ? Theme.text2 : Theme.text)
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Capsule().fill(Theme.pill))
+                    }
+                }
+            }
+
+            if !timeline.isEmpty {
                 Divider()
-                SectionLabel(text: "Sessions")
+                SectionLabel(text: aways.isEmpty ? "Sessions" : "Sessions and time away")
                 ScrollView {
                     VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(recs.reversed().enumerated()), id: \.offset) { _, r in sessionRow(r) }
+                        ForEach(Array(timeline.enumerated()), id: \.offset) { _, e in
+                            if let r = e.session { sessionRow(r) } else if let a = e.away { awayRow(a) }
+                        }
                     }
                 }
                 .frame(maxHeight: 180)
@@ -128,8 +155,42 @@ struct StatsView: View {
         .frame(maxWidth: .infinity)
     }
 
+    // ‹ Mon, 2 Nov › — one day at a time, back to StatsRange.maxDaysBack.
+    private func dayStepper(_ day: Date) -> some View {
+        let label = daysBack == 0 ? "Today" : daysBack == 1 ? "Yesterday"
+            : day.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
+        return HStack(spacing: 12) {
+            Button { daysBack += 1 } label: { Image(systemName: "chevron.left") }
+                .disabled(daysBack >= StatsRange.maxDaysBack)
+                .help("Previous day")
+            Text(label).font(.system(size: 13, weight: .semibold)).frame(minWidth: 110)
+            Button { daysBack -= 1 } label: { Image(systemName: "chevron.right") }
+                .disabled(daysBack == 0)
+                .help("Next day")
+            if daysBack > 0 {
+                Button("Today") { daysBack = 0 }.font(.system(size: 12))
+            }
+        }
+        .buttonStyle(.borderless)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var timeFormat: DateFormatter {
+        range == .day ? Fmt.clock : range == .week ? Fmt.weekdayClock : Fmt.dayClock
+    }
+
+    private func awayRow(_ a: AwayRecord) -> some View {
+        HStack(spacing: 8) {
+            Text(timeFormat.string(from: a.start)).font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary).frame(width: 70, alignment: .leading)
+            Image(systemName: "figure.walk").font(.system(size: 11)).foregroundStyle(Theme.text2)
+            Text(a.reasons.joined(separator: ", ")).font(.system(size: 12)).foregroundStyle(Theme.text2).lineLimit(1)
+            Spacer()
+            Text("\(Int(a.end.timeIntervalSince(a.start)) / 60)m").font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
+        }
+    }
+
     private func sessionRow(_ r: SessionRecord) -> some View {
-        let f = range <= 1 ? Fmt.clock : range == 2 ? Fmt.weekdayClock : Fmt.dayClock
+        let f = timeFormat
         let planned = r.planned ?? "–"
         let actual = r.actual.isEmpty ? "not reviewed" : r.actual.joined(separator: ", ")
         return HStack(spacing: 8) {

@@ -419,6 +419,46 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
         #expect(i.blocked == [.init(name: "youtube.com", count: 2), .init(name: "ru.keepcoder.Telegram", count: 1)])
     }
 
+    // Said reasons, split evenly when several; unexplained time is "Not said", but only once
+    // something was said — and sleep (over 3 h) is never counted.
+    @Test func awayReasons() {
+        let away = [AwayRecord(start: at(10), end: at(10, 30), did: ["Walk"]),
+                    AwayRecord(start: at(12), end: at(12, 20), did: ["Meal"], note: "Call with mom"),
+                    AwayRecord(start: at(14), end: at(14, 15)),
+                    AwayRecord(start: at(1), end: at(7), did: ["Sleep"])]
+        let i = insights([], events: [], away: away, from: at(0), to: at(0, day: 2))
+        #expect(i.awayReasons == [.init(name: "Walk", seconds: 1800), .init(name: "Call with mom", seconds: 600),
+                                  .init(name: "Meal", seconds: 600), .init(name: notSaidAway, seconds: 900)])
+        let unasked = insights([], events: [], away: [AwayRecord(start: at(14), end: at(14, 15))], from: at(0), to: at(0, day: 2))
+        #expect(unasked.awayReasons.isEmpty)
+    }
+
+    @Test func asksAboutAwayOnlyWhenOnAndInRange() {
+        var s = AppSettings()
+        #expect(!s.asksAboutAway(seconds: 600))                // off by default
+        s.awayAsk = .text
+        #expect(!s.asksAboutAway(seconds: 4 * 60 + 59))
+        #expect(s.asksAboutAway(seconds: 5 * 60))
+        #expect(s.asksAboutAway(seconds: 3 * 3600))
+        #expect(!s.asksAboutAway(seconds: 3 * 3600 + 1))       // sleep
+        s.features.enabled.remove(.away)
+        #expect(!s.asksAboutAway(seconds: 600))
+    }
+
+    @Test func awayLinesFromBeforeStillLoad() throws {
+        let old = try recordDecoder().decode(AwayRecord.self, from: Data(#"{"start":"2026-10-27T15:41:52Z","end":"2026-10-27T16:01:36Z"}"#.utf8))
+        #expect(old.did == nil && old.note == nil && old.reasons.isEmpty)
+    }
+
+    // The question survives a restart, with the paused session still waiting behind it.
+    @Test func awayReviewPhaseRoundTrips() throws {
+        let s = Session(block: "Work", phases: [Phase(isBreak: false, minutes: 30)], start: at(10), planned: "Work")
+        let phase = AppPhase.awayReview(since: at(10, 5), back: at(10, 20), paused: s)
+        let decoded = try JSONDecoder().decode(AppPhase.self, from: JSONEncoder().encode(phase))
+        #expect(decoded == phase && decoded.hasOpenSession && !decoded.canStart)
+        #expect(decoded.awayStretch?.back == at(10, 20))
+    }
+
     @Test func onlyTheHostOfABlockedSite() {
         #expect(siteName("https://www.youtube.com/watch?v=abc") == "youtube.com")
         #expect(siteName("file:///Users/x/a.html") == nil)

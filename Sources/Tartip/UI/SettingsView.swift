@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var askDelete: ActivitySetting?  // "Delete activity?" waiting for an answer
     @State private var askLock: LockSettings?  // warning before the settings lock gets on or stronger
     @State private var newActivity = ""
+    @State private var newAwayActivity = ""
     @State private var optionsText = Settings.shared.value.durationOptions.map(String.init).joined(separator: ", ")
 
     // The window shows this view itself, not one of its pages as a property:
@@ -119,12 +120,63 @@ struct SettingsView: View {
                             Text("Unlocking sooner locks it again until this much time has actually passed.")
                                 .font(.system(size: 11)).foregroundStyle(.secondary)
                             row("Ends a paused session after") { minuteStepper($settings.value.maxAwayMinutes, 5...240, step: 5) }
+                            row("Ask what you did when back") {
+                                Picker("", selection: $settings.value.awayAsk) {
+                                    ForEach(AwayAsk.allCases, id: \.self) { Text($0.title).tag($0) }
+                                }
+                                .labelsHidden().fixedSize()
+                            }
+                            if settings.value.awayAsk != .off {
+                                row("When away at least") { minuteStepper($settings.value.awayAskAfterMinutes, 1...60, step: 1) }
+                                Text("Shorter stretches aren't asked about, and neither are ones over 3 hours: that's sleep. The answers show in Stats.")
+                                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                            }
+                            if settings.value.awayAsk == .list { awayActivitiesEditor }
                         }
                         .padding(.top, 4)
                     }
                 }
             }
         }
+    }
+
+    // Things done away from the computer, offered when you come back. Not activities: no
+    // limits, no sessions, only a record of where the time away went.
+    private var awayActivitiesEditor: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Off the computer").font(.system(size: 13))
+            FlowLayout(spacing: 6) {
+                ForEach(settings.value.awayActivities, id: \.self) { name in
+                    HStack(spacing: 4) {
+                        Text(name)
+                        Button { settings.value.awayActivities.removeAll { $0 == name } } label: {
+                            Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
+                        }
+                        .buttonStyle(.plain).foregroundStyle(.secondary)
+                        .accessibilityLabel("Remove \(name)")
+                    }
+                    .font(.system(size: 12))
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .pill()
+                }
+            }
+            HStack(spacing: 6) {
+                TextField("Add one, e.g. Lunch", text: $newAwayActivity)
+                    .textFieldStyle(.plain).font(.system(size: 12))
+                    .padding(.horizontal, 10).padding(.vertical, 7)
+                    .card(radius: 9)
+                    .onSubmit(addAwayActivity)
+                Button("Add", action: addAwayActivity)
+                    .disabled(newAwayActivity.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+    }
+
+    private func addAwayActivity() {
+        let name = newAwayActivity.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        if !settings.value.awayActivities.contains(name) { settings.value.awayActivities.append(name) }
+        newAwayActivity = ""
     }
 
     // MARK: sections
@@ -239,13 +291,13 @@ struct SettingsView: View {
                             }
                             .buttonStyle(.plain)
                             if settings.value.has(.catchUp) {
-                                row("Catch-up if missed") {
+                                row("Minimum per day") {
                                     HStack(spacing: 6) {
                                         Text(item.catchUpMinutes == 0 ? "off" : "\(item.catchUpMinutes) min").monospacedDigit()
                                         Stepper("", value: a.catchUpMinutes, in: 0...120, step: 5).labelsHidden().controlSize(.small)
                                     }
                                 }
-                                .help("If these hours close with none of it done in any window, the next pick is forced to this many minutes of it.")
+                                .help("If the day's hours close with less than this done in total (across all windows), the next pick is forced to just the shortfall — this minus whatever was already done.")
                             }
                         }
                         Divider()

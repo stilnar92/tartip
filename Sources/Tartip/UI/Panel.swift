@@ -198,17 +198,24 @@ struct ContentView: View {
                 dailySummary(name)
             }
 
-            if Settings.current.has(.away) {
-                Button {
-                    model.stepAway()
-                } label: {
-                    Label("Step away", systemImage: "figure.walk")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(maxWidth: .infinity).padding(.vertical, 10)
-                        .pill(selected: true)
+            // One pill, like every card; ending early is the quieter link under it.
+            VStack(spacing: 10) {
+                if Settings.current.has(.away) {
+                    Button {
+                        model.stepAway()
+                    } label: {
+                        Label("Step away", systemImage: "figure.walk")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(maxWidth: .infinity).padding(.vertical, 10)
+                            .pill(selected: true)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Locks the screen and pauses the timer. ⌃⌥⌘L")
                 }
-                .buttonStyle(.plain)
-                .help("Locks the screen and pauses the timer. ⌃⌥⌘L")
+                Button("End session early") { model.endSession() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12)).foregroundStyle(Theme.text2)
+                    .help("Ends it now: say what you actually did, then pick what's next.")
             }
         }
         .padding(16)
