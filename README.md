@@ -16,24 +16,52 @@ A small macOS menu bar app that starts with a simple focus timer. Choose an acti
 
 ## Screenshots
 
-<p align="center">
-  <img src="docs/screenshots/whats-next.png" width="300" alt="What's next?: the day's activities, a catch-up owed for Spanish, session lengths, free time and Step away">
-  <img src="docs/screenshots/panel-session.png" width="300" alt="The menu bar panel during a Spanish session: countdown, progress, Step away and End session early">
-</p>
+Click any screenshot to see it full size.
 
-<p align="center">
-  <img src="docs/screenshots/stats.png" width="700" alt="Stats for one day: time focused, sessions, activities against their daily limits, catch-up and time away">
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/review.png" width="520" alt="Session done: pick what you actually worked on and check off its tasks">
-  <img src="docs/screenshots/welcome-back.png" width="300" alt="Welcome back: what you did while away, from your own list or typed">
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/activities.png" width="440" alt="Activities: today's plan as periods, each listing what can be picked then">
-  <img src="docs/screenshots/tasks.png" width="440" alt="Tasks: today's checklist for each activity">
-</p>
+<table>
+<tr>
+<td align="center" valign="top" width="33%">
+<a href="docs/screenshots/whats-next.png"><img src="docs/screenshots/whats-next.png" alt="What's next?: Pick what's next; a catch-up comes first"></a><br>
+<b>What's next?</b><br><sub>Pick what's next; a catch-up comes first</sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="docs/screenshots/panel-session.png"><img src="docs/screenshots/panel-session.png" alt="Focus session: The menu bar panel while you work"></a><br>
+<b>Focus session</b><br><sub>The menu bar panel while you work</sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="docs/screenshots/review.png"><img src="docs/screenshots/review.png" alt="Session done: Say what you actually did, check off tasks"></a><br>
+<b>Session done</b><br><sub>Say what you actually did, check off tasks</sub>
+</td>
+</tr>
+<tr>
+<td align="center" valign="top" width="33%">
+<a href="docs/screenshots/stats.png"><img src="docs/screenshots/stats.png" alt="Stats: Time per activity, catch-up, time away"></a><br>
+<b>Stats</b><br><sub>Time per activity, catch-up, time away</sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="docs/screenshots/activities.png"><img src="docs/screenshots/activities.png" alt="Activities: Today's plan: what you can pick, when"></a><br>
+<b>Activities</b><br><sub>Today's plan: what you can pick, when</sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="docs/screenshots/tasks.png"><img src="docs/screenshots/tasks.png" alt="Tasks: Today's checklist for each activity"></a><br>
+<b>Tasks</b><br><sub>Today, daily areas, overdue: Todoist-style</sub>
+</td>
+</tr>
+<tr>
+<td align="center" valign="top" width="33%">
+<a href="docs/screenshots/welcome-back.png"><img src="docs/screenshots/welcome-back.png" alt="Welcome back: Where you were while away"></a><br>
+<b>Welcome back</b><br><sub>Where you were while away</sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="docs/screenshots/features.png"><img src="docs/screenshots/features.png" alt="Features: Turn on only the tools you need"></a><br>
+<b>Features</b><br><sub>Turn on only the tools you need</sub>
+</td>
+<td align="center" valign="top" width="33%">
+<a href="docs/screenshots/first-run.png"><img src="docs/screenshots/first-run.png" alt="First run: A one-minute guide on a new install"></a><br>
+<b>First run</b><br><sub>A one-minute guide on a new install</sub>
+</td>
+</tr>
+</table>
 
 All the data in these screenshots is made up.
 
@@ -107,7 +135,7 @@ The behaviors below describe the optional tools. Enable only those you need in *
 10. **Forced breaks** (Features → Forced breaks; off by default). After a chosen number of continuous hours at the computer (0 = never, up to 8h), whatever's running ends and the screen locks for a cooldown (1–30 min) with no way to skip it; stepping back in early doesn't end it, only the cooldown running out does. The "After" and "Cooldown" controls sit right under the toggle.
 11. **Catch-up on missed activities** (Features → Catch-up on missed activities; off by default). Give an activity with hours a **Minimum per day** (Activities → ⌄ → Hours) to mark it important. Once the day's last window closes, everything you did of it that day is added up from the post-session reviews (full session lengths, across all its windows; time away doesn't count). If that's short of the minimum, the next "What's next?" forces that activity, and only it, for just the shortfall (minimum 60, done 20 → 40 min owed). The amount is fixed when it's owed. Doing anything else is blocked until it's paid off; if more than one activity is owed, the oldest goes first, one at a time. Ending a catch-up early only pays off the minutes you spent on it, and the rest stays owed. An unsettled debt carries one extra day before it's dropped.
 
-**Daily tasks.** Open **Tasks** in the main window to plan a checklist for each activity for the current day. Press Return to add another task, or paste multiple lines. Edit, reorder and delete tasks there. Before starting a session, expand **Today's tasks** under an activity to preview its checklist. The timer screen stays free of task controls. After a session, pick what you actually worked on: clicking an activity selects it alone (the fast default), and its tasks appear to mark as completed, plus an optional field for other work; check the box next to an activity instead of clicking it to add it to the selection and split the session's time across several. Besides your own activities you can also choose **Other** (a reviewed catch-all for real work that isn't on your list) or **Not planned** (purely a stats label for "none of this" — it doesn't start or restrict anything, it just keeps Stats honest instead of crediting the planned activity). Saving the review marks the selected tasks complete and records a snapshot in session history. A session crossing midnight reviews the tasks from the day it began. Tasks survive activity renames and restarts; each day has its own list without automatic carryover.
+**Daily tasks.** Open **Tasks** for today's list, Todoist-style: type in the bar at the top, pick the activity on its right, and press Return (the field stays ready for the next one; paste several lines to add each). Open tasks are grouped by activity; each has a round checkbox in the activity's color, a title you edit in place, and on hover a ⋯ menu to move it to another activity, reorder or delete it. Finished ones collapse under **Completed**. Anything left unfinished from an earlier day shows as **Overdue** with **Today** to bring it over (or **Move all to today**); nothing moves by itself. Before starting a session, expand **Today's tasks** under an activity to preview its checklist. The timer screen stays free of task controls. After a session, pick what you actually worked on: clicking an activity selects it alone (the fast default), and its tasks appear to mark as completed, plus an optional field for other work; check the box next to an activity instead of clicking it to add it to the selection and split the session's time across several. Besides your own activities you can also choose **Other** (a reviewed catch-all for real work that isn't on your list) or **Not planned** (purely a stats label for "none of this" — it doesn't start or restrict anything, it just keeps Stats honest instead of crediting the planned activity). Saving the review marks the selected tasks complete and records a snapshot in session history. A session crossing midnight reviews the tasks from the day it began. Tasks survive activity renames and restarts; each day has its own list, and unfinished ones wait under Overdue.
 
 **Shortcuts** (from any app, listed in Features): **⌃⌥⌘L** steps away when Step away is enabled, **⌃⌥⌘T** opens Today.
 

@@ -24,6 +24,12 @@ final class Model: ObservableObject {
         dailyTasks.set(tasks, day: day, activity: activity)
     }
 
+    func editTasks(_ change: (inout DailyTasks) -> Void) { change(&dailyTasks) }
+
+    func moveTask(_ id: UUID, from day: String, activity: UUID, to newDay: String, activity newActivity: UUID) {
+        dailyTasks.move(id, from: day, activity: activity, to: newDay, activity: newActivity)
+    }
+
     @Published var message = ""
     @Published var oneTimeLink = ""
     @Published private(set) var records: [SessionRecord]
