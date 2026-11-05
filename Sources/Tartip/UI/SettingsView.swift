@@ -29,11 +29,14 @@ struct SettingsView: View {
 
     // Pages of the main window's sidebar.
     private var activitiesPage: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            PageTitle(title: "Activities", subtitle: "Choose what to focus on. Add optional tools when you need them.")
+        // One sheet on the page background, no cards: Today, a hairline, then the list.
+        VStack(alignment: .leading, spacing: 14) {
+            PageTitle(title: "Activities", subtitle: "What you focus on, and when.")
             lockBanner
-            if settings.value.has(.scheduling) { dayPlan }
-            row("Default duration") { minuteStepper($settings.value.defaultMinutes, 15...240, step: 5) }
+            if settings.value.has(.scheduling) {
+                dayPlan
+                Divider()
+            }
             activitiesSection
         }
         // On the page, not on the list: a modifier on ForEach is applied to every row.
@@ -181,20 +184,37 @@ struct SettingsView: View {
 
     // MARK: sections
 
+    // One card: the list as rows with hairlines between them, the default length in its
+    // header, and adding a new one as the last row.
     private var activitiesSection: some View {
-        group("Your list", "Add activities or edit their names and appearance.") {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Your activities").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
+                Text("\(settings.value.activities.count)").font(.system(size: 12, weight: .medium)).monospacedDigit()
+                    .foregroundStyle(Theme.text2)
+                Spacer()
+                Text("Sessions default to").font(.system(size: 12)).foregroundStyle(Theme.text2)
+                minuteStepper($settings.value.defaultMinutes, 15...240, step: 5).font(.system(size: 12, weight: .medium))
+            }
+            .padding(.bottom, 4)
             ForEach($settings.value.activities) { $a in
+                Divider().opacity(0.6)
                 activityRow($a)
             }
-            HStack(spacing: 6) {
-                TextField("New activity", text: $newActivity)
-                    .textFieldStyle(.plain).font(.system(size: 12))
-                    .padding(.horizontal, 10).padding(.vertical, 7)
-                    .card(radius: 9)
+            Divider().opacity(0.6)
+            HStack(spacing: 10) {
+                Image(systemName: "plus").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.accent)
+                    .frame(width: 30, height: 30)
+                    .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.accentTint))
+                TextField("Add an activity", text: $newActivity)
+                    .textFieldStyle(.plain).font(.system(size: 13))
                     .onSubmit(addActivity)
-                Button("Add", action: addActivity)
-                    .disabled(newActivity.trimmingCharacters(in: .whitespaces).isEmpty)
+                if !newActivity.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Button("Add", action: addActivity).buttonStyle(.plain)
+                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.accent)
+                }
             }
+            .padding(.top, 8)
         }
     }
 
@@ -207,18 +227,26 @@ struct SettingsView: View {
         let item = a.wrappedValue
         let st = ActivityStyle.of(item)
         let open = expanded.contains(item.id)
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: st.icon).foregroundStyle(st.color).frame(width: 18)
-                TextField("Name", text: a.name).textFieldStyle(.plain).font(.system(size: 13))
+        // Days, hours and the minimum, as one quiet line under the name.
+        let details = settings.value.has(.scheduling)
+            ? [item.days.isEmpty ? "Every day" : daysLabel(item.days),
+               item.windows.isEmpty ? "any time" : item.windows.map { "\(clockLabel($0.from))–\(clockLabel($0.to))" }.joined(separator: ", ")]
+              + (settings.value.has(.catchUp) && item.catchUpMinutes > 0 && !item.windows.isEmpty ? ["at least \(item.catchUpMinutes)m"] : [])
+            : []
+        let spent = model?.limits.usedToday(item.name) ?? 0
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: st.icon).font(.system(size: 14)).foregroundStyle(st.color)
+                    .frame(width: 30, height: 30)
+                    .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(st.color.opacity(0.12)))
+                VStack(alignment: .leading, spacing: 2) {
+                    TextField("Name", text: a.name).textFieldStyle(.plain).font(.system(size: 13, weight: .semibold))
+                    if !details.isEmpty || spent > 0 {
+                        Text((details + (spent > 0 ? ["\(formatDuration(spent)) today"] : [])).joined(separator: " · "))
+                            .font(.system(size: 11)).foregroundStyle(Theme.text2).monospacedDigit().lineLimit(1)
+                    }
+                }
                 if settings.value.has(.scheduling) {
-                    if !item.days.isEmpty {
-                        Text(daysLabel(item.days)).font(.system(size: 11)).foregroundStyle(.secondary)
-                    }
-                    if !item.windows.isEmpty {
-                        Text(item.windows.map { "\(clockLabel($0.from))–\(clockLabel($0.to))" }.joined(separator: ", "))
-                            .font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
-                    }
                     Spacer()
                     if !item.dayMinutes.isEmpty {
                         Image(systemName: "calendar.badge.clock").font(.system(size: 11)).foregroundStyle(.secondary)
@@ -228,14 +256,18 @@ struct SettingsView: View {
                                         item.dayMinutes[d].map { "\(weekdayShort[d] ?? ""): \(limitLabel($0))" }
                                     }.joined(separator: ", "))
                     }
-                    Text(limitLabel(item.dailyMinutes))
-                        .font(.system(size: 12, weight: .medium)).monospacedDigit()
-                        .foregroundStyle(item.dailyMinutes == 0 ? .secondary : .primary)
-                        .frame(width: 60, alignment: .trailing)
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text(limitLabel(item.dailyMinutes))
+                            .font(.system(size: 13, weight: .semibold)).monospacedDigit()
+                            .foregroundStyle(item.dailyMinutes == 0 ? Theme.text2 : Theme.text)
+                        Text("a day").font(.system(size: 10)).foregroundStyle(Theme.text2)
+                    }
+                    .frame(width: 60, alignment: .trailing)
                     Stepper("", value: a.dailyMinutes, in: 0...720, step: 15).labelsHidden().controlSize(.small)
                         .help(item.dayMinutes.isEmpty ? "Daily limit" : "Usual daily limit; some days have their own (⌄)")
                 }
                 // A labelled button: a bare chevron was hard to see, hit and understand.
+                if !settings.value.has(.scheduling) { Spacer() }
                 Button {
                     toggle(item)
                 } label: {
@@ -251,7 +283,7 @@ struct SettingsView: View {
             .contentShape(Rectangle())
             .onTapGesture { toggle(item) }
             if open {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 10) {
                     if settings.value.has(.scheduling) {
                         SectionLabel(text: "Days")
                         dayPicker(a)
@@ -322,11 +354,13 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain).foregroundStyle(Theme.red)
                 }
-                .padding(.leading, 26)
+                // The editor is a tinted panel under the row, so it reads as this row's settings.
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(st.color.opacity(0.07)))
+                .padding(.leading, 40)
             }
         }
-        .padding(.horizontal, 10).padding(.vertical, 6)
-        .card(open ? st.color : nil, radius: 9)
+        .padding(.vertical, 8)
     }
 
     private var pickerSection: some View {
@@ -540,13 +574,15 @@ struct SettingsView: View {
         let awake = 1440 - nightLen
         let planned = active + rest + free
 
+        // Numbers about the day live in Stats; here only the plan, and a warning if it can't fit.
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Today").font(.system(size: 13, weight: .semibold))
-                Text(Fmt.dayTitle.string(from: Date())).font(.system(size: 12)).foregroundStyle(.secondary)
+                Text("Today").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
+                Text(Fmt.dayTitle.string(from: Date())).font(.system(size: 12)).foregroundStyle(Theme.text2)
                 Spacer()
                 if planned > awake {
-                    Text("More planned than your waking day").font(.system(size: 11)).foregroundStyle(.red)
+                    Label("More planned than your waking day", systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11)).foregroundStyle(Theme.red)
                 }
             }
             if day.isEmpty && !s.activities.isEmpty {
@@ -556,11 +592,9 @@ struct SettingsView: View {
             if let model {
                 DayTimeline(day: model.today)
                 Text("Not a schedule: within a period you pick any of these. Red: nothing can start then.")
-                    .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .font(.system(size: 11)).foregroundStyle(Theme.text2).fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(12)
-        .card(radius: 12)
     }
 
     // MARK: building blocks

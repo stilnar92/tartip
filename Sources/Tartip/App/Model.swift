@@ -463,7 +463,11 @@ final class Model: ObservableObject {
         case .away, .forcedBreak:       // already away, or on a break that can't be skipped by leaving
             if lock { lockScreen() }
             return
-        case .freeTime, .reviewing, .awayReview:   // the shortcut still locks; nothing pauses
+        case .freeTime:                 // free time goes on wherever you spend it; only noted, for when it runs out
+            if state.freeAwaySince == nil { state.freeAwaySince = now }
+            if lock { lockScreen() }
+            return
+        case .reviewing, .awayReview:   // the shortcut still locks; nothing pauses
             if lock { lockScreen() }
             return
         }
@@ -477,6 +481,8 @@ final class Model: ObservableObject {
     // Back at the computer. Asking what you did (Rules → Step away) comes first, and whatever
     // was paused waits for the answer; otherwise it's straight back to it.
     func comeBack() {
+        freeTimeRanOutWhileAway()   // the wake can come before the tick that would notice
+        if phase.freeTimeEnd != nil { state.freeAwaySince = nil; return }   // back while it still runs
         guard case .away(let since, let paused) = phase else { return }
         // A Step away with a minimum: back early just re-locks, staying away until it elapses.
         if let until = state.stepAwayUntil {
@@ -491,6 +497,18 @@ final class Model: ObservableObject {
             return
         }
         returned(since: since, back: now, paused: paused)
+    }
+
+    // Left during free time and it ran out before you came back: from its end on that's time
+    // away like any other, so coming back asks where you were (if asking is on) before
+    // "What's next?". The part inside free time stays free time, not counted twice.
+    private func freeTimeRanOutWhileAway() {
+        guard state.freeAwaySince != nil, let end = phase.freeTimeEnd, now >= end else { return }
+        state.freeAwaySince = nil
+        endRest()
+        state.phase = .away(since: end, paused: nil)
+        if Settings.current.has(.away) { keepAwake.on() }
+        log("free time ran out while away")
     }
 
     // "What did you do while away?" answered: from the list, in your own words, or both.
@@ -622,6 +640,7 @@ final class Model: ObservableObject {
             state.lastExtendedFreeAt = start
         }
         state.restTaken = true
+        state.freeAwaySince = nil
         state.phase = .freeTime(start: start, end: start.addingTimeInterval(Double(secs)))
         log("rest  \(secs / 60)m (\(freeLeft / 60)m left today)")
     }
@@ -674,6 +693,8 @@ final class Model: ObservableObject {
             }
         case .freeTime(_, let end):
             guard now >= end else { return }
+            freeTimeRanOutWhileAway()
+            guard phase.freeTimeEnd != nil else { return }
             endRest()
             notify("Free time is over", "Pick what's next.")
         case .picking:
@@ -725,10 +746,38 @@ final class Model: ObservableObject {
 
     // MARK: display
 
+    var catchUpDebts: [CatchUpDebt] { state.catchUpDebts }
+
+    // Screenshot mode only (see WindowCoordinator): jump straight to a state, without blocking
+    // or opening anything. "picking", "session:<activity>:<minutes>", "review:<activity>",
+    // "away-review", "idle".
+    func screenshotPhase(_ cmd: [String]) {
+        let arg = cmd.count > 1 ? cmd[1] : activities.first ?? otherActivity
+        switch cmd.first {
+        case "picking": state.phase = .picking; state.pickingSince = now
+        case "session":
+            let minutes = cmd.count > 2 ? Int(cmd[2]) ?? 30 : 30
+            state.phase = .session(Session(block: arg, phases: [Phase(isBreak: false, minutes: minutes)],
+                                           start: now.addingTimeInterval(-Double(minutes) * 24), planned: arg))
+        case "review":
+            state.phase = .reviewing(SessionRecord(start: now.addingTimeInterval(-25 * 60), end: now, mode: arg, planned: arg))
+        case "away-review": state.phase = .awayReview(since: now.addingTimeInterval(-22 * 60), back: now, paused: nil)
+        default: state.phase = .idle
+        }
+    }
+
+    // The menu bar's countdown; the icon beside it is the app's own (see menuIsBreak).
     var menuTitle: String {
-        if let end = freeTimeEnd { return "☕ " + countdown(to: end, from: now) }
-        guard let s = session, let cur = s.current(at: now) else { return "🎯" }
-        return (s.phases[cur.index].isBreak ? "☕ " : "🎯 ") + countdown(to: cur.end, from: now)
+        if let end = freeTimeEnd { return countdown(to: end, from: now) }
+        guard let s = session, let cur = s.current(at: now) else { return "" }
+        return countdown(to: cur.end, from: now)
+    }
+
+    // Free time or a Pomodoro break: a cup instead of the logo.
+    var menuIsBreak: Bool {
+        if freeTimeEnd != nil { return true }
+        guard let s = session, let cur = s.current(at: now) else { return false }
+        return s.phases[cur.index].isBreak
     }
 }
 

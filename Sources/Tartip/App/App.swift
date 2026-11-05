@@ -88,7 +88,10 @@ struct TartipApp: App {
             } else if model.session == nil && model.freeTimeEnd == nil {
                 Image(nsImage: Logo.menuBar)
             } else {
-                Text(model.menuTitle).monospacedDigit()
+                HStack(spacing: 4) {
+                    if model.menuIsBreak { Image(systemName: "cup.and.saucer.fill") } else { Image(nsImage: Logo.menuBar) }
+                    Text(model.menuTitle).monospacedDigit()
+                }
             }
         }
         .menuBarExtraStyle(.window)

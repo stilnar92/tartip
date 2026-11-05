@@ -22,6 +22,7 @@ struct StoredState: Codable, Equatable {
     var activeSince: Date?             // continuously present since; nil when away or not present
     var catchUpDebts: [CatchUpDebt] = []  // missed important-activity windows, owed or settled (see CatchUp.swift)
     var stepAwayUntil: Date?           // set only by a manual Step away with a minimum; re-locks early returns
+    var freeAwaySince: Date?           // left the computer during free time and not back yet
 }
 
 // Limits count sessions from `since` on, on `day` only.

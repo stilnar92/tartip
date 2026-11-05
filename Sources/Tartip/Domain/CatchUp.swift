@@ -68,6 +68,26 @@ func pay(_ debt: inout CatchUpDebt, with r: SessionRecord, at now: Date) {
     debt.settledAt = now
 }
 
+// A debt as Stats shows it. catchUpMinutes shrinks as an ended-early catch-up pays part of it,
+// so what was owed is rebuilt from the sessions that paid it plus whatever is still open.
+struct CatchUpReport: Equatable {
+    enum Status: Equatable { case paid, open, missed }
+    var debt: CatchUpDebt
+    var owedMinutes: Int
+    var paidMinutes: Int
+    var status: Status
+}
+
+func catchUpReport(_ debts: [CatchUpDebt], records: [SessionRecord], fromDay: String, toDay: String) -> [CatchUpReport] {
+    debts.filter { $0.day >= fromDay && $0.day <= toDay }.map { d in
+        let paid = (secondsByActivity(records.filter { $0.settles == d.id })[d.activity] ?? 0) / 60
+        let status: CatchUpReport.Status = d.settledAt != nil ? .paid : d.expired ? .missed : .open
+        let owed = status == .paid ? max(paid, d.catchUpMinutes) : paid + max(0, d.catchUpMinutes)
+        return CatchUpReport(debt: d, owedMinutes: owed, paidMinutes: status == .paid ? owed : paid, status: status)
+    }
+    .sorted { $0.debt.day != $1.debt.day ? $0.debt.day > $1.debt.day : $0.debt.activity < $1.debt.activity }
+}
+
 // The oldest unsettled, unexpired debt; ties (same windowEnd) broken by the activities' list order.
 func owedDebt(_ debts: [CatchUpDebt], order: [String]) -> CatchUpDebt? {
     debts.filter { $0.settledAt == nil && !$0.expired }.min { a, b in

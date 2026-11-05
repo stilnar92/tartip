@@ -228,6 +228,24 @@ private func todays(_ missed: [(activity: String, day: String, windowEnd: Date, 
         #expect(debt.settledAt == day(2, 13, 15))
     }
 
+    // Stats rebuilds what was owed: paid in part and still open, fully paid, or dropped.
+    @Test func reportRebuildsWhatWasOwed() {
+        var partial = CatchUpDebt(activity: "English", day: "2026-03-02", windowEnd: day(2, 11), catchUpMinutes: 20)
+        var r = record("English", day(2, 12), day(2, 12, 5)); r.ended = "stopped"; r.settles = partial.id
+        pay(&partial, with: r, at: day(2, 12, 5))
+        var full = CatchUpDebt(activity: "Arabic", day: "2026-03-01", windowEnd: day(1, 11), catchUpMinutes: 30)
+        var f = record("Arabic", day(2, 9), day(2, 9, 30)); f.ended = "done"; f.settles = full.id
+        pay(&full, with: f, at: day(2, 9, 30))
+        var dropped = CatchUpDebt(activity: "Work", day: "2026-02-20", windowEnd: day(1, 11), catchUpMinutes: 10)
+        dropped.expired = true
+        let report = catchUpReport([partial, full, dropped], records: [r, f], fromDay: "2026-03-01", toDay: "2026-03-02")
+        #expect(report.map(\.debt.activity) == ["English", "Arabic"])     // newest first; Feb 20 is out of range
+        #expect(report[0].status == .open && report[0].owedMinutes == 20 && report[0].paidMinutes == 5)
+        #expect(report[1].status == .paid && report[1].owedMinutes == 30 && report[1].paidMinutes == 30)
+        let all = catchUpReport([dropped], records: [], fromDay: "2026-02-01", toDay: "2026-03-02")
+        #expect(all.first?.status == .missed && all.first?.paidMinutes == 0)
+    }
+
     // Ended early and reviewed as something else: none of it was the catch-up.
     @Test func endedEarlyCatchUpSpentOnOtherWorkPaysNothing() {
         var debt = CatchUpDebt(activity: "English", day: "2026-03-02", windowEnd: day(2, 11), catchUpMinutes: 20)

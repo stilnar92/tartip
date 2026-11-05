@@ -14,6 +14,29 @@ A small macOS menu bar app that starts with a simple focus timer. Choose an acti
   <img src="docs/how-it-works.svg" width="900" alt="How Tärtip works: What's next? → your workspace opens → focus with distractions blocked → review → and again. At night nothing is asked and the night block stays on.">
 </p>
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/whats-next.png" width="300" alt="What's next?: the day's activities, a catch-up owed for Spanish, session lengths, free time and Step away">
+  <img src="docs/screenshots/panel-session.png" width="300" alt="The menu bar panel during a Spanish session: countdown, progress, Step away and End session early">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/stats.png" width="700" alt="Stats for one day: time focused, sessions, activities against their daily limits, catch-up and time away">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/review.png" width="520" alt="Session done: pick what you actually worked on and check off its tasks">
+  <img src="docs/screenshots/welcome-back.png" width="300" alt="Welcome back: what you did while away, from your own list or typed">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/activities.png" width="440" alt="Activities: today's plan as periods, each listing what can be picked then">
+  <img src="docs/screenshots/tasks.png" width="440" alt="Tasks: today's checklist for each activity">
+</p>
+
+All the data in these screenshots is made up.
+
 ## Optional discipline tools
 
 The following behaviors apply when you enable their corresponding features:
@@ -58,6 +81,11 @@ launchctl bootout gui/$UID/com.user.tartip; rm ~/Library/LaunchAgents/com.user.t
 Your data in `~/modes` is kept either way.
 
 ## How a day works
+
+<p align="center">
+  <img src="docs/screenshots/first-run.png" width="520" alt="The first-run guide: Make time for what matters">
+  <img src="docs/screenshots/first-run-panel.png" width="300" alt="The menu bar panel on a new install: Let's set you up">
+</p>
 
 0. **First launch.** Choose a name (initially **Focus**) and a duration (30 minutes), then press **Start focus**. **Later** dismisses the screen. No blocking, mandatory picker, review, schedule, or background relaunch is enabled. The timer saves elapsed time and returns to idle; the record remains explicitly unreviewed. Sessions shorter than a minute are omitted.
 

@@ -16,6 +16,9 @@ final class WindowCoordinator {
     func start() {
         model.onPhaseChange = { [weak self] in self?.show(for: $0) }
         show(for: model.phase)
+        // The marker file survives the relaunches launchd and AutoStart do; an env var doesn't.
+        if ProcessInfo.processInfo.environment["TARTIP_SCREENSHOTS"] == "1"
+            || FileManager.default.fileExists(atPath: modesDir.appendingPathComponent(".screenshots").path) { listenForScreenshots() }
         if Setup.isPending {
             openMain(.setup)
             // A closed Get started comes back every 30 min while you're at the computer,
@@ -36,6 +39,38 @@ final class WindowCoordinator {
         model.reloadRecords()
         let tab = MainTab.shown.contains(tab) ? tab : MainTab.shown[0]
         main.show(MainView(model: model, tab: tab, close: { [weak self] in self?.main.close() }))
+    }
+
+    // scripts/screenshots.sh only: in screenshot mode the app takes commands over a
+    // distributed notification, since keystrokes can't be sent to open the windows. A normal
+    // launch never listens.
+    private func listenForScreenshots() {
+        log("screenshot mode")
+        DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.user.tartip.screenshot"), object: nil, queue: .main) { [weak self] note in
+            let cmd = (note.object as? String ?? "").split(separator: ":").map(String.init)
+            MainActor.assumeIsolated { self?.screenshot(cmd) }
+        }
+    }
+
+    private func screenshot(_ cmd: [String]) {
+        switch cmd.first {
+        case "panel": clickStatusItem()
+        case "main": if let tab = MainTab.allCases.first(where: { "\($0)" == cmd.dropFirst().first }) { openMain(tab) }
+        case "close": main.close(); hideMenuPanel()
+        case "phase": model.screenshotPhase(Array(cmd.dropFirst()))
+        default: log("screenshot: unknown \(cmd)")
+        }
+    }
+
+    private func clickStatusItem() {
+        func button(in v: NSView?) -> NSButton? {
+            guard let v else { return nil }
+            if let b = v as? NSButton { return b }
+            return v.subviews.lazy.compactMap { button(in: $0) }.first
+        }
+        let bar = NSApp.windows.first { String(describing: type(of: $0)).contains("StatusBar") }
+        button(in: bar?.contentView)?.performClick(nil)
     }
 
     private func show(for phase: AppPhase) {
