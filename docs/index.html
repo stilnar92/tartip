@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tärtip: a calm focus app for your Mac</title>
+<meta name="description" content="Tärtip is a calm macOS menu bar app that asks what's next, blocks what pulls you away, and keeps an honest record of your day. Free.">
+<link rel="icon" type="image/png" href="favicon.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Tärtip: Use it. Don't get used.">
+<meta property="og:description" content="A calm macOS menu bar app that decides what's next with you, and keeps you there.">
+<meta property="og:image" content="https://stilnar92.github.io/tartip/og.png">
+<meta property="og:url" content="https://stilnar92.github.io/tartip/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..700,100;1,9..144,300..700,100&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="nav">
+  <a class="brand" href="#top"><img src="icon.png" alt="" width="28" height="28"><span>Tärtip</span></a>
+  <nav>
+    <a href="#features">Features</a>
+    <a href="#day">How it works</a>
+    <a href="#faq">FAQ</a>
+  </nav>
+  <a class="btn btn-small" href="https://github.com/stilnar92/tartip/releases/latest/download/Tartip.dmg">Download</a>
+</header>
+
+<main id="top">
+
+  <!-- Dawn: the day begins -->
+  <section class="hero">
+    <div class="sky" aria-hidden="true"><span class="sun"></span><span class="cloud c1"></span><span class="cloud c2"></span><span class="cloud c3"></span></div>
+    <div class="hero-text">
+      <p class="eyebrow">For macOS · Free</p>
+      <h1>Use it.<br><em>Don't get used.</em></h1>
+      <p class="lede">A calm menu bar app that leads your day: it asks what's next, clears the distractions and drops you straight into the work. Every feature is a switch — keep only what you need.</p>
+      <div class="ctas">
+        <a class="btn" href="https://github.com/stilnar92/tartip/releases/latest/download/Tartip.dmg">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 20h14"/></svg>
+          Download for macOS
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/stilnar92/tartip">View on GitHub</a>
+      </div>
+      <p class="fine">macOS 13 or later · Apple silicon &amp; Intel · <i>Tärtip</i> (тәртип) is Tatar for “order, discipline”</p>
+    </div>
+    <div class="stage" aria-label="Tärtip's windows">
+      <figure class="win win-back"><img src="screenshots/stats.png" alt="Stats: time focused today, activities against their daily limits" width="1400" height="1113"></figure>
+      <figure class="win win-front"><img src="screenshots/whats-next.png" alt="What's next?: today's activities, a catch-up owed, free time and Step away" width="848" height="1400"></figure>
+      <figure class="win win-panel"><img src="screenshots/panel-session.png" alt="The menu bar panel during a focus session" width="1400" height="1357"></figure>
+    </div>
+  </section>
+
+  <!-- Killer feature 1: it leads your day -->
+  <section class="lead reveal">
+    <p class="eyebrow center">It leads your day</p>
+    <h2 class="center">You don't plan to start.<br><em>It starts you.</em></h2>
+    <ol class="steps">
+      <li><span class="n">1</span><h3>Asks</h3><p>The moment you're free: “What's next?” It stays until you answer, so there's no drifting and no deciding alone.</p></li>
+      <li><span class="n">2</span><h3>Clears</h3><p>Distracting apps quit and sites go quiet, for exactly as long as the session. Nothing to resist.</p></li>
+      <li><span class="n">3</span><h3>Drops you in</h3><p>The activity's apps, links and files open, so you land in the work, not on an empty desktop.</p></li>
+    </ol>
+    <p class="loop center">When it's done, it asks again. All day, until night.</p>
+  </section>
+
+  <section class="row reveal">
+    <div class="row-text">
+      <p class="eyebrow">What's next?</p>
+      <h2>Always know what's next.</h2>
+      <p>Most focus apps wait until you find the willpower to sit down and choose — exactly where people get stuck. Tärtip shows what you can do right now, what's behind, and what's owed.</p>
+      <p>Leave it unanswered and it starts the activity that's furthest behind. Nothing is blocked until you choose.</p>
+    </div>
+    <figure class="shot shot-tall"><img src="screenshots/whats-next.png" alt="The What's next? window" width="848" height="1400" loading="lazy"></figure>
+  </section>
+
+  <!-- Killer feature 2: every feature is a switch -->
+  <section class="row row-flip switches reveal">
+    <figure class="shot"><img src="screenshots/features.png" alt="Features: each tool is one switch" width="1400" height="1113" loading="lazy"></figure>
+    <div class="row-text">
+      <p class="eyebrow">Every feature is a switch</p>
+      <h2>Only what you need.<br><em>The rest is truly off.</em></h2>
+      <p>Most apps bury features in settings. In Tärtip, blocking, tasks, Pomodoro, schedules, catch-up and night rules are each one switch — and off means gone: no menu, no badge, no nagging.</p>
+      <p>Start as a plain timer. Grow it into your own system, one switch at a time.</p>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="features reveal">
+    <p class="eyebrow center">The switches</p>
+    <h2 class="center">Turn on what helps.</h2>
+    <div class="grid">
+      <article><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></svg>
+        <h3>Distraction blocking</h3><p>Each activity locks its own block. Blocked apps quit, blocked sites become a quiet “Not now”. A lock only gets stricter.</p></article>
+      <article><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4m8-4v4"/></svg>
+        <h3>Days, hours &amp; limits</h3><p>Plan Arabic for Mon, Wed, Fri; Work 10–12 and again 16–18; an hour a day each. Today shows what you can pick, when.</p></article>
+      <article><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v4.5h4.5"/><path d="M12 8v4l3 2"/></svg>
+        <h3>Catch-up</h3><p>An important activity fell short today? Tomorrow's first pick is just the shortfall, never the whole thing again.</p></article>
+      <article><svg viewBox="0 0 24 24"><circle cx="13" cy="4.5" r="1.8"/><path d="M10 21l2-6 3 3v3m-6-9 3-3 3 2 2 3M9 12l-2 3"/></svg>
+        <h3>Step away</h3><p>Locks the screen and keeps the Mac awake, so builds keep running. Coming back, say where you were; Stats remembers.</p></article>
+      <article><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        <h3>Honest review</h3><p>After each session, one click says what you actually did. Planned English, ended up working? It's recorded as work.</p></article>
+      <article><svg viewBox="0 0 24 24"><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/></svg>
+        <h3>It sends you to bed</h3><p>At night nothing can be started and the night block stays on until morning. No prompts, no timers.</p></article>
+    </div>
+  </section>
+
+  <!-- Night: the manifesto -->
+  <section class="manifesto reveal">
+    <div class="stars" aria-hidden="true"></div>
+    <p class="m-lead">A plan made calmly should hold.</p>
+    <p>Daily limits, weekdays and hours shape the day. The settings lock makes sure they can only be loosened after a delay, never in a weak moment. And when you step away, a running session waits without counting.</p>
+    <p class="m-sign">Tärtip doesn't wait for willpower. It gives your day an order — and gets out of the way.</p>
+  </section>
+
+  <!-- Alternating rows -->
+  <section class="row reveal">
+    <figure class="shot"><img src="screenshots/tasks.png" alt="Tasks: today's list with daily areas and an overdue task" width="1400" height="1113" loading="lazy"></figure>
+    <div class="row-text">
+      <p class="eyebrow">Tasks</p>
+      <h2>Plan the day in a breath.</h2>
+      <p>Type, press Return, keep going. Tasks sit under their activity; unfinished ones wait as overdue instead of disappearing.</p>
+      <p><b>Daily areas</b> are the things you do every day for an activity, like “Solve problems on LeetCode”. They show up on their own; you only add today's specifics.</p>
+    </div>
+  </section>
+
+  <section class="row row-flip reveal">
+    <figure class="shot"><img src="screenshots/stats.png" alt="Stats for a day" width="1400" height="1113" loading="lazy"></figure>
+    <div class="row-text">
+      <p class="eyebrow">Stats</p>
+      <h2>Numbers that tell the truth.</h2>
+      <p>Time per activity against its daily limit, sessions that ran their full time, what's still owed, where the time away went, and what got blocked most. Any day of the last 90.</p>
+    </div>
+  </section>
+
+  <section class="row reveal">
+    <figure class="shot"><img src="screenshots/activities.png" alt="Activities: today's plan cut into periods" width="1400" height="1113" loading="lazy"></figure>
+    <div class="row-text">
+      <p class="eyebrow">Activities</p>
+      <h2>Not a schedule. A shape.</h2>
+      <p>Today is cut into periods wherever an activity's hours start or end. Within a period you choose freely; red means nothing can start. Plan more than fits, and it tells you.</p>
+    </div>
+  </section>
+
+  <section class="duo reveal">
+    <figure class="shot"><img src="screenshots/review.png" alt="Session done: pick what you actually worked on" width="1400" height="1132" loading="lazy"><figcaption>Session done: what you actually did.</figcaption></figure>
+    <figure class="shot"><img src="screenshots/welcome-back.png" alt="Welcome back: what you did while away" width="1400" height="930" loading="lazy"><figcaption>Welcome back: where you were.</figcaption></figure>
+  </section>
+
+  <!-- How a day works -->
+  <section id="day" class="day reveal">
+    <p class="eyebrow center">How a day works</p>
+    <h2 class="center">Decide, focus, review. Again.</h2>
+    <img src="how-it-works.svg" alt="What's next? → your workspace opens → focus with distractions blocked → review → and again. At night nothing is asked." width="900" height="430" loading="lazy">
+  </section>
+
+  <section class="row row-flip reveal">
+    <figure class="shot"><img src="screenshots/first-run.png" alt="The first-run guide" width="1400" height="1113" loading="lazy"></figure>
+    <div class="row-text">
+      <p class="eyebrow">Start simple</p>
+      <h2>A timer first. The rest, when you're ready.</h2>
+      <p>A new install is just an activity and a duration. Blocking, tasks, Pomodoro, schedules, catch-up and forced breaks are switches in Features, all off until you want them.</p>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="faq reveal">
+    <h2 class="center">Questions</h2>
+    <details><summary>Is it free?</summary><p>Yes. Download it, use it. The source is on <a href="https://github.com/stilnar92/tartip">GitHub</a>.</p></details>
+    <details><summary>macOS says it can't open it.</summary><p>Tärtip isn't signed by an identified developer yet. The first time, go to System Settings → Privacy &amp; Security and click <b>Open Anyway</b> next to Tartip.</p></details>
+    <details><summary>Where is my data?</summary><p>On your Mac only, in <code>~/modes</code>: settings, blocks and history as plain JSON files you can read, back up or analyze. Nothing is sent anywhere.</p></details>
+    <details><summary>Which browsers does it block sites in?</summary><p>Sites are blocked in Google Chrome. Other browsers are quit while a block with sites is on.</p></details>
+    <details><summary>Can't I just quit it?</summary><p>You can; it's self-control, not security. But with the settings lock on, loosening rules has to wait for a set window, so a plan made calmly holds.</p></details>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="final reveal">
+    <img src="icon.png" alt="" width="88" height="88">
+    <h2>Let's get started.</h2>
+    <p>Free for macOS 13 and later.</p>
+    <div class="ctas center">
+      <a class="btn" href="https://github.com/stilnar92/tartip/releases/latest/download/Tartip.dmg">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 20h14"/></svg>
+        Download for macOS
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/stilnar92/tartip/releases/latest">What's new</a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>All screenshots use made-up data.</p>
+  <p><a href="https://github.com/stilnar92/tartip">GitHub</a> · <a href="https://github.com/stilnar92/tartip/releases">Releases</a> · <a href="https://t.me/horesen">Telegram</a> · <a href="mailto:stilnar92@gmail.com">Email</a></p>
+</footer>
+
+<script src="site.js" defer></script>
+</body>
+</html>

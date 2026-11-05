@@ -6,6 +6,8 @@
 
 <p align="center"><b>Use it. Don't get used.</b></p>
 
+<p align="center"><a href="https://stilnar92.github.io/tartip/"><b>Website</b></a> · <a href="https://github.com/stilnar92/tartip/releases/latest/download/Tartip.dmg"><b>Download for macOS</b></a></p>
+
 <p align="center"><i>Tärtip</i> (тәртип) is Tatar for "order, discipline".</p>
 
 A small macOS menu bar app that starts with a simple focus timer. Choose an activity and a duration, then start. Add blocking, tasks, Pomodoro, reviews, schedules, and stronger discipline tools individually in **Settings → Features**. New installations keep these features off; upgrades preserve your existing setup.
