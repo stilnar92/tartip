@@ -79,6 +79,7 @@ enum AppPhase: Codable, Equatable {
     case away(since: Date, paused: Session?) // left the computer: screen locked, nothing counts
     case awayReview(since: Date, back: Date, paused: Session?) // back: "What did you do while away?"
     case forcedBreak(until: Date)           // too long at the computer: step away, can't be skipped
+    case offHours(until: Date)              // nothing can start until then: step away (GapMode.stepAway)
 
     var session: Session? {
         if case .session(let s) = self { return s }
@@ -105,6 +106,11 @@ enum AppPhase: Codable, Equatable {
         return nil
     }
 
+    var offHoursUntil: Date? {
+        if case .offHours(let until) = self { return until }
+        return nil
+    }
+
     var freeTimeEnd: Date? {
         if case .freeTime(_, let end) = self { return end }
         return nil
@@ -120,7 +126,17 @@ enum AppPhase: Codable, Equatable {
         switch self {
         case .session, .reviewing: true
         case .away(_, let paused), .awayReview(_, _, let paused): paused != nil
-        case .idle, .picking, .freeTime, .forcedBreak: false
+        case .idle, .picking, .freeTime, .forcedBreak, .offHours: false
         }
     }
+}
+
+// Left without locking the screen: nothing ran and there was no input for this long.
+let unlockedAwayAfter: TimeInterval = 5 * 60
+
+// When you left, if you did: the last input, but never before nothing started running
+// (`idleSince`), so the end of a session or free time isn't counted twice.
+func leftUnlocked(idleSince: Date, lastInput: Date, now: Date) -> Date? {
+    guard now.timeIntervalSince(lastInput) >= unlockedAwayAfter else { return nil }
+    return max(lastInput, idleSince)
 }

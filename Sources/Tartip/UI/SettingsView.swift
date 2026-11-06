@@ -9,6 +9,8 @@ struct SettingsView: View {
     let page: MainTab
     @State var expanded: Set<UUID> = []  // rows opened with ⌄
     @State private var limitsByDay: Set<UUID> = []  // "different limit on some days" opened
+    @State private var hoursByDay: Set<UUID> = []   // "different hours on some days" opened
+    @State private var dayOffset = 0                // the day plan shown: today, or days ahead of it
     @State private var askNight = false  // warning before night is switched on
     @State private var askFullScreen = false  // warning before "What's next?" goes full screen
     @State private var askDelete: ActivitySetting?  // "Delete activity?" waiting for an answer
@@ -227,11 +229,15 @@ struct SettingsView: View {
         let item = a.wrappedValue
         let st = ActivityStyle.of(item)
         let open = expanded.contains(item.id)
+        // Today's own limit or hours, when today has them: the row shows what applies now.
+        let weekday = Calendar.current.component(.weekday, from: Date())
+        let todayLimit = item.isPlanned(onWeekday: weekday) ? item.dayMinutes[weekday] : nil
+        let todayHours = item.isPlanned(onWeekday: weekday) ? item.dayWindows[weekday] : nil
         // Days, hours and the minimum, as one quiet line under the name.
         let details = settings.value.has(.scheduling)
             ? [item.days.isEmpty ? "Every day" : daysLabel(item.days),
-               item.windows.isEmpty ? "any time" : item.windows.map { "\(clockLabel($0.from))–\(clockLabel($0.to))" }.joined(separator: ", ")]
-              + (settings.value.has(.catchUp) && item.catchUpMinutes > 0 && !item.windows.isEmpty ? ["at least \(item.catchUpMinutes)m"] : [])
+               todayHours.map { "today \(hoursLabel($0))" } ?? hoursLabel(item.windows)]
+              + (settings.value.has(.catchUp) && item.catchUpMinutes > 0 && (1...7).contains(where: item.hasSchedule(onWeekday:)) ? ["at least \(item.catchUpMinutes)m"] : [])
             : []
         let spent = model?.limits.usedToday(item.name) ?? 0
         return VStack(alignment: .leading, spacing: 8) {
@@ -248,23 +254,31 @@ struct SettingsView: View {
                 }
                 if settings.value.has(.scheduling) {
                     Spacer()
-                    if !item.dayMinutes.isEmpty {
+                    if !item.dayMinutes.isEmpty || !item.dayWindows.isEmpty {
                         Image(systemName: "calendar.badge.clock").font(.system(size: 11)).foregroundStyle(.secondary)
                             .help(
                                 "Different on "
                                     + weekOrder.compactMap { d in
-                                        item.dayMinutes[d].map { "\(weekdayShort[d] ?? ""): \(limitLabel($0))" }
-                                    }.joined(separator: ", "))
+                                        let own = [item.dayMinutes[d].map(limitLabel), item.dayWindows[d].map(hoursLabel)].compactMap { $0 }
+                                        return own.isEmpty ? nil : "\(weekdayShort[d] ?? ""): \(own.joined(separator: ", "))"
+                                    }.joined(separator: "; "))
                     }
+                    let shown = todayLimit ?? item.dailyMinutes
                     VStack(alignment: .trailing, spacing: 1) {
-                        Text(limitLabel(item.dailyMinutes))
+                        Text(limitLabel(shown))
                             .font(.system(size: 13, weight: .semibold)).monospacedDigit()
-                            .foregroundStyle(item.dailyMinutes == 0 ? Theme.text2 : Theme.text)
-                        Text("a day").font(.system(size: 10)).foregroundStyle(Theme.text2)
+                            .foregroundStyle(shown == 0 ? Theme.text2 : Theme.text)
+                        Text(todayLimit == nil ? "a day" : "today · usual \(limitLabel(item.dailyMinutes))")
+                            .font(.system(size: 10)).foregroundStyle(Theme.text2).lineLimit(1).fixedSize()
                     }
-                    .frame(width: 60, alignment: .trailing)
-                    Stepper("", value: a.dailyMinutes, in: 0...720, step: 15).labelsHidden().controlSize(.small)
-                        .help(item.dayMinutes.isEmpty ? "Daily limit" : "Usual daily limit; some days have their own (⌄)")
+                    .frame(minWidth: 60, alignment: .trailing)
+                    // Edits what's shown: today's own limit when today has one, else the usual.
+                    Stepper("", value: todayLimit == nil ? a.dailyMinutes
+                                : Binding(get: { a.wrappedValue.dayMinutes[weekday] ?? 0 }, set: { a.wrappedValue.dayMinutes[weekday] = $0 }),
+                            in: 0...720, step: 15).labelsHidden().controlSize(.small)
+                        .help(todayLimit == nil
+                              ? (item.dayMinutes.isEmpty ? "Daily limit" : "Usual daily limit; some days have their own (Edit)")
+                              : "Today's own limit; the usual one is in Edit")
                 }
                 // A labelled button: a bare chevron was hard to see, hit and understand.
                 if !settings.value.has(.scheduling) { Spacer() }
@@ -298,39 +312,16 @@ struct SettingsView: View {
                             )
                         )
                         .toggleStyle(.switch).controlSize(.small)
-                        if !item.windows.isEmpty {
-                            ForEach(Array(item.windows.enumerated()), id: \.element.id) { i, _ in
+                        if !item.windows.isEmpty { windowList(a.windows) }
+                        dayHours(a)
+                        if settings.value.has(.catchUp) && (1...7).contains(where: item.hasSchedule(onWeekday:)) {
+                            row("Minimum per day") {
                                 HStack(spacing: 6) {
-                                    clockStepper(windowBound(a, i, \.from))
-                                    Text("–").foregroundStyle(.secondary)
-                                    clockStepper(windowBound(a, i, \.to))
-                                    Spacer()
-                                    if item.windows.count > 1 {
-                                        Button(role: .destructive) {
-                                            a.wrappedValue.windows.remove(at: i)
-                                        } label: {
-                                            Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
-                                        }
-                                        .buttonStyle(.plain)
-                                        .help("Remove this window")
-                                    }
+                                    Text(item.catchUpMinutes == 0 ? "off" : "\(item.catchUpMinutes) min").monospacedDigit()
+                                    Stepper("", value: a.catchUpMinutes, in: 0...120, step: 5).labelsHidden().controlSize(.small)
                                 }
                             }
-                            Button {
-                                addWindow(a)
-                            } label: {
-                                Label("Add window", systemImage: "plus.circle.fill").font(.system(size: 12))
-                            }
-                            .buttonStyle(.plain)
-                            if settings.value.has(.catchUp) {
-                                row("Minimum per day") {
-                                    HStack(spacing: 6) {
-                                        Text(item.catchUpMinutes == 0 ? "off" : "\(item.catchUpMinutes) min").monospacedDigit()
-                                        Stepper("", value: a.catchUpMinutes, in: 0...120, step: 5).labelsHidden().controlSize(.small)
-                                    }
-                                }
-                                .help("If the day's hours close with less than this done in total (across all windows), the next pick is forced to just the shortfall — this minus whatever was already done.")
-                            }
+                            .help("If the day's hours close with less than this done in total (across all windows), the next pick is forced to just the shortfall — this minus whatever was already done.")
                         }
                         Divider()
                     }
@@ -563,7 +554,8 @@ struct SettingsView: View {
     // Below, today as two calendar columns: the plan, and what actually happened.
     private var dayPlan: some View {
         let s = settings.value
-        let weekday = Calendar.current.component(.weekday, from: Date())
+        let date = Calendar.current.date(byAdding: .day, value: dayOffset, to: Date()) ?? Date()
+        let weekday = Calendar.current.component(.weekday, from: date)
         let day = s.activities.filter { $0.isPlanned(onWeekday: weekday) }
         let limit = { (a: ActivitySetting) in a.limit(onWeekday: weekday) }
         let isRest = { (a: ActivitySetting) in a.name.lowercased() == "rest" }
@@ -577,21 +569,65 @@ struct SettingsView: View {
         // Numbers about the day live in Stats; here only the plan, and a warning if it can't fit.
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Today").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
-                Text(Fmt.dayTitle.string(from: Date())).font(.system(size: 12)).foregroundStyle(Theme.text2)
+                Text(dayOffset == 0 ? "Today" : dayOffset == 1 ? "Tomorrow" : "Plan")
+                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
+                Text(Fmt.dayTitle.string(from: date)).font(.system(size: 12)).foregroundStyle(Theme.text2)
                 Spacer()
                 if planned > awake {
                     Label("More planned than your waking day", systemImage: "exclamationmark.triangle.fill")
                         .font(.system(size: 11)).foregroundStyle(Theme.red)
                 }
             }
+            weekSwitcher
             if day.isEmpty && !s.activities.isEmpty {
                 Text("Nothing planned: a day off, \"What's next?\" won't ask.")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }
             if let model {
-                DayTimeline(day: model.today)
+                DayTimeline(day: dayOffset == 0 ? model.today : Model.plan(s, weekday: weekday))
                 Text("Not a schedule: within a period you pick any of these. Red: nothing can start then.")
+                    .font(.system(size: 11)).foregroundStyle(Theme.text2).fixedSize(horizontal: false, vertical: true)
+            }
+            gapList(gaps(s, weekday: weekday))
+        }
+    }
+
+    // The week ahead as one click per day, today first: see how any day looks. Only today
+    // has what actually ran.
+    private var weekSwitcher: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<7, id: \.self) { offset in
+                let date = Calendar.current.date(byAdding: .day, value: offset, to: Date()) ?? Date()
+                let d = Calendar.current.component(.weekday, from: date)
+                Button {
+                    dayOffset = offset
+                } label: {
+                    Text(offset == 0 ? "Today" : weekdayShort[d] ?? "")
+                        .font(.system(size: 11, weight: dayOffset == offset ? .semibold : .regular))
+                        .frame(minWidth: 34).padding(.horizontal, 6).padding(.vertical, 4)
+                        .pill(selected: dayOffset == offset)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // Each gap of the day shown, free (nothing asked or blocked) or off the computer.
+    @ViewBuilder private func gapList(_ list: [Gap]) -> some View {
+        if !list.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                SectionLabel(text: "When nothing can start")
+                ForEach(list, id: \.self) { g in
+                    let locked = settings.value.lockedGaps.contains(g)
+                    HStack(spacing: 6) {
+                        Text("\(clockLabel(g.from % 1440))–\(clockLabel(g.to % 1440))")
+                            .font(.system(size: 12, weight: .medium)).monospacedDigit().frame(width: 100, alignment: .leading)
+                        choicePill("Free", !locked) { settings.value.lockedGaps.removeAll { $0 == g } }
+                        choicePill("Step away", locked) { if !locked { settings.value.lockedGaps.append(g) } }
+                        Spacer()
+                    }
+                }
+                Text("Free: nothing is asked or blocked. Step away: a full-screen window until something opens. A gap keeps its setting on every day it falls the same.")
                     .font(.system(size: 11)).foregroundStyle(Theme.text2).fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -622,23 +658,56 @@ struct SettingsView: View {
         }
     }
 
+    // from–to rows, one per window, with remove (while more than one is left) and add.
+    private func windowList(_ windows: Binding<[TimeWindow]>) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(windows.wrappedValue.enumerated()), id: \.element.id) { i, _ in
+                HStack(spacing: 6) {
+                    clockStepper(windowBound(windows, i, \.from))
+                    Text("–").foregroundStyle(.secondary)
+                    clockStepper(windowBound(windows, i, \.to))
+                    Spacer()
+                    if windows.wrappedValue.count > 1 {
+                        Button(role: .destructive) {
+                            windows.wrappedValue.remove(at: i)
+                        } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Remove this window")
+                    }
+                }
+            }
+            Button {
+                addWindow(windows)
+            } label: {
+                Label("Add window", systemImage: "plus.circle.fill").font(.system(size: 12))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     // A binding into one window's from/to that can't be dragged past a same-day neighbour.
-    private func windowBound(_ a: Binding<ActivitySetting>, _ i: Int, _ kp: WritableKeyPath<TimeWindow, Int>) -> Binding<Int> {
+    private func windowBound(_ windows: Binding<[TimeWindow]>, _ i: Int, _ kp: WritableKeyPath<TimeWindow, Int>) -> Binding<Int> {
         Binding(
-            get: { a.wrappedValue.windows.indices.contains(i) ? a.wrappedValue.windows[i][keyPath: kp] : 0 },
+            get: { windows.wrappedValue.indices.contains(i) ? windows.wrappedValue[i][keyPath: kp] : 0 },
             set: { new in
-                guard a.wrappedValue.windows.indices.contains(i) else { return }
-                a.wrappedValue.windows[i][keyPath: kp] = clampedWindowEdge(a.wrappedValue.windows, editing: i, movingFrom: kp == \TimeWindow.from, to: new)
+                guard windows.wrappedValue.indices.contains(i) else { return }
+                windows.wrappedValue[i][keyPath: kp] = clampedWindowEdge(windows.wrappedValue, editing: i, movingFrom: kp == \TimeWindow.from, to: new)
             }
         )
     }
 
     // A new window right after the last one, wrapping to the start of the day if that would run past 24:00.
-    private func addWindow(_ a: Binding<ActivitySetting>) {
-        let lastEnd = a.wrappedValue.windows.map(\.to).max() ?? 12 * 60
+    private func addWindow(_ windows: Binding<[TimeWindow]>) {
+        let lastEnd = windows.wrappedValue.map(\.to).max() ?? 12 * 60
         let start = lastEnd % 1440
         let end = min(start + 120, 1440)
-        a.wrappedValue.windows.append(TimeWindow(from: start, to: end))
+        windows.wrappedValue.append(TimeWindow(from: start, to: end))
+    }
+
+    private func hoursLabel(_ windows: [TimeWindow]) -> String {
+        windows.isEmpty ? "any time" : windows.map { "\(clockLabel($0.from))–\(clockLabel($0.to))" }.joined(separator: ", ")
     }
 
     // Half-hour steps, wrapping around midnight.
@@ -664,6 +733,7 @@ struct SettingsView: View {
                     if next.contains(d) { if next.count > 1 { next.remove(d) } } else { next.insert(d) }
                     days.wrappedValue = next.count == 7 ? [] : weekOrder.filter(next.contains)
                     a.wrappedValue.dayMinutes = a.wrappedValue.dayMinutes.filter { next.contains($0.key) }
+                    a.wrappedValue.dayWindows = a.wrappedValue.dayWindows.filter { next.contains($0.key) }
                 } label: {
                     Text(weekdayShort[d] ?? "").font(.system(size: 11, weight: on.contains(d) ? .semibold : .regular))
                         .frame(width: 34).padding(.vertical, 4)
@@ -713,6 +783,53 @@ struct SettingsView: View {
                             ).labelsHidden().controlSize(.small)
                         }
                         Spacer()
+                    }
+                }
+            }
+        }
+    }
+
+    // Per weekday: the usual hours, any time, or its own windows. Like dayLimits, only planned
+    // days are listed. Own hours start as a copy of the usual ones, to be adjusted.
+    private func dayHours(_ a: Binding<ActivitySetting>) -> some View {
+        let item = a.wrappedValue
+        let open = !item.dayWindows.isEmpty || hoursByDay.contains(item.id)
+        return VStack(alignment: .leading, spacing: 6) {
+            Toggle(
+                "Different hours on some days",
+                isOn: Binding(
+                    get: { open },
+                    set: { on in
+                        if on {
+                            hoursByDay.insert(item.id)
+                        } else {
+                            hoursByDay.remove(item.id)
+                            a.wrappedValue.dayWindows = [:]
+                        }
+                    })
+            )
+            .toggleStyle(.switch).controlSize(.small).font(.system(size: 12))
+            if open {
+                ForEach(weekOrder.filter(item.isPlanned(onWeekday:)), id: \.self) { d in
+                    let own = item.dayWindows[d]
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            Text(weekdayShort[d] ?? "").font(.system(size: 12, weight: .medium)).frame(width: 34, alignment: .leading)
+                            choicePill("Usual · \(hoursLabel(item.windows))", own == nil) { a.wrappedValue.dayWindows[d] = nil }
+                            choicePill("Any time", own?.isEmpty == true) { a.wrappedValue.dayWindows[d] = [] }
+                            choicePill("Own", own?.isEmpty == false) {
+                                if own?.isEmpty != false {
+                                    a.wrappedValue.dayWindows[d] = item.windows.isEmpty
+                                        ? [TimeWindow(from: 12 * 60, to: 20 * 60)]
+                                        : item.windows.map { TimeWindow(from: $0.from, to: $0.to) }
+                                }
+                            }
+                            Spacer()
+                        }
+                        if let own, !own.isEmpty {
+                            windowList(Binding(get: { a.wrappedValue.dayWindows[d] ?? [] }, set: { a.wrappedValue.dayWindows[d] = $0 }))
+                                .padding(.leading, 40)
+                        }
                     }
                 }
             }

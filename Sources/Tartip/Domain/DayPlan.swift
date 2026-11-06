@@ -53,7 +53,7 @@ func availability(_ s: AppSettings, weekday: Int, from: Int, to: Int) -> [Period
     let planned = s.activities.filter { !$0.name.isEmpty && $0.isPlanned(onWeekday: weekday) }
     var cuts = Set([from, to])
     for a in planned {
-        for w in a.windows {
+        for w in a.windows(onWeekday: weekday) {
             for edge in [w.from, w.to] {
                 for m in [edge, edge + 1440] where m > from && m < to { cuts.insert(m) }
             }
@@ -63,7 +63,8 @@ func availability(_ s: AppSettings, weekday: Int, from: Int, to: Int) -> [Period
     var out: [Period] = []
     for (start, end) in zip(edges, edges.dropFirst()) {
         let names = planned.filter { a in
-            a.windows.isEmpty || a.windows.contains { inWindow(start % 1440, $0.from, $0.to) }
+            let windows = a.windows(onWeekday: weekday)
+            return windows.isEmpty || windows.contains { inWindow(start % 1440, $0.from, $0.to) }
         }.map(\.name)
         out.append(Period(start: start, end: end, available: names))
     }
@@ -76,10 +77,10 @@ func availability(_ s: AppSettings, weekday: Int, from: Int, to: Int) -> [Period
 // combined length covers its limit, even if any one window alone falls short.
 func overcommittedActivities(_ s: AppSettings, weekday: Int) -> [String] {
     s.activities.filter { a in
-        guard !a.name.isEmpty, a.isPlanned(onWeekday: weekday), a.hasSchedule else { return false }
+        guard !a.name.isEmpty, a.isPlanned(onWeekday: weekday), a.hasSchedule(onWeekday: weekday) else { return false }
         let limit = a.limit(onWeekday: weekday)
         guard limit > 0 else { return false }
-        let span = a.windows.reduce(0) { $0 + (($1.to - $1.from + 1440) % 1440) }
+        let span = a.windows(onWeekday: weekday).reduce(0) { $0 + (($1.to - $1.from + 1440) % 1440) }
         return limit > span
     }.map(\.name)
 }
@@ -90,13 +91,13 @@ func overcommittedActivities(_ s: AppSettings, weekday: Int) -> [String] {
 // Midnight-crossing windows are split at midnight into same-day pieces for this analysis.
 func overcommittedPeriods(_ s: AppSettings, weekday: Int) -> [String] {
     struct Span { var start: Int; var end: Int }
-    let planned = s.activities.filter { !$0.name.isEmpty && $0.isPlanned(onWeekday: weekday) && $0.hasSchedule && $0.limit(onWeekday: weekday) > 0 }
+    let planned = s.activities.filter { !$0.name.isEmpty && $0.isPlanned(onWeekday: weekday) && $0.hasSchedule(onWeekday: weekday) && $0.limit(onWeekday: weekday) > 0 }
     guard !planned.isEmpty else { return [] }
 
     // Each activity's windows, split at midnight into same-day [0, 1440) pieces.
     var spans: [String: [Span]] = [:]
     for a in planned {
-        spans[a.name] = a.windows.flatMap { w -> [Span] in
+        spans[a.name] = a.windows(onWeekday: weekday).flatMap { w -> [Span] in
             if w.from < w.to { return [Span(start: w.from, end: w.to)] }
             return [Span(start: w.from, end: 1440), Span(start: 0, end: w.to)]
         }
@@ -120,6 +121,30 @@ func overcommittedPeriods(_ s: AppSettings, weekday: Int) -> [String] {
         if required > end - start { out.formUnion(here.map(\.name)) }
     }
     return out.sorted()
+}
+
+// The gap now is in: something is planned today, but nothing at all can start until `end`
+// (at most the end of the waking day). nil outside one, at night, or on a day off.
+func currentGap(_ s: AppSettings, at now: Date, calendar: Calendar = .current) -> (gap: Gap, end: Date)? {
+    guard s.has(.scheduling) else { return nil }
+    let weekday = calendar.component(.weekday, from: now)
+    guard s.activities.contains(where: { !$0.name.isEmpty && $0.isPlanned(onWeekday: weekday) }) else { return nil }
+    let w = wakingHours(s)
+    let dayStart = calendar.startOfDay(for: now)
+    var m = minuteOfDay(now, calendar: calendar)
+    if m < w.from && m + 1440 <= w.to { m += 1440 }   // the waking day runs past midnight
+    guard let p = availability(s, weekday: weekday, from: w.from, to: w.to).first(where: { $0.start <= m && m < $0.end }),
+          p.available.isEmpty
+    else { return nil }
+    let frameStart = m >= 1440 ? calendar.date(byAdding: .day, value: -1, to: dayStart)! : dayStart
+    return (Gap(from: p.start, to: p.end), frameStart.addingTimeInterval(Double(p.end) * 60))
+}
+
+// A weekday's gaps: periods when nothing at all can start, on a day with something planned.
+func gaps(_ s: AppSettings, weekday: Int) -> [Gap] {
+    guard s.activities.contains(where: { !$0.name.isEmpty && $0.isPlanned(onWeekday: weekday) }) else { return [] }
+    let w = wakingHours(s)
+    return availability(s, weekday: weekday, from: w.from, to: w.to).filter(\.available.isEmpty).map { Gap(from: $0.start, to: $0.end) }
 }
 
 // Neighbours with the same activities become one period.

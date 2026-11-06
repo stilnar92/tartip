@@ -1,11 +1,15 @@
 import CoreGraphics
+import Foundation
+
+// ~0 is kCGAnyInputEventType: the last input of any kind.
+func secondsSinceInput() -> TimeInterval {
+    guard let anyInput = CGEventType(rawValue: ~0) else { return 0 }
+    return CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput)
+}
 
 // At the computer: input in the last 2 minutes and screen not locked.
 func userPresent() -> Bool {
-    // ~0 is kCGAnyInputEventType: the last input of any kind.
-    if let anyInput = CGEventType(rawValue: ~0),
-       CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput) > 120 { return false }
-    return !screenLocked()
+    secondsSinceInput() <= 120 && !screenLocked()
 }
 
 func screenLocked() -> Bool {

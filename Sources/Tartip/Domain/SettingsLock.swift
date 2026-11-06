@@ -71,10 +71,11 @@ func loosenings(from o: AppSettings, to n: AppSettings) -> [String] {
         if oldDays.contains(where: { cap(b.limit(onWeekday: $0)) < cap(a.limit(onWeekday: $0)) }) {
             out.append("a lower limit for \(a.name)")
         }
-        if windowsSpan(b.windows) < windowsSpan(a.windows) { out.append("shorter hours for \(a.name)") }
+        if oldDays.contains(where: { windowsSpan(b.windows(onWeekday: $0)) < windowsSpan(a.windows(onWeekday: $0)) }) { out.append("shorter hours for \(a.name)") }
         if b.block != a.block { out.append("\(a.name) locking another block") }
     }
 
+    if o.lockedGaps.contains(where: { !n.lockedGaps.contains($0) }) { out.append("freeing a gap") }
     if n.dailyFreeMinutes > o.dailyFreeMinutes { out.append("more free time") }
     if n.maxRestMinutes > o.maxRestMinutes { out.append("a longer free time stretch") }
     if n.alwaysFreeMinutes > o.alwaysFreeMinutes { out.append("more always-available free time") }

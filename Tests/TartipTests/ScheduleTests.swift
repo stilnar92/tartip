@@ -70,6 +70,60 @@ private let monday = day(2), saturday = day(7)
         #expect(back.dayMinutes == [7: 45] && back.limit(onWeekday: 7) == 45 && back.limit(onWeekday: 2) == 120)
     }
 
+    // Some days have their own hours: Saturday 10–12 instead of the usual 14–18, Sunday any time.
+    @Test func ownHoursOnSomeDays() {
+        var s = AppSettings()
+        var work = ActivitySetting(name: "Work", windows: [TimeWindow(from: 14 * 60, to: 18 * 60)])
+        work.dayWindows = [7: [TimeWindow(from: 10 * 60, to: 12 * 60)], 1: []]
+        s.activities = [work]
+        #expect(!Limits(settings: s, today: [], now: day(2, 11), calendar: cal).isOpen("Work"))
+        #expect(Limits(settings: s, today: [], now: day(2, 15), calendar: cal).isOpen("Work"))
+        #expect(Limits(settings: s, today: [], now: day(7, 11), calendar: cal).isOpen("Work"))
+        let satAfternoon = Limits(settings: s, today: [], now: day(7, 15), calendar: cal)
+        #expect(!satAfternoon.isOpen("Work") && satAfternoon.opensLabel("Work") == "from 10:00")
+        #expect(Limits(settings: s, today: [], now: day(8, 7), calendar: cal).isOpen("Work"))
+        #expect(availability(s, weekday: 7, from: 0, to: 1440).contains { $0.start == 600 && $0.end == 720 && $0.available == ["Work"] })
+        #expect(availability(s, weekday: 1, from: 0, to: 1440) == [Period(start: 0, end: 1440, available: ["Work"])])
+    }
+
+    // Shortening one day's hours is caught like shortening the usual ones.
+    @Test func shorterHoursOnOneDayLoosen() {
+        var o = AppSettings()
+        o.activities = [ActivitySetting(name: "Work", windows: [TimeWindow(from: 600, to: 1080)])]
+        var n = o
+        n.activities[0].dayWindows = [7: [TimeWindow(from: 600, to: 720)]]
+        #expect(loosenings(from: o, to: n).contains("shorter hours for Work"))
+        #expect(!loosenings(from: n, to: o).contains("shorter hours for Work"))
+    }
+
+    // Work 9–12 and 15:30–18 leaves 12–15:30 with nothing to start: a gap, free unless locked.
+    @Test func gapsBetweenHours() {
+        var s = AppSettings()
+        s.features.enabled.remove(.night)
+        s.activities = [ActivitySetting(name: "Work", windows: [TimeWindow(from: 540, to: 720), TimeWindow(from: 930, to: 1080)])]
+        let list = gaps(s, weekday: 2)
+        #expect(list.contains(Gap(from: 720, to: 930)))
+        let g = currentGap(s, at: day(2, 13), calendar: cal)
+        #expect(g?.gap == Gap(from: 720, to: 930) && g?.end == day(2, 15).addingTimeInterval(30 * 60))
+        #expect(currentGap(s, at: day(2, 10), calendar: cal) == nil)
+        s.activities[0].days = [3]                   // Monday is a day off: no gaps at all
+        #expect(gaps(s, weekday: 2).isEmpty && currentGap(s, at: day(2, 13), calendar: cal) == nil)
+    }
+
+    @Test func freeingALockedGapLoosens() {
+        var o = AppSettings()
+        o.lockedGaps = [Gap(from: 720, to: 930)]
+        #expect(loosenings(from: o, to: AppSettings()).contains("freeing a gap"))
+        #expect(!loosenings(from: AppSettings(), to: o).contains("freeing a gap"))
+    }
+
+    @Test func dayHoursSurviveSaving() throws {
+        var a = ActivitySetting(name: "Work", windows: [TimeWindow(from: 600, to: 720)])
+        a.dayWindows = [7: [TimeWindow(from: 900, to: 960)], 1: []]
+        let back = try JSONDecoder().decode(ActivitySetting.self, from: JSONEncoder().encode(a))
+        #expect(back.dayWindows == a.dayWindows && back.windows(onWeekday: 2) == a.windows && back.windows(onWeekday: 1).isEmpty)
+    }
+
     // days and multiple windows are orthogonal: an off day has no periods at all for it,
     // regardless of how many windows it has on its planned days.
     @Test func multipleWindowsRespectDays() {

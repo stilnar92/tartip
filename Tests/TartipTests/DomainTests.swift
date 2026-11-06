@@ -435,14 +435,37 @@ private func at(_ h: Int, _ m: Int = 0, day: Int = 1) -> Date {
 
     @Test func asksAboutAwayOnlyWhenOnAndInRange() {
         var s = AppSettings()
-        #expect(!s.asksAboutAway(seconds: 600))                // off by default
+        s.nightEnabled = false
+        func asks(_ minutes: Int) -> Bool { s.asksAboutAway(since: at(12), back: at(12).addingTimeInterval(Double(minutes) * 60), calendar: cal) }
+        #expect(!asks(10))                     // off by default
         s.awayAsk = .text
-        #expect(!s.asksAboutAway(seconds: 4 * 60 + 59))
-        #expect(s.asksAboutAway(seconds: 5 * 60))
-        #expect(s.asksAboutAway(seconds: 3 * 3600))
-        #expect(!s.asksAboutAway(seconds: 3 * 3600 + 1))       // sleep
+        #expect(!s.asksAboutAway(since: at(12), back: at(12, 4).addingTimeInterval(59), calendar: cal))
+        #expect(asks(5))
+        #expect(asks(3 * 60))
+        #expect(!s.asksAboutAway(since: at(12), back: at(15).addingTimeInterval(1), calendar: cal))   // sleep
         s.features.enabled.remove(.away)
-        #expect(!s.asksAboutAway(seconds: 600))
+        #expect(!asks(10))
+    }
+
+    // Night: nothing is asked, whether you left or came back in it.
+    @Test func asksAboutAwayNeverAtNight() {
+        var s = AppSettings()
+        s.awayAsk = .text
+        s.features.enabled.insert(.night)
+        s.nightFrom = 0
+        s.nightTo = 8 * 60
+        #expect(!s.asksAboutAway(since: at(2), back: at(2, 30), calendar: cal))
+        #expect(!s.asksAboutAway(since: at(7, 40), back: at(8, 20), calendar: cal))
+        #expect(!s.asksAboutAway(since: at(23, 50), back: at(0, 20, day: 2), calendar: cal))
+        #expect(s.asksAboutAway(since: at(8), back: at(8, 30), calendar: cal))
+    }
+
+    // Walked off without locking: away from the last input, not before nothing ran.
+    @Test func leftUnlockedFromTheLastInput() {
+        #expect(leftUnlocked(idleSince: at(13), lastInput: at(13, 10), now: at(13, 14)) == nil)   // under 5 min
+        #expect(leftUnlocked(idleSince: at(13), lastInput: at(13, 10), now: at(13, 15)) == at(13, 10))
+        // Left during free time that ended at 13:57: the free time stays free time.
+        #expect(leftUnlocked(idleSince: at(13, 57), lastInput: at(13, 52), now: at(13, 58)) == at(13, 57))
     }
 
     @Test func awayLinesFromBeforeStillLoad() throws {

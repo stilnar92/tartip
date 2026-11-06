@@ -66,6 +66,43 @@ struct ForcedBreakView: View {
     }
 }
 
+// Nothing can start now and this gap is set to Step away (Activities → Today): a countdown to when
+// something opens. Only the clock lifts it.
+struct OffHoursView: View {
+    @ObservedObject var model: Model
+    @ObservedObject var clock: Clock
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "moon.zzz").font(.system(size: 40)).foregroundStyle(Theme.accent)
+            VStack(spacing: 6) {
+                Text("Nothing planned right now").font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.text)
+                Text(model.phase.offHoursUntil.map { "The computer isn't for now. Step away until \(Fmt.clock.string(from: $0))." }
+                     ?? "The computer isn't for now. Step away.")
+                    .font(.system(size: 13)).foregroundStyle(Theme.text2)
+                    .multilineTextAlignment(.center)
+            }
+            if let until = model.phase.offHoursUntil {
+                Text(countdown(to: until, from: clock.now))
+                    .font(.system(size: 52, weight: .semibold)).monospacedDigit()
+                    .foregroundStyle(Theme.text)
+                    .contentTransition(.numericText(countsDown: true))
+            }
+            Button {
+                model.stepAwayForBreak()
+            } label: {
+                Label("Step away", systemImage: "figure.walk")
+                    .font(.system(size: 14, weight: .semibold))
+                    .padding(.horizontal, 28).padding(.vertical, 11)
+                    .pill(selected: true)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(32)
+        .frame(width: 420)
+    }
+}
+
 // Back from away: what you did off the computer, picked from your list and/or typed. Required,
 // like the review: the stretch and any paused session wait for the answer. Several picks split
 // the time evenly in Stats.

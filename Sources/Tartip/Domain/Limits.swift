@@ -24,7 +24,7 @@ struct Limits {
 
     // Today's limit in minutes (0 = none): the one for today's weekday if it has its own.
     func limitMinutes(_ activity: String) -> Int {
-        settings.has(.scheduling) ? (setting(activity)?.limit(onWeekday: calendar.component(.weekday, from: now)) ?? 0) : 0
+        settings.has(.scheduling) ? (setting(activity)?.limit(onWeekday: weekday) ?? 0) : 0
     }
 
     // Seconds left today, or nil when the activity has no limit.
@@ -42,15 +42,15 @@ struct Limits {
 
     func hasTimeLeft(_ activity: String) -> Bool { (secondsLeftToday(activity) ?? 1) > 0 }
 
-    // Activity hours: outside them the activity is greyed out in the picker.
+    // Activity hours (today's own, if today has them): outside them the activity is greyed out in the picker.
     func isOpen(_ activity: String) -> Bool {
-        guard settings.has(.scheduling), let a = setting(activity), a.hasSchedule else { return true }
-        return a.windows.contains { inWindow(minuteOfDay(now, calendar: calendar), $0.from, $0.to) }
+        guard settings.has(.scheduling), let windows = setting(activity)?.windows(onWeekday: weekday), !windows.isEmpty else { return true }
+        return windows.contains { inWindow(minuteOfDay(now, calendar: calendar), $0.from, $0.to) }
     }
 
     // "from 12:00" for an activity that's closed right now: whichever window opens soonest.
     func opensLabel(_ activity: String) -> String? {
-        guard !isOpen(activity), let windows = setting(activity)?.windows, !windows.isEmpty else { return nil }
+        guard !isOpen(activity), let windows = setting(activity)?.windows(onWeekday: weekday), !windows.isEmpty else { return nil }
         let m = minuteOfDay(now, calendar: calendar)
         guard let next = windows.min(by: { ($0.from - m + 1440) % 1440 < ($1.from - m + 1440) % 1440 }) else { return nil }
         return "from \(clockLabel(next.from))"
@@ -87,6 +87,8 @@ struct Limits {
         if let best = limited.max(by: { (secondsLeftToday($0) ?? 0) < (secondsLeftToday($1) ?? 0) }) { return best }
         return pool.first
     }
+
+    private var weekday: Int { calendar.component(.weekday, from: now) }
 
     private func setting(_ activity: String) -> ActivitySetting? { settings.activities.first { $0.name == activity } }
 }

@@ -8,6 +8,7 @@ struct DayTimeline: View {
 
     private enum Mode: String, CaseIterable, Identifiable { case available, actual, compare; var id: Self { self } }
     @State private var mode: Mode = .available
+    private var shown: Mode { day.planOnly ? .available : mode }   // another day has only its plan
 
     private let hourHeight: CGFloat = 56   // a 15-minute session still gets its label
     private let labelWidth: CGFloat = 40
@@ -18,7 +19,7 @@ struct DayTimeline: View {
         VStack(alignment: .leading, spacing: 10) {
             if !day.overcommitted.isEmpty {
                 Label(
-                    "Won't fit in today's hours: " + day.overcommitted.joined(separator: ", "),
+                    "Won't fit in \(day.planOnly ? "this day's" : "today's") hours: " + day.overcommitted.joined(separator: ", "),
                     systemImage: "exclamationmark.triangle.fill"
                 )
                 .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.red)
@@ -31,30 +32,32 @@ struct DayTimeline: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
-                if mode == .compare {
+                if shown == .compare {
                     Color.clear.frame(width: labelWidth, height: 1)
                     title("Available", day.anyTime.isEmpty ? "what you can pick" : "plus the any-time ones")
                     title("Actual", "by their real time")
                 } else {
-                    title(mode == .actual ? "Actual" : "Available",
-                          mode == .actual ? "the sessions you ran, by their real time"
+                    title(shown == .actual ? "Actual" : "Available",
+                          shown == .actual ? "the sessions you ran, by their real time"
                           : (day.anyTime.isEmpty ? "what you can pick, by period" : "plus the any-time ones"))
                 }
                 Spacer()
-                Picker("", selection: $mode) {
-                    Text("Available").tag(Mode.available)
-                    Text("Actual").tag(Mode.actual)
-                    Text("Compare").tag(Mode.compare)
+                if !day.planOnly {
+                    Picker("", selection: $mode) {
+                        Text("Available").tag(Mode.available)
+                        Text("Actual").tag(Mode.actual)
+                        Text("Compare").tag(Mode.compare)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 240)
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 240)
             }
             HStack(alignment: .top, spacing: 8) {
-                hourLabels(mode == .actual ? actualMarks : availableMarks)
-                if mode == .available {
+                hourLabels(shown == .actual ? actualMarks : availableMarks)
+                if shown == .available {
                     availableColumn
-                } else if mode == .actual {
+                } else if shown == .actual {
                     actualColumn
                 } else {
                     availableColumn
@@ -73,7 +76,7 @@ struct DayTimeline: View {
     }
 
     private var actualColumn: some View {
-        column(mode == .compare ? availableMarks : actualMarks) { w in
+        column(shown == .compare ? availableMarks : actualMarks) { w in
             ForEach(Array(day.actual.enumerated()), id: \.offset) { _, s in
                 session(s).frame(width: w, height: max(2, y(s.end) - y(s.start) - 2)).offset(y: y(s.start) + 1)
             }
@@ -158,7 +161,9 @@ struct DayTimeline: View {
         let past = day.now.map { p.end <= $0 } ?? false
         let fill: Color = empty ? Theme.redTint.opacity(0.7) : isNow ? Theme.accentTint : Theme.accent.opacity(shade ? 0.05 : 0.10)
         let edge: Color = empty ? Theme.red.opacity(0.5) : isNow ? Theme.accent.opacity(0.5) : .clear
-        let label: Text = empty ? Text("Nothing can start").foregroundColor(Theme.red) : names(p.available)
+        let locked = day.lockedGaps.contains(Gap(from: p.start, to: p.end))
+        let label: Text = empty ? Text(locked ? "Nothing can start · step away" : "Nothing can start · free").foregroundColor(Theme.red)
+            : names(p.available)
         let what = empty ? "nothing can start" : (p.available + day.anyTime).joined(separator: ", ")
         return label
             .font(.system(size: 11, weight: .semibold))

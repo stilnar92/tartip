@@ -34,12 +34,12 @@ func missedWindows(_ s: AppSettings, records: [SessionRecord], now: Date,
                    calendar: Calendar = .current) -> [(activity: String, day: String, windowEnd: Date, shortfall: Int)] {
     var out: [(activity: String, day: String, windowEnd: Date, shortfall: Int)] = []
     for a in s.activities where a.catchUpMinutes > 0 {
-        guard !a.windows.isEmpty else { continue }
         // Yesterday and today only: anything that closed before that is already past its grace (see expiry below).
         let days = [-1, 0].map { calendar.date(byAdding: .day, value: $0, to: calendar.startOfDay(for: now))! }
         for dayStart in days {
-            guard a.isPlanned(onWeekday: calendar.component(.weekday, from: dayStart)) else { continue }
-            let spans = a.windows.map { w -> (start: Date, end: Date) in
+            let weekday = calendar.component(.weekday, from: dayStart)
+            guard a.isPlanned(onWeekday: weekday), a.hasSchedule(onWeekday: weekday) else { continue }
+            let spans = a.windows(onWeekday: weekday).map { w -> (start: Date, end: Date) in
                 let start = dayStart.addingTimeInterval(Double(w.from) * 60)
                 var end = dayStart.addingTimeInterval(Double(w.to) * 60)
                 if w.to <= w.from { end = end.addingTimeInterval(86_400) }   // crosses midnight

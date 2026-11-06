@@ -85,6 +85,7 @@ final class WindowCoordinator {
             prompt.show(ReviewView(model: model, size: size), fullScreen: fullScreen)
         case .awayReview: prompt.show(AwayReviewView(model: model), fullScreen: Settings.current.reviewFullScreen)
         case .forcedBreak: prompt.show(ForcedBreakView(model: model, clock: model.clock), fullScreen: true)
+        case .offHours: prompt.show(OffHoursView(model: model, clock: model.clock), fullScreen: true)
         case .idle, .session, .freeTime, .away: prompt.hide()
         }
     }

@@ -39,13 +39,17 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
     var days: [Int] = []           // weekdays it's planned for (Calendar: 1 = Sunday … 7 = Saturday); empty = every day
     var dayMinutes: [Int: Int] = [:]   // a different daily limit on some weekdays (0 = no limit); absent = dailyMinutes.
                                        // "Off on a day" is only ever `days`, never a limit.
+    var dayWindows: [Int: [TimeWindow]] = [:]   // other hours on some weekdays (empty = any time); absent = windows
     var catchUpMinutes = 0          // > 0 marks this activity "important": if its hours close with
                                      // none of it done, the next pick is forced to this many minutes of it.
     var opens = ModeConfig()       // apps and links opened when it starts
     var icon: String? = nil        // SF Symbol; nil = picked from the name
     var color: String? = nil       // one of ActivityStyle.colors; nil = picked from the name
 
-    var hasSchedule: Bool { !windows.isEmpty }
+    // The hours on a weekday (Calendar numbering): its own if it has them; empty = any time.
+    func windows(onWeekday d: Int) -> [TimeWindow] { dayWindows[d] ?? windows }
+
+    func hasSchedule(onWeekday d: Int) -> Bool { !windows(onWeekday: d).isEmpty }
 
     init(name: String, dailyMinutes: Int = 0, fromMinute: Int? = nil, toMinute: Int? = nil) {
         self.name = name
@@ -78,7 +82,7 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, block, dailyMinutes, windows, fromMinute, toMinute, days, dayMinutes, catchUpMinutes, opens, icon, color
+        case id, name, block, dailyMinutes, windows, fromMinute, toMinute, days, dayMinutes, dayWindows, catchUpMinutes, opens, icon, color
     }
 
     // Settings saved before a field existed still load. Settings saved before multiple windows
@@ -98,6 +102,7 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
         }
         days = try c.decodeIfPresent([Int].self, forKey: .days) ?? []
         dayMinutes = try c.decodeIfPresent([Int: Int].self, forKey: .dayMinutes) ?? [:]
+        dayWindows = try c.decodeIfPresent([Int: [TimeWindow]].self, forKey: .dayWindows) ?? [:]
         catchUpMinutes = try c.decodeIfPresent(Int.self, forKey: .catchUpMinutes) ?? 0
         opens = try c.decodeIfPresent(ModeConfig.self, forKey: .opens) ?? ModeConfig()
         icon = try c.decodeIfPresent(String.self, forKey: .icon)
@@ -113,6 +118,7 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
         try c.encode(windows, forKey: .windows)
         try c.encode(days, forKey: .days)
         try c.encode(dayMinutes, forKey: .dayMinutes)
+        try c.encode(dayWindows, forKey: .dayWindows)
         try c.encode(catchUpMinutes, forKey: .catchUpMinutes)
         try c.encode(opens, forKey: .opens)
         try c.encodeIfPresent(icon, forKey: .icon)
@@ -155,6 +161,15 @@ enum AwayAsk: String, Codable, CaseIterable {
     }
 }
 
+// A stretch of the waking day when nothing can start (red in Today), in the same minutes as
+// Period. It's free by default: nothing asked or blocked. Listed in lockedGaps, it's off the
+// computer instead: a full-screen window until something opens. Kept by its times, so it
+// applies on every day with that same gap, and an edit to the hours that moves it frees it.
+struct Gap: Codable, Hashable {
+    var from: Int
+    var to: Int
+}
+
 struct AppSettings: Codable, Equatable {
     var features = Features.legacy
     // Free time
@@ -190,6 +205,9 @@ struct AppSettings: Codable, Equatable {
     var awayAsk = AwayAsk.off
     var awayAskAfterMinutes = 5
     var awayActivities = ["Meal", "Walk", "Workout", "Errands", "Rest"]   // the list, with .list
+
+    // Gaps (nothing can start) spent off the computer; any other gap is free. See Gap.
+    var lockedGaps: [Gap] = []
 
     // Forced breaks: after this long continuously at the computer, the session ends and a
     // break is required. 0 = never. The break only lifts once the cooldown runs out.
@@ -251,10 +269,13 @@ extension AppSettings {
         return try? JSONDecoder().decode(AppSettings.self, from: mergedData)
     }
 
-    // Back from this many seconds away: ask what you did? Only past the minimum, and never for
-    // a stretch longer than longestAway — that's sleep, which Stats doesn't count as away either.
-    func asksAboutAway(seconds: Int) -> Bool {
-        has(.away) && awayAsk != .off && seconds >= max(1, awayAskAfterMinutes) * 60 && Double(seconds) <= longestAway
+    // Back from away: ask what you did? Only past the minimum, and never for a stretch longer
+    // than longestAway — that's sleep, which Stats doesn't count as away either. Nothing is
+    // asked at night, so neither leaving nor coming back may fall in it.
+    func asksAboutAway(since: Date, back: Date, calendar: Calendar = .current) -> Bool {
+        let seconds = Int(back.timeIntervalSince(since))
+        return has(.away) && awayAsk != .off && seconds >= max(1, awayAskAfterMinutes) * 60 && Double(seconds) <= longestAway
+            && !isNight(at: since, calendar: calendar) && !isNight(at: back, calendar: calendar)
     }
 
     // Night window, which may cross midnight (e.g. 22:00–06:00).

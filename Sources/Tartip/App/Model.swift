@@ -45,6 +45,7 @@ final class Model: ObservableObject {
     private var settingsSub: AnyCancellable?
     private let keepAwake = KeepAwake()
     private var lockSubs: [NSObjectProtocol] = []
+    private var idleSince: Date?    // when nothing started running, for leaving without locking
 
     init(clock: Clock? = nil, blocker: Blocker = NativeBlocker.shared, state: StoredState = StateStore.load()) {
         self.clock = clock ?? Clock()
@@ -155,6 +156,22 @@ final class Model: ObservableObject {
         var actual: [PlanSlot]     // from waking up until now
         var now: Int?              // nil outside the waking day
         var overcommitted: [String] // planned today, asking for more daily minutes than their hours can actually fit
+        var planOnly = false       // another day's plan: nothing ran, no Actual
+        var lockedGaps: [Gap] = [] // gaps spent off the computer
+    }
+
+    // A weekday's plan alone, to look at days other than today.
+    static func plan(_ s: AppSettings, weekday: Int) -> DayView {
+        let w = wakingHours(s)
+        let anyTime = s.activities.filter { a in
+            !a.name.isEmpty && a.isPlanned(onWeekday: weekday) && !a.hasSchedule(onWeekday: weekday)
+        }.map(\.name)
+        let periods = merged(availability(s, weekday: weekday, from: w.from, to: w.to).map {
+            Period(start: $0.start, end: $0.end, available: $0.available.filter { !anyTime.contains($0) })
+        })
+        let overcommitted = Set(overcommittedActivities(s, weekday: weekday) + overcommittedPeriods(s, weekday: weekday)).sorted()
+        return DayView(from: w.from, to: w.to, anyTime: anyTime, periods: periods, actual: [], now: nil,
+                       overcommitted: overcommitted, planOnly: true, lockedGaps: s.lockedGaps)
     }
 
     var today: DayView {
@@ -183,18 +200,11 @@ final class Model: ObservableObject {
             let start = inDay(minuteOfDay(max(e.t, dayStart)))
             return PlanSlot(start: start, end: start + max(1, (e.seconds ?? 0) / 60), activity: nil, free: true)
         }
-        let weekday = Calendar.current.component(.weekday, from: now)
-        let anyTime = s.activities.filter { a in
-            !a.name.isEmpty && a.isPlanned(onWeekday: weekday) && !a.hasSchedule
-        }.map(\.name)
-        let periods = merged(availability(s, weekday: weekday, from: w.from, to: w.to).map {
-            Period(start: $0.start, end: $0.end, available: $0.available.filter { !anyTime.contains($0) })
-        })
-        let overcommitted = Set(overcommittedActivities(s, weekday: weekday) + overcommittedPeriods(s, weekday: weekday)).sorted()
-        return DayView(from: w.from, to: w.to, anyTime: anyTime, periods: periods,
-                       actual: pastDay(done + aways + frees, from: w.from, until: min(nowM, w.to)),
-                       now: nowM >= w.from && nowM < w.to ? nowM : nil,
-                       overcommitted: overcommitted)
+        var day = Self.plan(s, weekday: Calendar.current.component(.weekday, from: now))
+        day.actual = pastDay(done + aways + frees, from: w.from, until: min(nowM, w.to))
+        day.now = nowM >= w.from && nowM < w.to ? nowM : nil
+        day.planOnly = false
+        return day
     }
 
     // Nothing can start but some work is open and used up: its limits count from zero again.
@@ -466,7 +476,7 @@ final class Model: ObservableObject {
         case .idle, .picking:
             guard Settings.current.has(.away) else { return }
             paused = nil
-        case .away, .forcedBreak:       // already away, or on a break that can't be skipped by leaving
+        case .away, .forcedBreak, .offHours:   // already away, or on a break that can't be skipped by leaving
             if lock { lockScreen() }
             return
         case .freeTime:                 // free time goes on wherever you spend it; only noted, for when it runs out
@@ -484,6 +494,18 @@ final class Model: ObservableObject {
         if lock { lockScreen() }
     }
 
+    // Walked off without locking while nothing ran: away as of the last input. The Mac isn't
+    // kept awake, as nothing was left running on purpose.
+    private func leftWithoutLocking(idleSince: Date) -> Bool {
+        guard Settings.current.has(.away),
+              let since = leftUnlocked(idleSince: idleSince, lastInput: now.addingTimeInterval(-secondsSinceInput()), now: now)
+        else { return false }
+        state.phase = .away(since: since, paused: nil)
+        state.pickingSince = nil
+        log("away  (no input since \(Fmt.clock.string(from: since)))")
+        return true
+    }
+
     // Back at the computer. Asking what you did (Rules → Step away) comes first, and whatever
     // was paused waits for the answer; otherwise it's straight back to it.
     func comeBack() {
@@ -497,7 +519,7 @@ final class Model: ObservableObject {
         }
         keepAwake.off()
         let away = max(0, Int(now.timeIntervalSince(since)))
-        if Settings.current.asksAboutAway(seconds: away) {
+        if Settings.current.asksAboutAway(since: since, back: now) {
             state.phase = .awayReview(since: since, back: now, paused: paused)
             log("back after \(minutesLabel(away / 60)): asking what you did")
             return
@@ -532,7 +554,7 @@ final class Model: ObservableObject {
     private func returned(since: Date, back: Date, paused: Session?, did: [String] = [], note: String = "") {
         let away = max(0, Int(back.timeIntervalSince(since)))
         if away >= 60 {
-            let r = AwayRecord(start: since, end: back, did: did.isEmpty ? nil : did, note: note.isEmpty ? nil : note)
+            let r = AwayRecord(start: since, end: now, did: did.isEmpty ? nil : did, note: note.isEmpty ? nil : note)
             appendAway(r)
             awayRecords.append(r)
         }
@@ -555,11 +577,17 @@ final class Model: ObservableObject {
         log("back after \(minutesLabel(away / 60)): \(s.planned ?? s.block) until \(Fmt.clock.string(from: s.end))")
     }
 
+    // In a gap set to Step away: when it ends.
+    private func lockedGapEnd() -> Date? {
+        guard let g = currentGap(Settings.current, at: now), Settings.current.lockedGaps.contains(g.gap) else { return nil }
+        return g.end
+    }
+
     // MARK: forced breaks (too long at the computer: step away, no other choice until the cooldown ends)
 
     // The only thing you can do on a forced break: lock the screen again.
     func stepAwayForBreak() {
-        guard phase.forcedBreakUntil != nil else { return }
+        guard phase.forcedBreakUntil != nil || phase.offHoursUntil != nil else { return }
         lockScreen()
     }
 
@@ -570,7 +598,7 @@ final class Model: ObservableObject {
             return
         }
         switch phase {
-        case .away, .forcedBreak, .reviewing, .awayReview:
+        case .away, .forcedBreak, .offHours, .reviewing, .awayReview:
             state.activeSince = nil
         default:
             if !userPresent() { state.activeSince = nil }
@@ -586,7 +614,7 @@ final class Model: ObservableObject {
               now.timeIntervalSince(since) >= Double(Settings.current.forceBreakAfterHours) * 3600
         else { return }
         switch phase {
-        case .away, .forcedBreak, .reviewing, .awayReview: return
+        case .away, .forcedBreak, .offHours, .reviewing, .awayReview: return
         case .session(let s): finish(s, ended: "forcedBreak")
         case .idle, .picking, .freeTime: break
         }
@@ -677,6 +705,7 @@ final class Model: ObservableObject {
         blocker.tick(now)
         updateActivePresence()
         enterForcedBreakIfDue()
+        if phase != .idle { idleSince = nil }
 
         switch phase {
         case .session(let s):
@@ -709,6 +738,12 @@ final class Model: ObservableObject {
                 state.phase = .idle
                 return
             }
+            if let until = lockedGapEnd() {   // left open into a gap set to Step away
+                state.pickingSince = nil
+                state.phase = .offHours(until: until)
+                log("gap  step away until \(Fmt.clock.string(from: until))")
+                return
+            }
             if state.pickingSince == nil { state.pickingSince = now }
             startRoundIfStuck()   // the picker opened, then what was left closed or ran out
             if let at = autoStartAt, now >= at { autoStart() }
@@ -716,16 +751,29 @@ final class Model: ObservableObject {
             return
         case .away(let since, _):
             // The unlock went unheard (or the lock didn't happen): if you're at it, you're back.
-            if now.timeIntervalSince(since) > 5 && !screenLocked() { comeBack() }
+            if now.timeIntervalSince(since) > 5 && userPresent() { comeBack() }
         case .forcedBreak(let until):
             // Coming back early changes nothing: only the cooldown running out ends the break.
             if now >= until { state.phase = .idle; log("break done, back to it") }
             else if !screenLocked() { lockScreen() }
+        case .offHours(let until):
+            // Over when something can start, or once the gap is freed or moved in Activities.
+            if now >= until || lockedGapEnd() == nil { state.phase = .idle; log("gap over") }
         case .idle:
+            if idleSince == nil { idleSince = now }
+            if let since = idleSince, leftWithoutLocking(idleSince: since) { return }
             // Nothing running and it's not night: you always decide what's next, right away.
             // The picker can't be closed; nothing is blocked until you pick.
             // A day with nothing planned is a day off: nothing is pushed.
-            guard Settings.current.has(.guidance), !night, !Setup.isPending, !todayActivities.isEmpty, userPresent() else { return }
+            guard !night, !Setup.isPending, !todayActivities.isEmpty, userPresent() else { return }
+            if let until = lockedGapEnd() {
+                state.phase = .offHours(until: until)
+                log("gap  step away until \(Fmt.clock.string(from: until))")
+                return
+            }
+            // A free gap: nothing can start, so nothing is asked.
+            if currentGap(Settings.current, at: now) != nil { return }
+            guard Settings.current.has(.guidance) else { return }
             startRoundIfStuck()
             // Day done: every limit reached and no free time to offer, so there's nothing to choose.
             let limits = limits
