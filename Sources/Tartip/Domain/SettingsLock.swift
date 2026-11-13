@@ -73,6 +73,7 @@ func loosenings(from o: AppSettings, to n: AppSettings) -> [String] {
         }
         if oldDays.contains(where: { windowsSpan(b.windows(onWeekday: $0)) < windowsSpan(a.windows(onWeekday: $0)) }) { out.append("shorter hours for \(a.name)") }
         if b.block != a.block { out.append("\(a.name) locking another block") }
+        if b.allowedDuringCatchUp && !a.allowedDuringCatchUp { out.append("allowing \(a.name) during a catch-up") }
     }
 
     if o.lockedGaps.contains(where: { !n.lockedGaps.contains($0) }) { out.append("freeing a gap") }

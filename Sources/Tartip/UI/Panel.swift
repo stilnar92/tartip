@@ -25,7 +25,14 @@ struct ContentView: View {
     // its own icon, title and Tasks/Settings inside its own card (see statusCard).
     private var showsDayHeader: Bool {
         model.freeTimeEnd == nil && model.session == nil && !Setup.isPending
-            && model.phase.awaySince == nil && !Settings.current.isNight(at: model.now)
+            && model.phase.awaySince == nil && !Settings.current.isNight(at: model.now) && !nothingCanStart
+    }
+
+    // No activity in today's list can start (a gap, a day off, a catch-up owed elsewhere, every
+    // limit reached): the list would only be greyed-out rows, so a card says so instead.
+    private var nothingCanStart: Bool {
+        let limits = model.limits
+        return !model.activities.isEmpty && !model.todayActivities.contains(where: limits.canStart)
     }
 
     // Every state but the idle list is a single full-width card and nothing else: matching
@@ -46,6 +53,8 @@ struct ContentView: View {
                 awayCard(since)
             } else if Settings.current.isNight(at: model.now) {
                 nightCard
+            } else if nothingCanStart {
+                nothingCanStartCard
             } else {
                 TodayList(model: model, clock: clock)
                 if Settings.current.has(.workspace) { siteRow }
@@ -308,6 +317,18 @@ struct ContentView: View {
             "sparkles", Theme.accent, "Let's set you up", "Choose an activity and a duration. Add optional tools later.",
             readout: "👋",
             buttonTitle: "Get started", action: { openMain(.setup) }
+        )
+    }
+
+    // MARK: nothing can start
+
+    // Like the night card: when something opens again, or nothing more today.
+    private var nothingCanStartCard: some View {
+        let opens = currentGap(Settings.current, at: model.now)?.end
+        return statusCard(
+            "moon.zzz", Theme.accent, "Nothing can start",
+            opens.map { "Something opens at \(Fmt.clock.string(from: $0))" } ?? "Nothing more today",
+            readout: opens.map { countdown(to: $0, from: model.now) } ?? "🌿"
         )
     }
 

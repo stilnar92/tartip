@@ -59,11 +59,22 @@ struct Limits {
     // Planned for today's weekday (activities without days are planned every day).
     func isToday(_ activity: String) -> Bool { !settings.has(.scheduling) || (setting(activity)?.isPlanned(on: now, calendar: calendar) ?? true) }
 
-    // A debt owed by an activity still in the list forces it as the only choice. One deleted
-    // from Settings since is orphaned (moot, not settled): fall through to the normal rule.
+    // A debt owed by an activity still in the list forces it as the only choice, except for
+    // activities allowed during a catch-up: those follow their usual rules. One deleted from
+    // Settings since is orphaned (moot, not settled): fall through to the normal rule.
     func canStart(_ activity: String) -> Bool {
-        if let debt = owedDebt, settings.activity(named: debt.activity) != nil { return activity == debt.activity }
+        if let debt = owedDebt, settings.activity(named: debt.activity) != nil {
+            if activity == debt.activity { return true }
+            if !blockedByDebt(activity) { return isToday(activity) && isOpen(activity) && hasTimeLeft(activity) }
+            return false
+        }
         return isToday(activity) && isOpen(activity) && hasTimeLeft(activity)
+    }
+
+    // Held back by a catch-up another activity owes (allowed-during-catch-up ones never are).
+    func blockedByDebt(_ activity: String) -> Bool {
+        guard let debt = owedDebt, settings.activity(named: debt.activity) != nil, debt.activity != activity else { return false }
+        return setting(activity)?.allowedDuringCatchUp != true
     }
 
     // Time for a new round: no work can start now, but some that's planned and open is used up.
@@ -80,6 +91,8 @@ struct Limits {
     // start now, the one furthest behind its daily limit (most time left), then ones without
     // a limit, in list order. Rest only if nothing else can start.
     func autoPick(from activities: [String]) -> String? {
+        // A catch-up owed is still what gets picked, even with others allowed alongside it.
+        if let debt = owedDebt, settings.activity(named: debt.activity) != nil { return debt.activity }
         let open = activities.filter(canStart)
         let work = open.filter { $0.lowercased() != "rest" }
         let pool = work.isEmpty ? open : work

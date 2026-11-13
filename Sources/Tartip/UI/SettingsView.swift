@@ -323,6 +323,11 @@ struct SettingsView: View {
                             }
                             .help("If the day's hours close with less than this done in total (across all windows), the next pick is forced to just the shortfall — this minus whatever was already done.")
                         }
+                        if settings.value.has(.catchUp) {
+                            Toggle("Allowed during a catch-up", isOn: a.allowedDuringCatchUp)
+                                .toggleStyle(.switch).controlSize(.small)
+                                .help("While another activity owes a catch-up, this one can still start, within its usual hours and limit.")
+                        }
                         Divider()
                     }
                     if settings.value.has(.blocking) {

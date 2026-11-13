@@ -185,6 +185,23 @@ private func todays(_ missed: [(activity: String, day: String, windowEnd: Date, 
         #expect(limits.canStart("English") && !limits.canStart("Work"))
     }
 
+    // Allowed during a catch-up: it starts under its usual rules while another is owed, but
+    // auto-start still picks the owed one.
+    @Test func allowedActivityStartsDuringACatchUp() {
+        var work = ActivitySetting(name: "Work")
+        work.allowedDuringCatchUp = true
+        var s = AppSettings(features: .legacy, activities: [english(), work, ActivitySetting(name: "Reading")])
+        s.features.enabled.insert(.catchUp)
+        let debt = CatchUpDebt(activity: "English", day: "2026-03-02", windowEnd: day(2, 11), catchUpMinutes: 20)
+        let limits = Limits(settings: s, today: [], now: day(2, 12), calendar: cal, debts: [debt])
+        #expect(limits.canStart("English") && limits.canStart("Work") && !limits.canStart("Reading"))
+        #expect(!limits.blockedByDebt("Work") && limits.blockedByDebt("Reading"))
+        #expect(limits.autoPick(from: ["Work", "English"]) == "English")
+        var before = work
+        before.allowedDuringCatchUp = false
+        #expect(loosenings(from: AppSettings(activities: [before]), to: AppSettings(activities: [work])) == ["allowing Work during a catch-up"])
+    }
+
     // A debt for an activity since deleted from Settings is orphaned (moot), not an eternal lock.
     @Test func orphanedDebtFallsThroughToNormalRules() {
         var s = AppSettings(features: .legacy, activities: [ActivitySetting(name: "Work")])

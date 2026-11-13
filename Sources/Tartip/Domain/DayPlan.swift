@@ -140,6 +140,19 @@ func currentGap(_ s: AppSettings, at now: Date, calendar: Calendar = .current) -
     return (Gap(from: p.start, to: p.end), frameStart.addingTimeInterval(Double(p.end) * 60))
 }
 
+// How much of from..<to falls outside gaps, i.e. when something could have started. Steps a
+// minute at a time outside a gap and jumps to its end inside one.
+func timeOutsideGaps(_ s: AppSettings, from: Date, to: Date, calendar: Calendar = .current) -> TimeInterval {
+    var t = from, outside: TimeInterval = 0
+    while t < to {
+        if let g = currentGap(s, at: t, calendar: calendar) { t = max(g.end, t.addingTimeInterval(1)); continue }
+        let next = min(to, t.addingTimeInterval(60))
+        outside += next.timeIntervalSince(t)
+        t = next
+    }
+    return outside
+}
+
 // A weekday's gaps: periods when nothing at all can start, on a day with something planned.
 func gaps(_ s: AppSettings, weekday: Int) -> [Gap] {
     guard s.activities.contains(where: { !$0.name.isEmpty && $0.isPlanned(onWeekday: weekday) }) else { return [] }

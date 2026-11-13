@@ -46,6 +46,7 @@ final class Model: ObservableObject {
     private let keepAwake = KeepAwake()
     private var lockSubs: [NSObjectProtocol] = []
     private var idleSince: Date?    // when nothing started running, for leaving without locking
+    private var lastWatched: Date?  // last seen watching something: counts as input for leaving
 
     init(clock: Clock? = nil, blocker: Blocker = NativeBlocker.shared, state: StoredState = StateStore.load()) {
         self.clock = clock ?? Clock()
@@ -495,10 +496,13 @@ final class Model: ObservableObject {
     }
 
     // Walked off without locking while nothing ran: away as of the last input. The Mac isn't
-    // kept awake, as nothing was left running on purpose.
+    // kept awake, as nothing was left running on purpose. Watching a film isn't leaving, and
+    // once it ends you left no earlier than that.
     private func leftWithoutLocking(idleSince: Date) -> Bool {
+        if watching() { lastWatched = now; return false }
+        let lastInput = max(now.addingTimeInterval(-secondsSinceInput()), lastWatched ?? .distantPast)
         guard Settings.current.has(.away),
-              let since = leftUnlocked(idleSince: idleSince, lastInput: now.addingTimeInterval(-secondsSinceInput()), now: now)
+              let since = leftUnlocked(idleSince: idleSince, lastInput: lastInput, now: now)
         else { return false }
         state.phase = .away(since: since, paused: nil)
         state.pickingSince = nil

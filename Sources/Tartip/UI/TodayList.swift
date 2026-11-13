@@ -123,7 +123,7 @@ struct TodayList: View {
         let closed = limits.opensLabel(a)
         // A debt owed by a different activity forces it: everything else is disabled here too,
         // not just at the actual start (startActivity already refuses it regardless).
-        let owedElsewhere = limits.owedDebt.map { $0.activity != a } ?? false
+        let owedElsewhere = limits.blockedByDebt(a)
         let owedHere = limits.owedDebt?.activity == a
         // A debt overrides the activity's own limit/hours (same rule as Limits.canStart):
         // the catch-up is owed regardless of whether today's budget or window would allow it.

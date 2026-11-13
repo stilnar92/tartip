@@ -42,6 +42,7 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
     var dayWindows: [Int: [TimeWindow]] = [:]   // other hours on some weekdays (empty = any time); absent = windows
     var catchUpMinutes = 0          // > 0 marks this activity "important": if its hours close with
                                      // none of it done, the next pick is forced to this many minutes of it.
+    var allowedDuringCatchUp = false   // can still start while another activity owes a catch-up
     var opens = ModeConfig()       // apps and links opened when it starts
     var icon: String? = nil        // SF Symbol; nil = picked from the name
     var color: String? = nil       // one of ActivityStyle.colors; nil = picked from the name
@@ -82,7 +83,7 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, block, dailyMinutes, windows, fromMinute, toMinute, days, dayMinutes, dayWindows, catchUpMinutes, opens, icon, color
+        case id, name, block, dailyMinutes, windows, fromMinute, toMinute, days, dayMinutes, dayWindows, catchUpMinutes, allowedDuringCatchUp, opens, icon, color
     }
 
     // Settings saved before a field existed still load. Settings saved before multiple windows
@@ -104,6 +105,7 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
         dayMinutes = try c.decodeIfPresent([Int: Int].self, forKey: .dayMinutes) ?? [:]
         dayWindows = try c.decodeIfPresent([Int: [TimeWindow]].self, forKey: .dayWindows) ?? [:]
         catchUpMinutes = try c.decodeIfPresent(Int.self, forKey: .catchUpMinutes) ?? 0
+        allowedDuringCatchUp = try c.decodeIfPresent(Bool.self, forKey: .allowedDuringCatchUp) ?? false
         opens = try c.decodeIfPresent(ModeConfig.self, forKey: .opens) ?? ModeConfig()
         icon = try c.decodeIfPresent(String.self, forKey: .icon)
         color = try c.decodeIfPresent(String.self, forKey: .color)
@@ -120,6 +122,7 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
         try c.encode(dayMinutes, forKey: .dayMinutes)
         try c.encode(dayWindows, forKey: .dayWindows)
         try c.encode(catchUpMinutes, forKey: .catchUpMinutes)
+        try c.encode(allowedDuringCatchUp, forKey: .allowedDuringCatchUp)
         try c.encode(opens, forKey: .opens)
         try c.encodeIfPresent(icon, forKey: .icon)
         try c.encodeIfPresent(color, forKey: .color)
@@ -271,11 +274,13 @@ extension AppSettings {
 
     // Back from away: ask what you did? Only past the minimum, and never for a stretch longer
     // than longestAway — that's sleep, which Stats doesn't count as away either. Nothing is
-    // asked at night, so neither leaving nor coming back may fall in it.
+    // asked at night, so neither leaving nor coming back may fall in it. Time in a gap (nothing
+    // could start) isn't counted toward the minimum: there was nothing to skip.
     func asksAboutAway(since: Date, back: Date, calendar: Calendar = .current) -> Bool {
         let seconds = Int(back.timeIntervalSince(since))
         return has(.away) && awayAsk != .off && seconds >= max(1, awayAskAfterMinutes) * 60 && Double(seconds) <= longestAway
             && !isNight(at: since, calendar: calendar) && !isNight(at: back, calendar: calendar)
+            && Int(timeOutsideGaps(self, from: since, to: back, calendar: calendar)) >= max(1, awayAskAfterMinutes) * 60
     }
 
     // Night window, which may cross midnight (e.g. 22:00–06:00).

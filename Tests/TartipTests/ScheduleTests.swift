@@ -110,6 +110,21 @@ private let monday = day(2), saturday = day(7)
         #expect(gaps(s, weekday: 2).isEmpty && currentGap(s, at: day(2, 13), calendar: cal) == nil)
     }
 
+    // Away in a gap: nothing could start, so coming back doesn't ask what you did. Only the
+    // part outside the gap counts toward the minimum.
+    @Test func awayInAGapIsntAsked() {
+        var s = AppSettings()
+        s.features.enabled.remove(.night)
+        s.awayAsk = .text
+        s.activities = [ActivitySetting(name: "Work", windows: [TimeWindow(from: 540, to: 720), TimeWindow(from: 930, to: 1080)])]
+        let at = { (h: Int, m: Int) in day(2, h).addingTimeInterval(Double(m) * 60) }
+        #expect(!s.asksAboutAway(since: at(12, 30), back: at(14, 0), calendar: cal))    // all in the 12–15:30 gap
+        #expect(!s.asksAboutAway(since: at(11, 58), back: at(13, 0), calendar: cal))    // 2 min before it
+        #expect(!s.asksAboutAway(since: at(15, 0), back: at(15, 33), calendar: cal))    // 3 min after it
+        #expect(s.asksAboutAway(since: at(11, 50), back: at(13, 0), calendar: cal))     // 10 min before it
+        #expect(s.asksAboutAway(since: at(10, 0), back: at(10, 30), calendar: cal))     // no gap at all
+    }
+
     @Test func freeingALockedGapLoosens() {
         var o = AppSettings()
         o.lockedGaps = [Gap(from: 720, to: 930)]
