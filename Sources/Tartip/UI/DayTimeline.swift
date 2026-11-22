@@ -163,6 +163,7 @@ struct DayTimeline: View {
         let edge: Color = empty ? Theme.red.opacity(0.5) : isNow ? Theme.accent.opacity(0.5) : .clear
         let locked = day.lockedGaps.contains(Gap(from: p.start, to: p.end))
         let label: Text = empty ? Text(locked ? "Nothing can start · step away" : "Nothing can start · free").foregroundColor(Theme.red)
+            : p.available.isEmpty ? Text("Only any-time  ").foregroundColor(Theme.text2) + names(day.anyTime)
             : names(p.available)
         let what = empty ? "nothing can start" : (p.available + day.anyTime).joined(separator: ", ")
         return label
