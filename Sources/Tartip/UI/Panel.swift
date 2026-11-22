@@ -30,10 +30,7 @@ struct ContentView: View {
 
     // No activity in today's list can start (a gap, a day off, a catch-up owed elsewhere, every
     // limit reached): the list would only be greyed-out rows, so a card says so instead.
-    private var nothingCanStart: Bool {
-        let limits = model.limits
-        return !model.activities.isEmpty && !model.todayActivities.contains(where: limits.canStart)
-    }
+    private var nothingCanStart: Bool { model.nothingCanStart }
 
     // Every state but the idle list is a single full-width card and nothing else: matching
     // the panel's own background to the card's removes the seam between them, instead of a

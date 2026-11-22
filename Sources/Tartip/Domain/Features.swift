@@ -39,7 +39,7 @@ enum Feature: String, Codable, CaseIterable, Identifiable {
         case .settingsLock: "Limit when settings can be loosened."
         case .statistics: "Explore your recorded sessions and activity totals."
         case .login: "Start Tartip when you sign in."
-        case .relaunch: "Keep Tartip running after a quit. Requires Launch at login."
+        case .relaunch: "Keep Tartip running after a quit. If it's stopped some other way, for example with launchctl, it starts again within 15 minutes. Requires Launch at login."
         case .notifications: "Play sounds and show session notifications."
         case .away: "Lock the screen and keep the Mac awake while away. Optionally ask what you did when you're back, and see it in Stats."
         case .forcedBreak: "End the session and require a step away after a long stretch at the computer, with no way to skip it."

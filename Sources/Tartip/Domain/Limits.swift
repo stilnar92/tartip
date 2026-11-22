@@ -71,6 +71,13 @@ struct Limits {
         return isToday(activity) && isOpen(activity) && hasTimeLeft(activity)
     }
 
+    // Not one of today's `activities` can start (a gap, a day off, a catch-up owed elsewhere,
+    // every limit reached). Only today's count: one owing a catch-up on a day it isn't planned
+    // isn't in the list to start. With no activities at all there's nothing to say: false.
+    func nothingCanStart(_ activities: [String]) -> Bool {
+        !activities.isEmpty && !activities.contains { isToday($0) && canStart($0) }
+    }
+
     // Held back by a catch-up another activity owes (allowed-during-catch-up ones never are).
     func blockedByDebt(_ activity: String) -> Bool {
         guard let debt = owedDebt, settings.activity(named: debt.activity) != nil, debt.activity != activity else { return false }

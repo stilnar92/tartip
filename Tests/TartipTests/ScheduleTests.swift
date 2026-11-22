@@ -35,6 +35,26 @@ private let monday = day(2), saturday = day(7)
         #expect(sat.canStart("Project"))
     }
 
+    // The panel's "Nothing can start" and the away question share this: a day off or every
+    // limit used up counts, not only a gap.
+    @Test func nothingCanStartCoversDaysOffAndUsedLimits() {
+        var s = AppSettings()
+        var work = ActivitySetting(name: "Work"); work.dailyMinutes = 60
+        var weekend = ActivitySetting(name: "Project"); weekend.days = [1, 7]
+        s.activities = [work, weekend]
+        let names = ["Work", "Project"]
+        #expect(!Limits(settings: s, today: [], now: monday, calendar: cal).nothingCanStart(names))
+        let hour = SessionRecord(start: monday.addingTimeInterval(-3600), end: monday, mode: "Work", planned: "Work")
+        #expect(Limits(settings: s, today: [hour], now: monday, calendar: cal).nothingCanStart(names))
+        #expect(!Limits(settings: s, today: [hour], now: monday, calendar: cal).nothingCanStart([]))
+        // Saturday, nothing planned, a catch-up owed by weekday Work: still nothing to start.
+        s.activities = [{ var w = work; w.days = [2, 3, 4, 5, 6]; w.catchUpMinutes = 30; return w }()]
+        s.features.enabled.insert(.catchUp)
+        let debt = CatchUpDebt(activity: "Work", day: "2026-03-06", windowEnd: day(6, 18), catchUpMinutes: 30)
+        #expect(Limits(settings: s, today: [], now: saturday, calendar: cal, debts: [debt]).canStart("Work"))   // the old check said "can start"
+        #expect(Limits(settings: s, today: [], now: saturday, calendar: cal, debts: [debt]).nothingCanStart(["Work"]))
+    }
+
     @Test func daysLabels() {
         #expect(daysLabel([]) == "Every day")
         #expect(daysLabel([1, 2, 3, 4, 5, 6, 7]) == "Every day")

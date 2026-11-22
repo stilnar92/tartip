@@ -96,7 +96,7 @@ cd tartip
 
 Look for ◎ in the menu bar. macOS hides icons that do not fit, so ⌘-drag ◎ next to the clock if necessary.
 
-On a new installation, Tartip starts manually and can be quit normally. **Launch at login** and **Relaunch after quitting** are separate optional settings. Existing installations keep their previous startup behavior. Changing startup settings briefly restarts the app and is deferred by refusal while block locks are active.
+On a new installation, Tartip starts manually and can be quit normally. **Launch at login** and **Relaunch after quitting** are separate optional settings. With Relaunch on, a small guard agent also starts Tartip again 15 minutes after it was stopped some other way, for example with `launchctl bootout`. Existing installations keep their previous startup behavior. Changing startup settings briefly restarts the app and is deferred by refusal while block locks are active.
 
 No permissions are needed for the basic timer. Enable **Notifications** for completion alerts. Workspace window resizing uses Accessibility; Chrome operations use Automation. Relevant permission controls appear only for enabled features.
 
@@ -105,6 +105,7 @@ No permissions are needed for the basic timer. Enable **Notifications** for comp
 **Uninstall:** `./install.sh --uninstall`. This removes the app and its auto-start. Without the source, run this in Terminal:
 
 ```sh
+launchctl bootout gui/$UID/com.user.tartip.guard; rm -f ~/Library/LaunchAgents/com.user.tartip.guard.plist
 launchctl bootout gui/$UID/com.user.tartip; rm ~/Library/LaunchAgents/com.user.tartip.plist; rm -rf /Applications/Tartip.app
 ```
 

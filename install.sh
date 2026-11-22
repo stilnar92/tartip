@@ -8,10 +8,14 @@ cd "${0:A:h}"
 LABEL="com.user.tartip"
 APP="/Applications/Tartip.app"
 AGENT="$HOME/Library/LaunchAgents/$LABEL.plist"
+GUARD="$HOME/Library/LaunchAgents/$LABEL.guard.plist"
 
 fail() { echo "Error: $1" >&2; exit 1; }
 
 if [ "$1" = "--uninstall" ]; then
+  # The guard first: it would open the app again 15 minutes after it stops.
+  launchctl bootout "gui/$UID/$LABEL.guard" 2>/dev/null || true
+  rm -f "$GUARD" "$HOME/Library/Caches/$LABEL/guard-down-since"
   launchctl bootout "gui/$UID/$LABEL" 2>/dev/null || true
   pkill -x Tartip 2>/dev/null || true
   rm -f "$AGENT"

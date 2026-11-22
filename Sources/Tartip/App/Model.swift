@@ -142,6 +142,15 @@ final class Model: ObservableObject {
         Limits(settings: Settings.current, today: recordsSince(roundStart), now: now, debts: state.catchUpDebts)
     }
 
+    var nothingCanStart: Bool { limits.nothingCanStart(activities) }
+
+    // The same at an earlier moment of today's round, from what had run by then.
+    private func nothingCouldStart(at t: Date) -> Bool {
+        guard t >= roundStart, t <= now else { return false }
+        return Limits(settings: Settings.current, today: recordsSince(roundStart, upTo: t), now: t, debts: state.catchUpDebts)
+            .nothingCanStart(activities)
+    }
+
     // Today's round: 1 until the limits first start over.
     var roundNumber: Int { todaysRound?.number ?? 1 }
     // Where the limits count from: the start of the day, or of today's round.
@@ -523,7 +532,11 @@ final class Model: ObservableObject {
         }
         keepAwake.off()
         let away = max(0, Int(now.timeIntervalSince(since)))
-        if Settings.current.asksAboutAway(since: since, back: now) {
+        // Nothing could start when you left and nothing can now (a day off, every limit used,
+        // a catch-up owed elsewhere): there was nothing to skip, so nothing to ask about.
+        // Gaps that open while you're away are counted in asksAboutAway.
+        let nothingToSkip = paused == nil && nothingCouldStart(at: since) && nothingCanStart
+        if !nothingToSkip && Settings.current.asksAboutAway(since: since, back: now) {
             state.phase = .awayReview(since: since, back: now, paused: paused)
             log("back after \(minutesLabel(away / 60)): asking what you did")
             return

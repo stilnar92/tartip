@@ -87,6 +87,36 @@ import Testing
         #expect(AutoStart.agent("/tmp/legacy")["KeepAlive"] as? Bool == true)
     }
 
+    @Test @MainActor func guardAgentChecksEveryMinuteWithArgumentsKeptOutOfTheScript() throws {
+        let g = AutoStart.guardAgent(app: "/Applications/Tartip.app", stateFile: "/tmp/down since")
+        #expect(g["Label"] as? String == "com.user.tartip.guard")
+        #expect(g["StartInterval"] as? Int == 60)
+        #expect(g["RunAtLoad"] as? Bool == true)
+        let args = try #require(g["ProgramArguments"] as? [String])
+        #expect(args.suffix(4) == ["/Applications/Tartip.app", "/tmp/down since", "900", "Tartip"])
+        #expect(!args[2].contains("/Applications/Tartip.app"))
+    }
+
+    // Runs the real script against a process name nothing has: down, then down long enough.
+    @Test @MainActor func guardScriptOpensTheAppOnlyAfterTheDelay() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let state = dir.appendingPathComponent("state/down-since")
+        // "Opening" a plain file that isn't there fails harmlessly instead of launching anything.
+        let app = dir.appendingPathComponent("missing.app").path
+        func tick(delay: Int) throws {
+            let args = try #require(AutoStart.guardAgent(app: app, stateFile: state.path, delay: delay,
+                process: "tartip-test-\(UUID().uuidString.prefix(8))")["ProgramArguments"] as? [String])
+            #expect(run(args[0], Array(args.dropFirst())) >= 0)
+        }
+        try tick(delay: 900)
+        let since = try #require(Int(String(contentsOf: state, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)))
+        try tick(delay: 900)   // still within the delay: unchanged
+        #expect(Int(try String(contentsOf: state, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)) == since)
+        try tick(delay: 0)     // down long enough: reopened, the clock resets
+        #expect(!FileManager.default.fileExists(atPath: state.path))
+    }
+
     @Test func unreviewedTimeDoesNotClaimConfirmedWork() {
         let r = SessionRecord(start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 120), mode: "Focus", planned: "Focus")
         #expect(!r.asPlanned)

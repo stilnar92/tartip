@@ -26,6 +26,8 @@ Startup behavior is optional. `AppSettings.fresh` disables all feature modules. 
 
 `install.sh` and `scripts/build.sh` preserve an existing launch agent. With none present, they open the installed application normally; the app installs an agent only when login launch is enabled. KeepAlive is a separate choice. Startup changes submit a separate one-shot launchd helper because unloading a running launch agent can terminate the app and its child processes.
 
+With Relaunch on, the app also installs a guard agent, `com.user.tartip.guard` (`AutoStart.ensureGuard()`). KeepAlive doesn't survive `launchctl bootout` or a deleted plist, so the guard checks every minute whether a `Tartip` process is running. It writes when it first saw none to `~/Library/Caches/com.user.tartip/guard-down-since`, and after 15 minutes down in a row it runs `open` on the app, whose `ensure()` puts the main agent back. While the app runs, it restores a missing guard every minute. Turning Relaunch off removes the guard, and `install.sh --uninstall` removes it before the main agent.
+
 ### Feature policy and persistence
 
 - `Domain/Features.swift` defines typed capabilities, dependencies, fresh settings, and the persisted session policy.
@@ -58,6 +60,8 @@ launchctl bootout gui/$UID/com.user.tartip
 swift run Tartip
 # when you're done: scripts/build.sh (rebuilds and brings the agent back)
 ```
+
+A `swift run` copy is also a process named `Tartip`, so the guard counts it as running. If you stop Tartip completely for more than 15 minutes with Relaunch on, the guard opens the installed app again. Stop it too with `launchctl bootout gui/$UID/com.user.tartip.guard`; the next launch of the installed app brings it back.
 
 A dev build uses the same `~/modes` as the installed app, so back up the folder before you try anything risky. Events are written to `~/modes/logs/modes.log`.
 
