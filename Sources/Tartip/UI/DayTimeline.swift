@@ -5,10 +5,20 @@ import SwiftUI
 // their own real times, not Available's. Compare shows both side by side.
 struct DayTimeline: View {
     let day: Model.DayView
+    var editable = false       // Edit hours: drag each activity's hours, for this weekday only
 
     private enum Mode: String, CaseIterable, Identifiable { case available, actual, compare; var id: Self { self } }
     @State private var mode: Mode = .available
-    private var shown: Mode { day.planOnly ? .available : mode }   // another day has only its plan
+    // Edit hours works on a draft of the activities: Undo/Redo step through it, Apply saves it.
+    @State private var draft: [ActivitySetting]?
+    @State private var undoStack: [[ActivitySetting]] = []
+    @State private var redoStack: [[ActivitySetting]] = []
+    @State private var drag: Drag?
+    @State private var picked: String?     // the block whose time fields are open
+    private var editing: Bool { draft != nil }
+    @ObservedObject private var settings = Settings.shared
+    // Another day has only its plan; editing works on the plan.
+    private var shown: Mode { day.planOnly || editing ? .available : mode }
 
     private let hourHeight: CGFloat = 56   // a 15-minute session still gets its label
     private let labelWidth: CGFloat = 40
@@ -42,7 +52,20 @@ struct DayTimeline: View {
                           : (day.anyTime.isEmpty ? "what you can pick, by period" : "plus the any-time ones"))
                 }
                 Spacer()
-                if !day.planOnly {
+                if editable && !editing {
+                    Button {
+                        draft = settings.value.activities
+                        undoStack = []; redoStack = []; drag = nil
+                    } label: {
+                        Label("Edit hours", systemImage: "hand.draw")
+                            .font(.system(size: 11, weight: .medium))
+                            .padding(.horizontal, 9).padding(.vertical, 4)
+                            .pill(selected: false)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Drag each activity's hours on \(weekdayShort[day.weekday] ?? "this day") only")
+                }
+                if !day.planOnly && !editing {
                     Picker("", selection: $mode) {
                         Text("Available").tag(Mode.available)
                         Text("Actual").tag(Mode.actual)
@@ -53,9 +76,12 @@ struct DayTimeline: View {
                     .frame(width: 240)
                 }
             }
+            if editing { editBar }
             HStack(alignment: .top, spacing: 8) {
-                hourLabels(shown == .actual ? actualMarks : availableMarks)
-                if shown == .available {
+                hourLabels(editing ? blockMarks : shown == .actual ? actualMarks : availableMarks)
+                if editing {
+                    editColumn
+                } else if shown == .available {
                     availableColumn
                 } else if shown == .actual {
                     actualColumn
@@ -179,6 +205,210 @@ struct DayTimeline: View {
             .help("\(clockLabel(p.start % 1440))–\(clockLabel(p.end % 1440)): " + what)
     }
 
+    // MARK: edit hours
+
+    // One window of one activity on this weekday, in the day's minutes (which may pass 1440).
+    // Overlapping blocks share the width side by side: `lane` of `lanes`.
+    private struct Block: Identifiable {
+        var id: String { "\(activity)-\(index)" }
+        let activity: UUID
+        let name: String
+        let index: Int
+        let start: Int
+        let end: Int
+        let ownDay: Bool        // the weekday has its own hours, not the usual ones
+        var lane = 0
+        var lanes = 1
+    }
+
+    private enum Grip { case move, top, bottom }
+    private struct Drag { let id: String; let grip: Grip; var delta: Int }
+
+    private var blocks: [Block] {
+        let d = day.weekday
+        var out: [Block] = []
+        for a in draft ?? settings.value.activities where !a.name.isEmpty && a.isPlanned(onWeekday: d) {
+            let list = a.windows(onWeekday: d)
+            for (i, w) in list.enumerated() where w.from != w.to {
+                var start = w.from
+                if start < day.from && start + 1440 < day.to { start += 1440 }   // the waking day runs past midnight
+                out.append(Block(activity: a.id, name: a.name, index: i, start: start, end: start + (w.to - w.from + 1440) % 1440, ownDay: a.dayWindows[d] != nil))
+            }
+        }
+        out.sort { ($0.start, $0.end) < ($1.start, $1.end) }
+        // Lanes per cluster of overlapping blocks, so a lone block keeps the full width.
+        var k = 0
+        while k < out.count {
+            var clusterEnd = out[k].end, laneEnds: [Int] = [], j = k
+            while j < out.count && (j == k || out[j].start < clusterEnd) {
+                if let l = laneEnds.firstIndex(where: { $0 <= out[j].start }) { out[j].lane = l; laneEnds[l] = out[j].end }
+                else { out[j].lane = laneEnds.count; laneEnds.append(out[j].end) }
+                clusterEnd = max(clusterEnd, out[j].end)
+                j += 1
+            }
+            for m in k..<j { out[m].lanes = laneEnds.count }
+            k = j
+        }
+        return out
+    }
+
+    // Where a block is drawn: its own place, or where the drag would put it (15-minute steps).
+    private func span(_ b: Block) -> (start: Int, end: Int) {
+        guard let g = drag, g.id == b.id else { return (b.start, b.end) }
+        switch g.grip {
+        case .move:
+            let delta = min(max(g.delta, day.from - b.start), day.to - b.end)
+            return (b.start + delta, b.end + delta)
+        case .top: return (min(max(b.start + g.delta, day.from), b.end - 15), b.end)
+        case .bottom: return (b.start, max(min(b.end + g.delta, day.to), b.start + 15))
+        }
+    }
+
+    // The draft's marks: where its blocks start and end.
+    private var blockMarks: [Int] { Array(Set(blocks.flatMap { [$0.start, $0.end] } + [day.from, day.to])).sorted() }
+
+    // Undo, Redo, Cancel, Apply. Nothing is saved before Apply; Cancel drops the draft.
+    private var editBar: some View {
+        let changes = undoStack.count
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                editButton("Undo", "arrow.uturn.backward", enabled: !undoStack.isEmpty) {
+                    redoStack.append(draft ?? []); draft = undoStack.popLast()
+                }
+                .keyboardShortcut("z", modifiers: .command)
+                editButton("Redo", "arrow.uturn.forward", enabled: !redoStack.isEmpty) {
+                    undoStack.append(draft ?? []); draft = redoStack.popLast()
+                }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+                Text(changes == 0 ? "No changes yet" : changes == 1 ? "1 change, not saved" : "\(changes) changes, not saved")
+                    .font(.system(size: 11)).foregroundStyle(Theme.text2)
+                Spacer()
+                editButton("Cancel", nil, enabled: true) { draft = nil }
+                    .keyboardShortcut(.cancelAction)
+                Button(action: apply) {
+                    Text("Apply").font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 4)
+                        .background(Capsule().fill(changes == 0 ? Theme.text2.opacity(0.4) : Theme.accent))
+                }
+                .buttonStyle(.plain).disabled(changes == 0)
+            }
+            Text("Drag a block to move it, its top or bottom edge to resize, right-click to delete it. Each change is for that weekday only; you can switch days before applying.")
+                .font(.system(size: 11)).foregroundStyle(Theme.text2).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func editButton(_ title: String, _ icon: String?, enabled: Bool, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Group {
+                if let icon { Label(title, systemImage: icon) } else { Text(title) }
+            }
+            .font(.system(size: 11, weight: .medium))
+            .padding(.horizontal, 9).padding(.vertical, 4)
+            .pill(selected: false)
+            .opacity(enabled ? 1 : 0.4)
+        }
+        .buttonStyle(.plain).disabled(!enabled)
+    }
+
+    // Saves the draft's days and hours into the activities as they are now, so anything else
+    // changed meanwhile stays. Refused by the settings lock: the draft stays to keep or cancel.
+    private func apply() {
+        guard let draft else { return }
+        var s = settings.value
+        for d in draft {
+            guard let i = s.activities.firstIndex(where: { $0.id == d.id }) else { continue }
+            s.activities[i].days = d.days
+            s.activities[i].dayMinutes = d.dayMinutes
+            s.activities[i].dayWindows = d.dayWindows
+        }
+        settings.value = s
+        if settings.value == s { self.draft = nil }
+    }
+
+    private var editColumn: some View {
+        column(blockMarks) { w in
+            ForEach(blocks) { b in
+                let laneWidth = w / CGFloat(b.lanes)
+                editBlock(b).frame(width: laneWidth - 2, height: max(8, y(span(b).end) - y(span(b).start) - 2))
+                    .offset(x: CGFloat(b.lane) * laneWidth, y: y(span(b).start) + 1)
+            }
+        }
+    }
+
+    private func dragGesture(_ b: Block, _ grip: Grip) -> some Gesture {
+        DragGesture(minimumDistance: 2)
+            .onChanged { v in
+                let minutes = Int((v.translation.height / hourHeight * 60 / 15).rounded()) * 15
+                drag = Drag(id: b.id, grip: grip, delta: minutes)
+            }
+            .onEnded { _ in
+                let to = span(b)
+                drag = nil
+                guard to != (b.start, b.end) else { return }
+                change(b) { $0.moveWindow(b.index, onWeekday: day.weekday, from: to.start, to: to.end) }
+            }
+    }
+
+    // Edits that activity in the draft, one Undo step; a refused change (an overlap) leaves it.
+    private func change(_ b: Block, _ edit: (inout ActivitySetting) -> Bool) {
+        guard var list = draft, let i = list.firstIndex(where: { $0.id == b.activity }), edit(&list[i]) else { return }
+        undoStack.append(draft ?? [])
+        redoStack = []
+        draft = list
+    }
+
+    private func editBlock(_ b: Block) -> some View {
+        let color = ActivityStyle.of(b.name).color
+        let (start, end) = span(b)
+        let h = y(end) - y(start)
+        let dayName = weekdayShort[day.weekday] ?? "this day"
+        let edge = { (grip: Grip) in
+            Color.clear.frame(height: 7).contentShape(Rectangle())
+                .onHover { inside in if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() } }
+                .gesture(dragGesture(b, grip))
+        }
+        return VStack(alignment: .leading, spacing: 1) {
+            Text(b.name).font(.system(size: 11, weight: .semibold)).foregroundStyle(color).lineLimit(1)
+            if h >= 30 {
+                Text("\(clockLabel(start % 1440))–\(clockLabel(end % 1440))")
+                    .font(.system(size: 10)).monospacedDigit().foregroundStyle(Theme.text2)
+            }
+        }
+        .padding(.horizontal, 7).padding(.vertical, h >= 24 ? 4 : 0)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: h >= 24 ? .topLeading : .leading)
+        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(color.opacity(drag?.id == b.id ? 0.30 : 0.16)))
+        .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(color.opacity(0.55), lineWidth: 1))
+        .clipped()
+        .contentShape(Rectangle())
+        .onHover { inside in if inside { NSCursor.openHand.push() } else { NSCursor.pop() } }
+        .gesture(dragGesture(b, .move))
+        .onTapGesture { picked = b.id }
+        .popover(isPresented: Binding(get: { picked == b.id }, set: { if !$0 { picked = nil } }), arrowEdge: .trailing) {
+            BlockTimeEditor(name: b.name, dayName: dayName, from: b.start % 1440, to: b.end % 1440,
+                save: { from, to in
+                    var ok = false
+                    change(b) { ok = $0.moveWindow(b.index, onWeekday: day.weekday, from: from, to: to); return ok }
+                    if ok { picked = nil }
+                    return ok
+                },
+                delete: {
+                    change(b) { $0.deleteWindow(b.index, onWeekday: day.weekday) }
+                    picked = nil
+                })
+        }
+        .overlay(alignment: .top) { edge(.top) }
+        .overlay(alignment: .bottom) { edge(.bottom) }
+        .contextMenu {
+            Button("Delete this block (\(dayName) only)") { change(b) { $0.deleteWindow(b.index, onWeekday: day.weekday) } }
+            if b.ownDay {
+                Button("Back to usual hours on \(dayName)") {
+                    change(b) { a in a.dayWindows[day.weekday] = nil; return true }
+                }
+            }
+        }
+        .help("\(b.name) \(clockLabel(start % 1440))–\(clockLabel(end % 1440)) on \(dayName)")
+    }
+
     // MARK: actual
 
     @ViewBuilder private func session(_ s: PlanSlot) -> some View {
@@ -276,5 +506,56 @@ struct DayStrip: View {
             }
             .font(.system(size: 10)).foregroundStyle(Theme.text2)
         }
+    }
+}
+
+// A block's hours as two time fields (type or use the arrows), saved into the draft.
+private struct BlockTimeEditor: View {
+    let name: String
+    let dayName: String
+    let save: (Int, Int) -> Bool
+    let delete: () -> Void
+    @State private var from: Date
+    @State private var to: Date
+    @State private var refused = false
+
+    init(name: String, dayName: String, from: Int, to: Int, save: @escaping (Int, Int) -> Bool, delete: @escaping () -> Void) {
+        self.name = name; self.dayName = dayName; self.save = save; self.delete = delete
+        _from = State(initialValue: Self.date(from))
+        _to = State(initialValue: Self.date(to))
+    }
+
+    private static func date(_ m: Int) -> Date {
+        Calendar.current.date(bySettingHour: m / 60, minute: m % 60, second: 0, of: Date()) ?? Date()
+    }
+    private static func minutes(_ d: Date) -> Int { minuteOfDay(d) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(name).font(.system(size: 13, weight: .semibold)).foregroundStyle(ActivityStyle.of(name).color)
+            HStack(spacing: 8) {
+                DatePicker("From", selection: $from, displayedComponents: .hourAndMinute).labelsHidden()
+                Text("–").foregroundStyle(Theme.text2)
+                DatePicker("To", selection: $to, displayedComponents: .hourAndMinute).labelsHidden()
+            }
+            .datePickerStyle(.field)
+            .environment(\.locale, Locale(identifier: "en_GB"))   // 24-hour, like the rest of the app
+            .onChange(of: from) { _ in refused = false }
+            .onChange(of: to) { _ in refused = false }
+            if refused {
+                Text("Overlaps its other hours that day, or is empty.")
+                    .font(.system(size: 11)).foregroundStyle(Theme.red)
+            }
+            Text("For \(dayName) only. Saved when you click Apply.")
+                .font(.system(size: 11)).foregroundStyle(Theme.text2)
+            HStack {
+                Button("Delete block", role: .destructive, action: delete)
+                Spacer()
+                Button("Set") { refused = !save(Self.minutes(from), Self.minutes(to)) }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(14)
+        .frame(width: 250)
     }
 }

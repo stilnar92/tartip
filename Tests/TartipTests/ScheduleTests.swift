@@ -55,6 +55,51 @@ private let monday = day(2), saturday = day(7)
         #expect(Limits(settings: s, today: [], now: saturday, calendar: cal, debts: [debt]).nothingCanStart(["Work"]))
     }
 
+    // Dragging on the Plan timeline: only that weekday changes, back to usual drops the override.
+    @Test func movingAWindowChangesOnlyThatWeekday() {
+        var a = ActivitySetting(name: "Go", windows: [TimeWindow(from: 630, to: 720), TimeWindow(from: 870, to: 960)])
+        let r1 = a.moveWindow(0, onWeekday: 2, from: 660, to: 750)
+        #expect(r1)
+        #expect(a.windows(onWeekday: 2).map(\.from) == [660, 870])
+        #expect(a.windows(onWeekday: 3).map(\.from) == [630, 870])          // Tuesday untouched
+        let r2 = a.moveWindow(0, onWeekday: 2, from: 840, to: 900)
+        #expect(!r2)          // would overlap 14:30–16:00
+        let r3 = a.moveWindow(0, onWeekday: 2, from: 630, to: 720)
+        #expect(r3)
+        #expect(a.dayWindows[2] == nil)                                      // same as usual again
+        let r4 = a.moveWindow(1, onWeekday: 2, from: 1380, to: 1440)
+        #expect(r4)         // to midnight
+        #expect(a.windows(onWeekday: 2)[1].to == 0)
+    }
+
+    @Test func removingHoursKeepsOneAndTurningOffKeepsADay() {
+        var a = ActivitySetting(name: "Go", windows: [TimeWindow(from: 630, to: 720), TimeWindow(from: 870, to: 960)])
+        let r5 = a.removeWindow(0, onWeekday: 2)
+        #expect(r5)
+        #expect(a.windows(onWeekday: 2).count == 1 && a.windows.count == 2)
+        let r6 = a.removeWindow(0, onWeekday: 2)
+        #expect(!r6)                            // none left would mean any time
+        let r7 = a.turnOff(onWeekday: 2)
+        #expect(r7)
+        #expect(!a.isPlanned(onWeekday: 2) && a.isPlanned(onWeekday: 3) && a.dayWindows[2] == nil)
+        a.days = [3]
+        let r8 = a.turnOff(onWeekday: 3)
+        #expect(!r8)
+    }
+
+    @Test func deletingABlockTouchesOnlyThatWeekday() {
+        var a = ActivitySetting(name: "Go", windows: [TimeWindow(from: 630, to: 720), TimeWindow(from: 870, to: 960)])
+        let first = a.deleteWindow(1, onWeekday: 2)
+        #expect(first && a.windows(onWeekday: 2).map(\.from) == [630] && a.windows(onWeekday: 3).count == 2)
+        let last = a.deleteWindow(0, onWeekday: 2)                         // the day's last block: off that day
+        #expect(last && !a.isPlanned(onWeekday: 2) && a.isPlanned(onWeekday: 3) && a.windows.count == 2)
+    }
+
+    @Test func overlapAcrossMidnight() {
+        #expect(windowsOverlap(TimeWindow(from: 1380, to: 60), TimeWindow(from: 30, to: 120)))
+        #expect(!windowsOverlap(TimeWindow(from: 600, to: 660), TimeWindow(from: 660, to: 720)))
+    }
+
     @Test func daysLabels() {
         #expect(daysLabel([]) == "Every day")
         #expect(daysLabel([1, 2, 3, 4, 5, 6, 7]) == "Every day")

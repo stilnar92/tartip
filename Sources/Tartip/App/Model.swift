@@ -168,6 +168,7 @@ final class Model: ObservableObject {
         var overcommitted: [String] // planned today, asking for more daily minutes than their hours can actually fit
         var planOnly = false       // another day's plan: nothing ran, no Actual
         var lockedGaps: [Gap] = [] // gaps spent off the computer
+        var weekday = 1            // Calendar numbering: the weekday whose hours these are
     }
 
     // A weekday's plan alone, to look at days other than today.
@@ -181,7 +182,7 @@ final class Model: ObservableObject {
         })
         let overcommitted = Set(overcommittedActivities(s, weekday: weekday) + overcommittedPeriods(s, weekday: weekday)).sorted()
         return DayView(from: w.from, to: w.to, anyTime: anyTime, periods: periods, actual: [], now: nil,
-                       overcommitted: overcommitted, planOnly: true, lockedGaps: s.lockedGaps)
+                       overcommitted: overcommitted, planOnly: true, lockedGaps: s.lockedGaps, weekday: weekday)
     }
 
     var today: DayView {

@@ -589,7 +589,7 @@ struct SettingsView: View {
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }
             if let model {
-                DayTimeline(day: dayOffset == 0 ? model.today : Model.plan(s, weekday: weekday))
+                DayTimeline(day: dayOffset == 0 ? model.today : Model.plan(s, weekday: weekday), editable: s.has(.scheduling))
                 Text("Not a schedule: within a period you pick any of these. Red: nothing can start then.")
                     .font(.system(size: 11)).foregroundStyle(Theme.text2).fixedSize(horizontal: false, vertical: true)
             }

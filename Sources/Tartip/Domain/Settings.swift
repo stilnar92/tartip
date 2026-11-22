@@ -77,6 +77,58 @@ struct ActivitySetting: Codable, Hashable, Identifiable {
 
     func isPlanned(onWeekday d: Int) -> Bool { days.isEmpty || days.contains(d) }
 
+    // MARK: editing one weekday's hours (the Plan timeline)
+
+    // Sets that weekday's own hours. Hours equal to the usual ones drop the override.
+    private mutating func setHours(_ list: [TimeWindow], onWeekday d: Int) {
+        let same = list.map { [$0.from, $0.to] } == windows.map { [$0.from, $0.to] }
+        dayWindows[d] = same ? nil : list
+    }
+
+    // Window `i` of weekday `d`'s hours moved or resized to `from`..`to` (minutes, `to` may be
+    // <= `from` across midnight); only that weekday changes. False, nothing changed: no such
+    // window, empty, or it would overlap another of its windows that day.
+    @discardableResult
+    mutating func moveWindow(_ i: Int, onWeekday d: Int, from: Int, to: Int) -> Bool {
+        var list = windows(onWeekday: d)
+        let f = (from % 1440 + 1440) % 1440, t = (to % 1440 + 1440) % 1440
+        guard list.indices.contains(i), f != t else { return false }
+        let moved = TimeWindow(id: list[i].id, from: f, to: t)
+        guard !list.enumerated().contains(where: { $0.offset != i && windowsOverlap($0.element, moved) }) else { return false }
+        list[i] = moved
+        setHours(list, onWeekday: d)
+        return true
+    }
+
+    // Removes window `i` from weekday `d`, which keeps at least one: no hours would mean any time.
+    @discardableResult
+    mutating func removeWindow(_ i: Int, onWeekday d: Int) -> Bool {
+        var list = windows(onWeekday: d)
+        guard list.count > 1, list.indices.contains(i) else { return false }
+        list.remove(at: i)
+        setHours(list, onWeekday: d)
+        return true
+    }
+
+    // Deletes one block of the Plan timeline: window `i` on weekday `d` only. The day's last
+    // window takes the activity off that weekday (no hours would mean any time).
+    @discardableResult
+    mutating func deleteWindow(_ i: Int, onWeekday d: Int) -> Bool {
+        windows(onWeekday: d).count > 1 ? removeWindow(i, onWeekday: d) : turnOff(onWeekday: d)
+    }
+
+    // Not planned on weekday `d` any more; it stays on at least one day.
+    @discardableResult
+    mutating func turnOff(onWeekday d: Int) -> Bool {
+        let on = (1...7).filter(isPlanned(onWeekday:))
+        guard on.contains(d), on.count > 1 else { return false }
+        let next = on.filter { $0 != d }
+        days = next
+        dayMinutes = dayMinutes.filter { next.contains($0.key) }
+        dayWindows = dayWindows.filter { next.contains($0.key) }
+        return true
+    }
+
     // Planned for the day `d` falls on: any day when no days are set.
     func isPlanned(on d: Date, calendar: Calendar = .current) -> Bool {
         isPlanned(onWeekday: calendar.component(.weekday, from: d))
@@ -295,6 +347,13 @@ extension AppSettings {
         if today > d { return today }
         return calendar.date(byAdding: .day, value: 1, to: today) ?? today.addingTimeInterval(86_400)
     }
+}
+
+// Whether two windows share any minute, either one possibly crossing midnight. Touching
+// edges don't count.
+func windowsOverlap(_ a: TimeWindow, _ b: TimeWindow) -> Bool {
+    let la = (a.to - a.from + 1440) % 1440, lb = (b.to - b.from + 1440) % 1440
+    return [-1440, 0, 1440].contains { shift in a.from < b.from + shift + lb && b.from + shift < a.from + la }
 }
 
 func minuteOfDay(_ d: Date, calendar: Calendar = .current) -> Int {
