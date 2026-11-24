@@ -47,12 +47,13 @@ private let monday = day(2), saturday = day(7)
         let hour = SessionRecord(start: monday.addingTimeInterval(-3600), end: monday, mode: "Work", planned: "Work")
         #expect(Limits(settings: s, today: [hour], now: monday, calendar: cal).nothingCanStart(names))
         #expect(!Limits(settings: s, today: [hour], now: monday, calendar: cal).nothingCanStart([]))
-        // Saturday, nothing planned, a catch-up owed by weekday Work: still nothing to start.
+        // Saturday, nothing planned, a catch-up owed by weekday Work: a day off stays quiet.
         s.activities = [{ var w = work; w.days = [2, 3, 4, 5, 6]; w.catchUpMinutes = 30; return w }()]
         s.features.enabled.insert(.catchUp)
         let debt = CatchUpDebt(activity: "Work", day: "2026-03-06", windowEnd: day(6, 18), catchUpMinutes: 30)
-        #expect(Limits(settings: s, today: [], now: saturday, calendar: cal, debts: [debt]).canStart("Work"))   // the old check said "can start"
+        #expect(Limits(settings: s, today: [], now: saturday, calendar: cal, debts: [debt]).canStart("Work"))
         #expect(Limits(settings: s, today: [], now: saturday, calendar: cal, debts: [debt]).nothingCanStart(["Work"]))
+        #expect(Limits(settings: s, today: [], now: saturday, calendar: cal, debts: [debt]).offered(["Work"]).isEmpty)
     }
 
     // Dragging on the Plan timeline: only that weekday changes, back to usual drops the override.

@@ -15,7 +15,11 @@ struct ActivityPickerView: View {
             if let at = model.autoStartAt, let activity = model.autoStartActivity {
                 HStack(spacing: 8) {
                     Image(systemName: "timer").foregroundStyle(Theme.accent)
-                    Text("\(activity) starts by itself in \(countdown(to: at, from: clock.now)) for \(formatDuration(model.limits.sessionSeconds(activity, requested: max(Settings.current.minMinutes, Settings.current.autoStartMinutes) * 60)))")
+                    // A catch-up runs its own fixed length, the same as autoStart() uses.
+                    let debt = model.limits.owedDebt.flatMap { $0.activity == activity ? $0 : nil }
+                    let seconds = debt.map { $0.catchUpMinutes * 60 }
+                        ?? model.limits.sessionSeconds(activity, requested: max(Settings.current.minMinutes, Settings.current.autoStartMinutes) * 60)
+                    Text("\(activity) starts by itself in \(countdown(to: at, from: clock.now)) for \(formatDuration(seconds))")
                         .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text)
                         .monospacedDigit()
                 }

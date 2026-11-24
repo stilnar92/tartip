@@ -103,8 +103,9 @@ final class Model: ObservableObject {
     var stepAwayUntil: Date? { state.stepAwayUntil }
     var restTaken: Bool { state.restTaken }
     var activities: [String] { Settings.current.activities.map(\.name).filter { !$0.isEmpty } }
-    // The ones planned for today's weekday: what the Today list and "What's next?" offer.
-    var todayActivities: [String] { activities.filter(limits.isToday) }
+    // The ones planned for today's weekday, plus one owing a catch-up: what the Today list
+    // and "What's next?" offer.
+    var todayActivities: [String] { limits.offered(activities) }
 
     // Length for the next start, kept across restarts.
     var minutes: Int {
@@ -212,6 +213,11 @@ final class Model: ObservableObject {
             return PlanSlot(start: start, end: start + max(1, (e.seconds ?? 0) / 60), activity: nil, free: true)
         }
         var day = Self.plan(s, weekday: Calendar.current.component(.weekday, from: now))
+        // A catch-up owed can start at any hour, so no period ahead is one with nothing to start.
+        if let owed = limits.owedToday, !day.anyTime.contains(owed) {
+            day.anyTime.append(owed)
+            day.periods = day.periods.map { var p = $0; p.available.removeAll { $0 == owed }; return p }
+        }
         day.actual = pastDay(done + aways + frees, from: w.from, until: min(nowM, w.to))
         day.now = nowM >= w.from && nowM < w.to ? nowM : nil
         day.planOnly = false
@@ -595,11 +601,15 @@ final class Model: ObservableObject {
         log("back after \(minutesLabel(away / 60)): \(s.planned ?? s.block) until \(Fmt.clock.string(from: s.end))")
     }
 
-    // In a gap set to Step away: when it ends.
+    // In a gap set to Step away: when it ends. A catch-up owed can start at any hour, so no
+    // gap holds while one is.
     private func lockedGapEnd() -> Date? {
-        guard let g = currentGap(Settings.current, at: now), Settings.current.lockedGaps.contains(g.gap) else { return nil }
+        guard !owesCatchUp, let g = currentGap(Settings.current, at: now), Settings.current.lockedGaps.contains(g.gap) else { return nil }
         return g.end
     }
+
+    // A catch-up owed and payable today: it can start whatever the hours say (not on a day off).
+    private var owesCatchUp: Bool { limits.owedToday != nil }
 
     // MARK: forced breaks (too long at the computer: step away, no other choice until the cooldown ends)
 
@@ -789,8 +799,8 @@ final class Model: ObservableObject {
                 log("gap  step away until \(Fmt.clock.string(from: until))")
                 return
             }
-            // A free gap: nothing can start, so nothing is asked.
-            if currentGap(Settings.current, at: now) != nil { return }
+            // A free gap: nothing can start, so nothing is asked (unless a catch-up is owed).
+            if !owesCatchUp && currentGap(Settings.current, at: now) != nil { return }
             guard Settings.current.has(.guidance) else { return }
             startRoundIfStuck()
             // Day done: every limit reached and no free time to offer, so there's nothing to choose.

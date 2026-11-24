@@ -59,6 +59,22 @@ struct Limits {
     // Planned for today's weekday (activities without days are planned every day).
     func isToday(_ activity: String) -> Bool { !settings.has(.scheduling) || (setting(activity)?.isPlanned(on: now, calendar: calendar) ?? true) }
 
+    // What the Today list and "What's next?" offer: today's planned activities, plus the one
+    // owing a catch-up even if it isn't planned today. Otherwise a debt from yesterday hides
+    // the only activity that can start while every other row says "do X first".
+    func offered(_ activities: [String]) -> [String] {
+        let owed = owedToday
+        return activities.filter { isToday($0) || $0 == owed }
+    }
+
+    // The activity owing a catch-up, if it can be paid today: it starts at any hour, but a day
+    // off (nothing planned) stays quiet, so a debt never brings work into it.
+    var owedToday: String? {
+        guard let a = owedDebt?.activity, settings.activity(named: a) != nil,
+              settings.activities.contains(where: { !$0.name.isEmpty && isToday($0.name) }) else { return nil }
+        return a
+    }
+
     // A debt owed by an activity still in the list forces it as the only choice, except for
     // activities allowed during a catch-up: those follow their usual rules. One deleted from
     // Settings since is orphaned (moot, not settled): fall through to the normal rule.
@@ -71,11 +87,11 @@ struct Limits {
         return isToday(activity) && isOpen(activity) && hasTimeLeft(activity)
     }
 
-    // Not one of today's `activities` can start (a gap, a day off, a catch-up owed elsewhere,
-    // every limit reached). Only today's count: one owing a catch-up on a day it isn't planned
-    // isn't in the list to start. With no activities at all there's nothing to say: false.
+    // Not one of the offered `activities` can start (a gap, a day off, every limit reached).
+    // One owing a catch-up counts even on a day it isn't planned: it can always start.
+    // With no activities at all there's nothing to say: false.
     func nothingCanStart(_ activities: [String]) -> Bool {
-        !activities.isEmpty && !activities.contains { isToday($0) && canStart($0) }
+        !activities.isEmpty && !offered(activities).contains(where: canStart)
     }
 
     // Held back by a catch-up another activity owes (allowed-during-catch-up ones never are).

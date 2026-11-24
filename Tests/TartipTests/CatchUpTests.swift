@@ -202,6 +202,40 @@ private func todays(_ missed: [(activity: String, day: String, windowEnd: Date, 
         #expect(loosenings(from: AppSettings(activities: [before]), to: AppSettings(activities: [work])) == ["allowing Work during a catch-up"])
     }
 
+    // A debt from yesterday for an activity not planned today is still offered, so the one
+    // activity that can start isn't hidden while every other row says "do it first".
+    @Test func owedActivityIsOfferedOnADayItIsNotPlanned() {
+        var e = english()
+        e.days = [1]   // Sundays only; day 2 is a Monday
+        var s = AppSettings(features: .legacy, activities: [e, ActivitySetting(name: "Work")])
+        s.features.enabled.insert(.catchUp)
+        let debt = CatchUpDebt(activity: "English", day: "2026-03-01", windowEnd: day(1, 11), catchUpMinutes: 20)
+        let limits = Limits(settings: s, today: [], now: day(2, 12), calendar: cal, debts: [debt])
+        #expect(!limits.isToday("English"))
+        #expect(limits.offered(["English", "Work"]) == ["English", "Work"])
+        #expect(limits.canStart("English") && !limits.canStart("Work"))
+        #expect(limits.autoPick(from: limits.offered(["English", "Work"])) == "English")
+        // No debt: an unplanned activity stays hidden.
+        let plain = Limits(settings: s, today: [], now: day(2, 12), calendar: cal)
+        #expect(plain.offered(["English", "Work"]) == ["Work"])
+    }
+
+    // Outside every window (a gap), something can still start while a catch-up is owed, even
+    // by an activity not planned today; without the debt, nothing can.
+    @Test func owedCatchUpMeansSomethingCanStartInAGap() {
+        var e = english()
+        e.days = [1]   // Sundays only; day 2 is a Monday
+        var work = ActivitySetting(name: "Work", fromMinute: 9 * 60, toMinute: 10 * 60)
+        work.days = []
+        var s = AppSettings(features: .legacy, activities: [e, work])
+        s.features.enabled.insert(.catchUp)
+        let debt = CatchUpDebt(activity: "English", day: "2026-03-01", windowEnd: day(1, 11), catchUpMinutes: 20)
+        let owing = Limits(settings: s, today: [], now: day(2, 12), calendar: cal, debts: [debt])
+        #expect(!owing.nothingCanStart(["English", "Work"]))
+        let plain = Limits(settings: s, today: [], now: day(2, 12), calendar: cal)
+        #expect(plain.nothingCanStart(["English", "Work"]))
+    }
+
     // A debt for an activity since deleted from Settings is orphaned (moot), not an eternal lock.
     @Test func orphanedDebtFallsThroughToNormalRules() {
         var s = AppSettings(features: .legacy, activities: [ActivitySetting(name: "Work")])
